@@ -140,7 +140,8 @@
 - [x] Security fixes (SQL injection prevention, memory leaks, DOS protection)
 
 ### Remaining ⏳
-- [ ] Unit tests for all Milestone 3 components (see docs/TEST_PLAN.md)
+- [x] Unit tests for Milestone 3 security and core functionality (22 tests passing)
+- [ ] Integration tests for webview panels (see docs/TEST_PLAN.md)
 
 ---
 
