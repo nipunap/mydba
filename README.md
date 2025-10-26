@@ -10,13 +10,14 @@ MyDBA is an AI-powered VSCode extension that brings database management, monitor
 
 ### Phase 1 MVP (Current)
 - **Multi-Database Support**: MySQL 8.0+, MariaDB 10.6+ (GA versions only)
-- **AI-Powered Query Analysis**: Intelligent optimization suggestions with VSCode AI
+- **AI-Powered Query Analysis**: Multi-provider support (VSCode LM, OpenAI, Anthropic, Ollama)
 - **Visual EXPLAIN Plans**: Interactive tree diagrams with pain point highlighting
 - **Query Profiling**: Performance Schema integration with waterfall charts
 - **Database Explorer**: Tree view with databases, tables, indexes, and processes
-- **VSCode Chat Integration**: `@mydba` participant with slash commands
+- **Enhanced Process List**: Transaction detection and grouping by user/host/query
 - **Security-First Design**: Credential isolation, production safeguards
-- **Documentation-Grounded AI**: RAG system to reduce hallucinations
+- **Documentation-Grounded AI**: RAG system with MySQL/MariaDB docs to reduce hallucinations
+- **Editor Compatibility**: Works in VSCode, Cursor, Windsurf, and VSCodium
 
 ### Coming Soon (Phase 2)
 - PostgreSQL, Redis, Valkey support
@@ -83,13 +84,60 @@ npm run install-extension
 
 ## 🔧 Configuration
 
+### AI Provider Setup
+
+MyDBA supports multiple AI providers for maximum compatibility:
+
+| Provider | Editors | Cost | Privacy | Setup Required |
+|----------|---------|------|---------|----------------|
+| **GitHub Copilot** (VSCode LM API) | VSCode only | Included with Copilot subscription | Data sent to GitHub | Automatic (no config) |
+| **OpenAI** | All editors | Pay-per-use (~$0.0015/1K tokens) | Data sent to OpenAI | API key required |
+| **Anthropic Claude** | All editors | Pay-per-use (~$0.003/1K tokens) | Data sent to Anthropic | API key required |
+| **Ollama** | All editors | Free | 100% local, no data sent | Local installation |
+
+#### Auto-Detection (Recommended)
+Set `mydba.ai.provider` to `"auto"` (default) and MyDBA will automatically use the best available provider in this order:
+1. VSCode Language Model (if available)
+2. Configured API keys (OpenAI → Anthropic)
+3. Ollama (if running locally)
+4. Prompt to configure
+
+#### VSCode with GitHub Copilot
+No configuration needed! If you have GitHub Copilot, MyDBA will automatically use it.
+
+#### OpenAI Setup
+1. Get API key from [platform.openai.com](https://platform.openai.com/api-keys)
+2. Open Command Palette (`Ctrl+Shift+P`)
+3. Run `MyDBA: Configure AI Provider`
+4. Select "OpenAI" and enter your API key
+5. Choose model (default: gpt-4o-mini)
+
+#### Anthropic Claude Setup
+1. Get API key from [console.anthropic.com](https://console.anthropic.com/)
+2. Open Command Palette (`Ctrl+Shift+P`)
+3. Run `MyDBA: Configure AI Provider`
+4. Select "Anthropic" and enter your API key
+5. Choose model (default: claude-3-5-sonnet)
+
+#### Ollama Setup (Local & Private)
+1. Install Ollama from [ollama.ai](https://ollama.ai/)
+2. Pull a model: `ollama pull llama3.1`
+3. MyDBA will auto-detect Ollama running on `localhost:11434`
+4. Configure custom endpoint in settings if needed
+
+**Note for Cursor/Windsurf Users**: VSCode Language Model API is not available in VSCode forks. Use OpenAI, Anthropic, or Ollama instead.
+
 ### AI Settings
 ```json
 {
   "mydba.ai.enabled": true,
-  "mydba.ai.anonymizeData": true,
-  "mydba.ai.chatEnabled": true,
-  "mydba.ai.confirmBeforeSend": false
+  "mydba.ai.provider": "auto",
+  "mydba.ai.anonymizeQueries": true,
+  "mydba.ai.includeSchemaContext": true,
+  "mydba.ai.openaiModel": "gpt-4o-mini",
+  "mydba.ai.anthropicModel": "claude-3-5-sonnet-20241022",
+  "mydba.ai.ollamaEndpoint": "http://localhost:11434",
+  "mydba.ai.ollamaModel": "llama3.1"
 }
 ```
 

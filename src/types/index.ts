@@ -174,6 +174,12 @@ export interface Process {
     time: number;
     state: string;
     info: string | null;
+    inTransaction?: boolean;
+    transactionId?: string;
+    transactionState?: string;
+    transactionStarted?: Date;
+    autocommit?: boolean;
+    queryFingerprint?: string;
 }
 
 export interface Variable {
@@ -308,4 +314,3 @@ export interface ExtensionConfig {
         enabled: boolean;
     };
 }
-

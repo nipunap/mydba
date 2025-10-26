@@ -1,0 +1,132 @@
+{
+  "documents": [
+    {
+      "id": "mariadb-aria-storage",
+      "title": "Aria Storage Engine",
+      "keywords": ["aria", "storage engine", "crash-safe", "myisam", "transactional"],
+      "content": "Aria is MariaDB's crash-safe non-transactional storage engine, designed to replace MyISAM. Features: crash recovery, better caching, page-based storage. Use for: temporary tables, read-heavy workloads where transactions not needed. Configure with aria_pagecache_buffer_size (similar to key_buffer_size for MyISAM).",
+      "source": "https://mariadb.com/kb/en/aria-storage-engine/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-columnstore",
+      "title": "ColumnStore for Analytics",
+      "keywords": ["columnstore", "analytics", "olap", "data warehouse", "columnar"],
+      "content": "ColumnStore is MariaDB's columnar storage engine for analytics workloads. Optimized for: aggregations, GROUP BY queries, large table scans, OLAP. Use when: read-heavy analytical queries, data warehousing, reporting. Not suitable for: OLTP, frequent updates, small queries. Install separately from MariaDB Server.",
+      "source": "https://mariadb.com/kb/en/mariadb-columnstore/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-sequences",
+      "title": "Sequences (Better than AUTO_INCREMENT)",
+      "keywords": ["sequence", "auto_increment", "nextval", "increment", "id generation"],
+      "content": "MariaDB sequences provide more control than AUTO_INCREMENT: CREATE SEQUENCE seq_name START WITH 1000 INCREMENT BY 1. Use NEXT VALUE FOR seq_name or seq_name.NEXTVAL. Benefits: predictable values, no gaps from failed transactions, can be shared across tables, restart at any value. Available in MariaDB 10.3+.",
+      "source": "https://mariadb.com/kb/en/create-sequence/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-temporal-tables",
+      "title": "System-Versioned Tables (Temporal)",
+      "keywords": ["system versioned", "temporal", "history", "audit", "time travel"],
+      "content": "System-versioned tables automatically track row history. Create with: ADD SYSTEM VERSIONING. MariaDB adds row_start, row_end columns. Query history with FOR SYSTEM_TIME AS OF timestamp. Use cases: audit trails, historical reporting, data recovery. Performance impact: extra storage, slightly slower writes.",
+      "source": "https://mariadb.com/kb/en/system-versioned-tables/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-optimizer-trace",
+      "title": "Optimizer Trace",
+      "keywords": ["optimizer trace", "explain", "query optimization", "debugging"],
+      "content": "Optimizer trace shows detailed query optimization decisions. Enable: SET optimizer_trace='enabled=on'. Run query, then: SELECT * FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE. Shows: table access costs, index selection reasoning, join order decisions. More detailed than EXPLAIN. Use for complex query tuning.",
+      "source": "https://mariadb.com/kb/en/optimizer-trace/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-thread-pool",
+      "title": "Thread Pool Plugin",
+      "keywords": ["thread pool", "performance", "connections", "scalability", "thread_handling"],
+      "content": "Thread pool improves scalability under high connection counts. Set thread_handling=pool-of-threads. Better than one-thread-per-connection for: many concurrent connections, short queries, OLTP workloads. Configure thread_pool_size (default: CPU count). MariaDB's implementation superior to MySQL's commercial version.",
+      "source": "https://mariadb.com/kb/en/thread-pool-system-variables/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-check-constraints",
+      "title": "CHECK Constraints",
+      "keywords": ["check constraint", "constraint", "validation", "data integrity"],
+      "content": "CHECK constraints enforce data validation rules: ALTER TABLE t ADD CONSTRAINT chk CHECK (price > 0). MariaDB fully enforces CHECK constraints (MySQL 8.0+ only). Use for: range validation, enum-like values, cross-column rules. Violations cause INSERT/UPDATE to fail. Better than trigger-based validation.",
+      "source": "https://mariadb.com/kb/en/constraint/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-json-improvements",
+      "title": "JSON Functions and Performance",
+      "keywords": ["json", "json functions", "performance", "index", "virtual column"],
+      "content": "MariaDB JSON: uses native LONGTEXT storage (vs MySQL's binary format). Functions: JSON_EXTRACT, JSON_SET, JSON_ARRAY, JSON_OBJECT. Index JSON fields: create virtual columns with PERSISTENT keyword, then index the virtual column. Example: ADD col_extracted VARCHAR(100) AS (JSON_EXTRACT(json_col, '$.field')) PERSISTENT, ADD INDEX(col_extracted).",
+      "source": "https://mariadb.com/kb/en/json-functions/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-explain-format",
+      "title": "Extended EXPLAIN Formats",
+      "keywords": ["explain", "analyze", "explain format", "query optimization"],
+      "content": "MariaDB EXPLAIN extensions: EXPLAIN ANALYZE (runs query, shows actual vs estimated rows), EXPLAIN FORMAT=JSON (detailed JSON output). ANALYZE shows: actual execution time, rows read, sorting details. More accurate than EXPLAIN alone. Use ANALYZE on development, not production (actually executes query).",
+      "source": "https://mariadb.com/kb/en/explain/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-persistent-statistics",
+      "title": "Engine-Independent Table Statistics",
+      "keywords": ["statistics", "analyze", "innodb", "persistent", "use_stat_tables"],
+      "content": "MariaDB stores table statistics in mysql.table_stats, mysql.column_stats, mysql.index_stats. Set use_stat_tables='preferably'. Benefits: statistics survive server restart, more accurate histograms, analyze once - use everywhere. Run ANALYZE TABLE to populate. Check with SELECT * FROM mysql.table_stats WHERE table_name='your_table'.",
+      "source": "https://mariadb.com/kb/en/engine-independent-table-statistics/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-galera-cluster",
+      "title": "Galera Cluster Overview",
+      "keywords": ["galera", "cluster", "replication", "multi-master", "wsrep"],
+      "content": "Galera provides synchronous multi-master replication. All nodes are writable, changes replicate immediately. Benefits: automatic failover, no data loss, read scaling. Limitations: only InnoDB/XtraDB supported, certification-based flow control can slow writes. Configure wsrep_* variables. Test for: serialization conflicts, flow control events.",
+      "source": "https://mariadb.com/kb/en/galera-cluster/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-instant-alter",
+      "title": "Instant ALTER TABLE Operations",
+      "keywords": ["alter table", "instant", "online ddl", "schema change"],
+      "content": "MariaDB supports instant ALTER for many operations (no table copy): ADD COLUMN at end, DROP COLUMN, CHANGE column comment, RENAME table/column. Check if instant: use ALGORITHM=INSTANT. Falls back to COPY if not possible. Much faster than traditional ALTER. View with ALTER TABLE...ALGORITHM=INSTANT or metadata-only changes.",
+      "source": "https://mariadb.com/kb/en/instant-add-column-for-innodb/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-invisible-columns",
+      "title": "Invisible Columns",
+      "keywords": ["invisible column", "hidden", "column", "select *", "schema"],
+      "content": "Invisible columns are not shown in SELECT * or DESCRIBE. Create: ALTER TABLE t ADD COLUMN hidden_col INT INVISIBLE. Use for: audit columns, soft deletes, data migration. Access explicitly: SELECT hidden_col FROM t. Benefits: backward compatibility, cleaner default output. Toggle with INVISIBLE/VISIBLE keyword.",
+      "source": "https://mariadb.com/kb/en/invisible-columns/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-encryption",
+      "title": "Data-at-Rest Encryption",
+      "keywords": ["encryption", "security", "file_key_management", "encrypted tables"],
+      "content": "MariaDB encryption: uses plugin (file_key_management, AWS KMS). Enable: encrypt_tmp_disk_tables=ON, encrypt_binlog=ON, encrypt_tmp_files=ON. Encrypt tables: CREATE TABLE...ENCRYPTED=YES or ALTER TABLE...ENCRYPTED=YES. Performance impact: ~5-10%. Transparent to applications. Keys stored outside datadir.",
+      "source": "https://mariadb.com/kb/en/data-at-rest-encryption/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-spider-engine",
+      "title": "Spider Storage Engine (Sharding)",
+      "keywords": ["spider", "sharding", "partitioning", "distributed", "federation"],
+      "content": "Spider engine enables table sharding across multiple servers. Create spider table pointing to backend servers. Use for: horizontal scaling, distributed data, large datasets. Configuration: define remote servers, create spider table with CONNECTION string. More flexible than MySQL partitioning. Supports transactions across shards.",
+      "source": "https://mariadb.com/kb/en/spider-storage-engine/",
+      "version": "10.6"
+    },
+    {
+      "id": "mariadb-compat-mysql",
+      "title": "MySQL 8.0 Compatibility",
+      "keywords": ["mysql", "compatibility", "migration", "differences"],
+      "content": "MariaDB 10.6 compatible with MySQL 5.7, but differs from MySQL 8.0. Major differences: authentication (mysql_native_password vs caching_sha2_password), JSON storage format, some SQL modes. Migration tips: test thoroughly, review deprecated features, check storage engine support. Use mysql_upgrade after migration.",
+      "source": "https://mariadb.com/kb/en/mariadb-vs-mysql-compatibility/",
+      "version": "10.6"
+    }
+  ]
+}

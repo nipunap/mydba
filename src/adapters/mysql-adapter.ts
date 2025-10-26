@@ -339,6 +339,83 @@ export class MySQLAdapter {
         this.ensureConnected();
 
         try {
+            // First, check if Performance Schema is enabled
+            const [psConfig] = await this.pool!.query<any[]>(
+                "SELECT @@global.performance_schema AS enabled"
+            );
+            const psEnabled = psConfig && psConfig[0]?.enabled === 1;
+
+            if (!psEnabled) {
+                // Fallback to basic processlist without transaction info
+                this.logger.warn('Performance Schema disabled - transaction detection unavailable');
+                return this.getBasicProcessList();
+            }
+
+            // Enhanced query with transaction detection
+            const query = `
+                SELECT
+                    p.ID as id,
+                    p.USER as user,
+                    p.HOST as host,
+                    p.DB as db,
+                    p.COMMAND as command,
+                    p.TIME as time,
+                    p.STATE as state,
+                    p.INFO as info,
+                    t.THREAD_ID as threadId,
+                    t.PROCESSLIST_STATE as threadState,
+                    tc.TRX_ID as transactionId,
+                    tc.TRX_STATE as transactionState,
+                    tc.TRX_STARTED as transactionStarted,
+                    tc.AUTOCOMMIT as autocommit
+                FROM information_schema.PROCESSLIST p
+                LEFT JOIN performance_schema.threads t
+                    ON t.PROCESSLIST_ID = p.ID
+                LEFT JOIN information_schema.INNODB_TRX tc
+                    ON tc.trx_mysql_thread_id = p.ID
+                WHERE p.ID != CONNECTION_ID()
+                ORDER BY p.TIME DESC
+            `;
+
+            this.logger.debug('Executing enhanced processlist query with transaction detection');
+            const [rows] = await this.pool!.query<any[]>(query);
+            this.logger.debug(`Retrieved ${(rows as any[]).length} processes`);
+
+            // Import QueryAnonymizer for fingerprinting
+            const { QueryAnonymizer } = await import('../utils/query-anonymizer');
+            const anonymizer = new QueryAnonymizer();
+
+            return (rows as any[]).map((row: any) => {
+                const inTransaction = !!row.transactionId;
+                const queryText = row.info || '';
+
+                return {
+                    id: row.id,
+                    user: row.user,
+                    host: row.host,
+                    db: row.db || null,
+                    command: row.command,
+                    time: row.time,
+                    state: row.state || '',
+                    info: queryText,
+                    inTransaction,
+                    transactionId: row.transactionId || undefined,
+                    transactionState: row.transactionState || undefined,
+                    transactionStarted: row.transactionStarted ? new Date(row.transactionStarted) : undefined,
+                    autocommit: row.autocommit === 'YES',
+                    queryFingerprint: queryText ? anonymizer.fingerprint(queryText) : undefined
+                };
+            });
+
+        } catch (error) {
+            this.logger.error('Failed to get enhanced process list, falling back:', error as Error);
+            // Fallback to basic processlist if enhanced query fails
+            return this.getBasicProcessList();
+        }
+    }
+
+    private async getBasicProcessList(): Promise<Process[]> {
+        try {
             this.logger.debug('Executing SHOW FULL PROCESSLIST');
             const [rows] = await this.pool!.query<any[]>('SHOW FULL PROCESSLIST');
             this.logger.debug(`Retrieved ${(rows as any[]).length} processes`);
@@ -347,16 +424,16 @@ export class MySQLAdapter {
                 id: row.Id,
                 user: row.User,
                 host: row.Host,
-                db: row.db || row.DB || '',
+                db: row.db || row.DB || null,
                 command: row.Command,
                 time: row.Time,
                 state: row.State || '',
-                info: row.Info || ''
+                info: row.Info || null
             }));
 
         } catch (error) {
-            this.logger.error('Failed to get process list:', error as Error);
-            throw new QueryError('Failed to retrieve process list', 'SHOW PROCESSLIST', error as Error);
+            this.logger.error('Failed to get basic process list:', error as Error);
+            throw error;
         }
     }
 

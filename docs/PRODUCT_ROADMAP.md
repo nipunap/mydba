@@ -148,26 +148,43 @@
 ## ⏳ **Milestone 4: AI Integration** (NOT STARTED)
 
 ### Phase 1 Scope
-- [ ] VSCode AI API integration
-  - Use `vscode.lm` API
-  - Request access to language models
-  - Handle model availability
-  - Respect user privacy settings
+- [ ] **Multi-Provider AI Integration** (12-15 hours)
+  - Provider abstraction layer with auto-detection
+  - VSCode Language Model API (`vscode.lm`) - VSCode only, requires Copilot
+  - OpenAI API integration - All editors
+  - Anthropic Claude API integration - All editors
+  - Ollama local model support - All editors, fully private
+  - Provider configuration UI and setup wizard
 - [ ] Query analysis engine
   - Parse SQL with `node-sql-parser`
   - Identify query patterns
-  - Detect anti-patterns
+  - Detect anti-patterns (SELECT *, missing WHERE, Cartesian joins, etc.)
   - Generate optimization suggestions
 - [ ] Basic optimization suggestions
   - Missing indexes
-  - SELECT *
+  - SELECT * usage
   - Implicit type conversions
-  - Missing WHERE clauses
+  - Missing WHERE clauses in DELETE/UPDATE
+  - Functions on indexed columns
 - [ ] **Documentation-Grounded AI (RAG) - Phase 1**:
-  - [ ] Curate MySQL 8.0 and MariaDB 10.6+ docs
+  - [ ] Curate MySQL 8.0 and MariaDB 10.6+ docs (150-200 snippets)
   - [ ] Keyword-based doc retrieval
   - [ ] Include docs in AI prompts
   - [ ] Require citations in responses
+- [ ] **Enhanced Process List** (6-8 hours)
+  - Transaction detection using performance_schema
+  - Grouping by user, host, and query fingerprint
+  - Transaction state indicators
+- [ ] **Integration Tests** (6-8 hours)
+  - Webview panel lifecycle tests
+  - Alert system integration tests
+  - Message passing tests
+
+**Editor Compatibility**:
+- ✅ VSCode (all providers)
+- ✅ Cursor (OpenAI, Anthropic, Ollama)
+- ✅ Windsurf (OpenAI, Anthropic, Ollama)
+- ✅ VSCodium (OpenAI, Anthropic, Ollama)
 
 ### Phase 2 Scope (Deferred)
 - [ ] Interactive explanations

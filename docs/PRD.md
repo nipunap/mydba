@@ -967,14 +967,25 @@ Would you like me to:
 - **Plotly.js or Chart.js** - Waterfall/timeline charts for query profiling
 - React (for complex webviews)
 
-**AI Integration**:
-- VSCode Language Model API
-- VSCode Copilot Chat API (for conversational interface)
+**AI Integration** (Multi-Provider):
+- **VSCode Language Model API** (`vscode.lm`) - VSCode only, requires GitHub Copilot
+- **OpenAI API** - All editors, pay-per-use
+- **Anthropic Claude API** - All editors, pay-per-use
+- **Ollama** - All editors, free, fully local and private
+- Provider abstraction layer with auto-detection and fallback
 - **RAG (Retrieval-Augmented Generation)**:
   - TF-IDF or natural (Node.js NLP library) for keyword-based doc search (Phase 1)
   - Vectra or hnswlib-node for vector embeddings storage (Phase 2)
   - transformers.js or @xenova/transformers for local embeddings (Phase 2)
   - Cheerio or jsdom for live doc parsing (Phase 3)
+
+**Editor Compatibility**:
+| Editor | VSCode LM | OpenAI | Anthropic | Ollama |
+|--------|-----------|---------|-----------|---------|
+| VSCode | ✅ | ✅ | ✅ | ✅ |
+| Cursor | ❌ | ✅ | ✅ | ✅ |
+| Windsurf | ❌ | ✅ | ✅ | ✅ |
+| VSCodium | ❌ | ✅ | ✅ | ✅ |
 
 **SQL Parsing & Anonymization**:
 - node-sql-parser (templating-based query anonymization for privacy)

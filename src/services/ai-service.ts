@@ -1,343 +1,217 @@
 import * as vscode from 'vscode';
+import { AIProvider, QueryContext, AIAnalysisResult, SchemaContext, AIProviderConfig } from '../types/ai-types';
 import { Logger } from '../utils/logger';
-import { ConnectionManager } from '../services/connection-manager';
-
-export interface QueryOptimizationSuggestion {
-    issue: string;
-    severity: 'critical' | 'warning' | 'info';
-    suggestion: string;
-    estimatedImpact: string;
-    sqlExample?: string;
-}
-
-export interface AIAnalysisResult {
-    summary: string;
-    suggestions: QueryOptimizationSuggestion[];
-    explanation: string;
-}
+import { QueryAnonymizer } from '../utils/query-anonymizer';
+import { QueryAnalyzer } from './query-analyzer';
+import { AIProviderFactory } from './ai/provider-factory';
+import { RAGService } from './rag-service';
 
 /**
- * AI Service for query optimization and database assistance
- * Uses VSCode Language Model API (Copilot/Claude/etc)
+ * AI Service
+ *
+ * Main service for AI-powered query analysis and optimization
+ * Coordinates between providers, analyzers, and RAG system
  */
 export class AIService {
-    private readonly MODEL_SELECTOR: vscode.LanguageModelChatSelector = {
-        vendor: 'copilot',
-        family: 'gpt-4'
-    };
+    private provider: AIProvider | null = null;
+    private anonymizer: QueryAnonymizer;
+    private analyzer: QueryAnalyzer;
+    private providerFactory: AIProviderFactory;
+    private ragService: RAGService;
 
     constructor(
         private logger: Logger,
-        private connectionManager: ConnectionManager
-    ) {}
+        private context: vscode.ExtensionContext
+    ) {
+        this.anonymizer = new QueryAnonymizer();
+        this.analyzer = new QueryAnalyzer();
+        this.providerFactory = new AIProviderFactory(logger, context);
+        this.ragService = new RAGService(logger);
+    }
 
     /**
-     * Analyze a query and provide optimization suggestions
+     * Initialize AI service
+     */
+    async initialize(): Promise<void> {
+        this.logger.info('Initializing AI Service...');
+
+        try {
+            const config = this.getConfig();
+
+            if (!config.enabled) {
+                this.logger.info('AI features are disabled');
+                return;
+            }
+
+            // Initialize RAG service
+            await this.ragService.initialize(this.context.extensionPath);
+            const ragStats = this.ragService.getStats();
+            this.logger.info(`RAG: ${ragStats.total} docs loaded (MySQL: ${ragStats.mysql}, MariaDB: ${ragStats.mariadb})`);
+
+            // Initialize AI provider
+            this.provider = await this.providerFactory.createProvider(config);
+
+            if (this.provider) {
+                this.logger.info(`AI Service initialized with provider: ${this.provider.name}`);
+            } else {
+                this.logger.warn('No AI provider configured');
+            }
+        } catch (error) {
+            this.logger.error('Failed to initialize AI Service:', error as Error);
+            // Don't throw - allow extension to work without AI
+        }
+    }
+
+    /**
+     * Analyze a SQL query
      */
     async analyzeQuery(
-        connectionId: string,
         query: string,
-        explainResult?: any,
-        schemaContext?: string
+        schemaContext?: SchemaContext,
+        dbType: 'mysql' | 'mariadb' = 'mysql'
     ): Promise<AIAnalysisResult> {
-        this.logger.info('Analyzing query with AI...');
+        // First, run static analysis
+        const staticAnalysis = this.analyzer.analyze(query);
 
-        const cfg = vscode.workspace.getConfiguration('mydba');
-        if (!cfg.get<boolean>('ai.enabled')) {
-            throw new Error('AI features are disabled (mydba.ai.enabled=false). Enable in settings to use AI analysis.');
+        // Check if AI provider is available
+        if (!this.provider) {
+            // Return static analysis only
+            return {
+                summary: `Query type: ${staticAnalysis.queryType}, Complexity: ${staticAnalysis.complexity}`,
+                antiPatterns: staticAnalysis.antiPatterns,
+                optimizationSuggestions: [],
+                estimatedComplexity: staticAnalysis.complexity
+            };
         }
 
-        try {
-            // Check if AI is available
-            const models = await vscode.lm.selectChatModels(this.MODEL_SELECTOR);
-            if (models.length === 0) {
-                throw new Error('No language model available. Please ensure GitHub Copilot or another language model provider is installed and enabled.');
+        // Prepare context
+        const config = this.getConfig();
+        const anonymizedQuery = config.anonymizeQueries
+            ? this.anonymizer.anonymize(query)
+            : query;
+
+        // Check for sensitive data
+        if (this.anonymizer.hasSensitiveData(query)) {
+            this.logger.warn('Query contains potentially sensitive data');
+
+            if (!config.anonymizeQueries) {
+                const proceed = await vscode.window.showWarningMessage(
+                    'Query may contain sensitive data. Anonymize before sending to AI?',
+                    'Yes, Anonymize',
+                    'Cancel'
+                );
+
+                if (proceed !== 'Yes, Anonymize') {
+                    throw new Error('Query analysis cancelled - contains sensitive data');
+                }
             }
+        }
 
-            const model = models[0];
+        // Retrieve relevant documentation with RAG
+        const ragDocs = this.ragService.retrieveRelevantDocs(query, dbType, 3);
+        this.logger.debug(`RAG retrieved ${ragDocs.length} relevant documents`);
 
-            // Anonymize the query for privacy
-            const anonymizedQuery = this.anonymizeQuery(query);
+        const context: QueryContext = {
+            query,
+            anonymizedQuery,
+            schema: config.includeSchemaContext ? schemaContext : undefined,
+            ragDocs
+        };
 
-            // Build context-rich prompt
-            const prompt = this.buildQueryAnalysisPrompt(
-                anonymizedQuery,
-                explainResult,
-                schemaContext
+        try {
+            // Get AI analysis
+            const aiResult = await this.provider.analyzeQuery(anonymizedQuery, context);
+
+            // Merge static and AI analysis
+            return {
+                summary: aiResult.summary,
+                antiPatterns: [
+                    ...staticAnalysis.antiPatterns,
+                    ...aiResult.antiPatterns
+                ],
+                optimizationSuggestions: aiResult.optimizationSuggestions,
+                estimatedComplexity: aiResult.estimatedComplexity || staticAnalysis.complexity,
+                citations: aiResult.citations
+            };
+        } catch (error) {
+            this.logger.error('AI analysis failed, returning static analysis:', error as Error);
+
+            // Show error to user
+            vscode.window.showErrorMessage(
+                `AI analysis failed: ${(error as Error).message}. Showing static analysis only.`
             );
 
-            // Send to AI
-            const messages = [
-                vscode.LanguageModelChatMessage.User(prompt)
-            ];
-
-            const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
-
-            // Collect response
-            let fullResponse = '';
-            for await (const chunk of response.text) {
-                fullResponse += chunk;
-            }
-
-            // Parse AI response
-            return this.parseAIResponse(fullResponse);
-
-        } catch (error) {
-            this.logger.error('AI analysis failed:', error as Error);
-            throw new Error(`AI analysis failed: ${(error as Error).message}`);
-        }
-    }
-
-    /**
-     * Get configuration recommendations
-     */
-    async getConfigurationAdvice(
-        connectionId: string,
-        variables: Record<string, string>
-    ): Promise<string> {
-        this.logger.info('Getting configuration advice from AI...');
-
-        const cfg = vscode.workspace.getConfiguration('mydba');
-        if (!cfg.get<boolean>('ai.enabled')) {
-            throw new Error('AI features are disabled (mydba.ai.enabled=false).');
-        }
-
-        try {
-            const models = await vscode.lm.selectChatModels(this.MODEL_SELECTOR);
-            if (models.length === 0) {
-                throw new Error('No language model available');
-            }
-
-            const model = models[0];
-
-            const prompt = this.buildConfigurationAdvicePrompt(variables);
-            const messages = [vscode.LanguageModelChatMessage.User(prompt)];
-
-            const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
-
-            let fullResponse = '';
-            for await (const chunk of response.text) {
-                fullResponse += chunk;
-            }
-
-            return fullResponse;
-
-        } catch (error) {
-            this.logger.error('Configuration advice failed:', error as Error);
-            throw error;
-        }
-    }
-
-    /**
-     * Explain a concept or error
-     */
-    async explainConcept(concept: string, context?: string): Promise<string> {
-        try {
-            const cfg = vscode.workspace.getConfiguration('mydba');
-            if (!cfg.get<boolean>('ai.enabled')) {
-                throw new Error('AI features are disabled (mydba.ai.enabled=false).');
-            }
-            const models = await vscode.lm.selectChatModels(this.MODEL_SELECTOR);
-            if (models.length === 0) {
-                throw new Error('No language model available');
-            }
-
-            const model = models[0];
-
-            let prompt = `You are a MySQL/MariaDB database expert. Explain the following concept in clear, concise terms:\n\n${concept}`;
-
-            if (context) {
-                prompt += `\n\nContext: ${context}`;
-            }
-
-            const messages = [vscode.LanguageModelChatMessage.User(prompt)];
-            const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
-
-            let fullResponse = '';
-            for await (const chunk of response.text) {
-                fullResponse += chunk;
-            }
-
-            return fullResponse;
-
-        } catch (error) {
-            this.logger.error('Concept explanation failed:', error as Error);
-            throw error;
-        }
-    }
-
-    private buildQueryAnalysisPrompt(
-        anonymizedQuery: string,
-        explainResult?: any,
-        schemaContext?: string
-    ): string {
-        let prompt = `You are a MySQL/MariaDB performance optimization expert. Analyze the following SQL query and provide optimization suggestions.
-
-**Query (anonymized for privacy):**
-\`\`\`sql
-${anonymizedQuery}
-\`\`\`
-`;
-
-        if (explainResult) {
-            prompt += `\n**EXPLAIN Result:**
-\`\`\`json
-${JSON.stringify(explainResult, null, 2).substring(0, 2000)}
-\`\`\`
-`;
-        }
-
-        if (schemaContext) {
-            prompt += `\n**Schema Context:**
-${schemaContext}
-`;
-        }
-
-        prompt += `
-**Instructions:**
-1. Identify performance issues (e.g., full table scans, missing indexes, inefficient joins)
-2. Provide specific, actionable optimization suggestions
-3. Estimate the potential performance impact (High/Medium/Low)
-4. Include SQL examples where applicable
-5. Prioritize suggestions by severity (Critical/Warning/Info)
-
-**Response Format:**
-Provide your response in the following JSON format:
-\`\`\`json
-{
-  "summary": "Brief overview of query performance",
-  "suggestions": [
-    {
-      "issue": "Description of the issue",
-      "severity": "critical|warning|info",
-      "suggestion": "How to fix it",
-      "estimatedImpact": "High|Medium|Low",
-      "sqlExample": "Optional SQL example"
-    }
-  ],
-  "explanation": "Detailed explanation of the analysis"
-}
-\`\`\`
-`;
-
-        return prompt;
-    }
-
-    private buildConfigurationAdvicePrompt(variables: Record<string, string>): string {
-        // Filter sensitive/irrelevant variables
-        const relevantVars = Object.entries(variables)
-            .filter(([key]) =>
-                key.includes('buffer') ||
-                key.includes('cache') ||
-                key.includes('pool') ||
-                key.includes('thread') ||
-                key.includes('connection') ||
-                key.includes('timeout') ||
-                key.includes('sort') ||
-                key.includes('join')
-            )
-            .slice(0, 50); // Limit to avoid token overflow
-
-        const varList = relevantVars.map(([key, value]) => `${key} = ${value}`).join('\n');
-
-        return `You are a MySQL/MariaDB database configuration expert. Review the following server variables and provide recommendations for optimization:
-
-**Current Configuration:**
-\`\`\`
-${varList}
-\`\`\`
-
-**Instructions:**
-1. Identify any misconfigurations or suboptimal settings
-2. Provide specific recommendations with reasoning
-3. Consider modern best practices for MySQL 8.0+/MariaDB 10.6+
-4. Prioritize recommendations by impact
-5. Include warnings for any dangerous settings
-
-Provide a clear, well-structured response with actionable recommendations.`;
-    }
-
-    /**
-     * Anonymize query for privacy by replacing literals with placeholders
-     * This is a simplified implementation - could be enhanced with proper SQL parsing
-     */
-    private anonymizeQuery(query: string): string {
-        // Replace string literals
-        let anonymized = query.replace(/'[^']*'/g, "'<string>'");
-
-        // Replace numeric literals (but not in function calls or table/column names)
-        anonymized = anonymized.replace(/\b\d+\b/g, '<number>');
-
-        // Replace email patterns
-        anonymized = anonymized.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '<email>');
-
-        // Replace UUID patterns
-        anonymized = anonymized.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<uuid>');
-
-        return anonymized;
-    }
-
-    private parseAIResponse(response: string): AIAnalysisResult {
-        try {
-            // Try to extract JSON from code blocks
-            const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[1]);
-                return parsed;
-            }
-
-            // Try to parse as direct JSON
-            const parsed = JSON.parse(response);
-            return parsed;
-
-        } catch (error) {
-            // If parsing fails, return a structured fallback
-            this.logger.warn('Failed to parse AI response as JSON, using fallback structure');
-
+            // Return static analysis as fallback
             return {
-                summary: 'AI analysis completed (response format could not be parsed)',
-                suggestions: [
-                    {
-                        issue: 'Analysis available',
-                        severity: 'info',
-                        suggestion: response,
-                        estimatedImpact: 'Unknown'
-                    }
-                ],
-                explanation: response
+                summary: `Query type: ${staticAnalysis.queryType}, Complexity: ${staticAnalysis.complexity}`,
+                antiPatterns: staticAnalysis.antiPatterns,
+                optimizationSuggestions: [{
+                    title: 'AI Analysis Unavailable',
+                    description: 'Static analysis completed successfully. Configure AI provider for detailed suggestions.',
+                    impact: 'low',
+                    difficulty: 'easy'
+                }],
+                estimatedComplexity: staticAnalysis.complexity
             };
         }
     }
 
     /**
-     * Check if AI features are available
+     * Get current provider info
      */
-    async isAIAvailable(): Promise<boolean> {
-        try {
-            const models = await vscode.lm.selectChatModels(this.MODEL_SELECTOR);
-            return models.length > 0;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * Get AI model information
-     */
-    async getAIModelInfo(): Promise<{ vendor: string; family: string; name: string } | null> {
-        try {
-            const models = await vscode.lm.selectChatModels(this.MODEL_SELECTOR);
-            if (models.length === 0) {
-                return null;
-            }
-            const model = models[0];
-            return {
-                vendor: model.vendor,
-                family: model.family,
-                name: model.name || 'Unknown'
-            };
-        } catch {
+    getProviderInfo(): { name: string; available: boolean } | null {
+        if (!this.provider) {
             return null;
         }
+
+        return {
+            name: this.provider.name,
+            available: true
+        };
+    }
+
+    /**
+     * Reinitialize with new configuration
+     */
+    async reinitialize(): Promise<void> {
+        this.provider = null;
+        await this.initialize();
+    }
+
+    /**
+     * Get AI configuration from settings
+     */
+    private getConfig(): AIProviderConfig {
+        const config = vscode.workspace.getConfiguration('mydba.ai');
+        
+        return {
+            provider: config.get<'auto' | 'vscode-lm' | 'openai' | 'anthropic' | 'ollama' | 'none'>('provider', 'auto'),
+            enabled: config.get<boolean>('enabled', true),
+            anonymizeQueries: config.get<boolean>('anonymizeQueries', true),
+            includeSchemaContext: config.get<boolean>('includeSchemaContext', true),
+            openaiModel: config.get<string>('openaiModel', 'gpt-4o-mini'),
+            anthropicModel: config.get<string>('anthropicModel', 'claude-3-5-sonnet-20241022'),
+            ollamaEndpoint: config.get<string>('ollamaEndpoint', 'http://localhost:11434'),
+            ollamaModel: config.get<string>('ollamaModel', 'llama3.1')
+        };
+    }
+
+    /**
+     * Generate query fingerprint for grouping
+     */
+    generateFingerprint(query: string): string {
+        return this.anonymizer.fingerprint(query);
+    }
+
+    /**
+     * Get RAG service statistics
+     */
+    getRAGStats(): {
+        total: number;
+        mysql: number;
+        mariadb: number;
+        avgKeywordsPerDoc: number;
+    } {
+        return this.ragService.getStats();
     }
 }
