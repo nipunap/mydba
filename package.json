@@ -293,6 +293,41 @@
           "type": "number",
           "default": 30000,
           "description": "Query execution timeout in milliseconds"
+        },
+        "mydba.metrics.connectionUsageWarning": {
+          "type": "number",
+          "default": 80,
+          "description": "Connection usage warning threshold (percentage)"
+        },
+        "mydba.metrics.connectionUsageCritical": {
+          "type": "number",
+          "default": 95,
+          "description": "Connection usage critical threshold (percentage)"
+        },
+        "mydba.metrics.bufferPoolHitRateWarning": {
+          "type": "number",
+          "default": 90,
+          "description": "Buffer pool hit rate warning threshold (percentage)"
+        },
+        "mydba.metrics.slowQueriesThreshold": {
+          "type": "number",
+          "default": 10,
+          "description": "Slow queries threshold (queries per minute)"
+        },
+        "mydba.metrics.customTimeRange": {
+          "type": "string",
+          "enum": [
+            "5min",
+            "15min",
+            "30min",
+            "1hour",
+            "2hours",
+            "6hours",
+            "12hours",
+            "24hours"
+          ],
+          "default": "1hour",
+          "description": "Custom time range for metrics dashboard"
         }
       }
     },
@@ -321,6 +356,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.85.0",
+    "@types/html2canvas": "^1.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vscode/test-electron": "^2.3.0",
@@ -345,7 +381,8 @@
     "node-sql-parser": "^4.0.0",
     "plotly.js": "^2.25.0",
     "react": "^19.2.0",
-    "webpack": "^5.102.1"
+    "webpack": "^5.102.1",
+    "html2canvas": "^1.4.1"
   },
   "extensionDependencies": [],
   "repository": {

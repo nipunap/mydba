@@ -330,6 +330,11 @@ export class QueriesWithoutIndexesService {
      * Find duplicate indexes
      */
     async findDuplicateIndexes(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
+        // Security: Validate schema name to prevent SQL injection
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(schemaName)) {
+            throw new Error('Invalid schema name: only alphanumeric characters and underscores allowed');
+        }
+
         const query = `
             SELECT
                 TABLE_NAME as table_name,
@@ -352,6 +357,43 @@ export class QueriesWithoutIndexesService {
         `;
 
         const result = await adapter.query<any>(query, [schemaName, schemaName]);
+        return Array.isArray(result) ? result : ((result as any).rows || []);
+    }
+
+    /**
+     * Find unused indexes (indexes with no usage in Performance Schema)
+     */
+    async findUnusedIndexes(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
+        // Security: Validate schema name to prevent SQL injection
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(schemaName)) {
+            throw new Error('Invalid schema name: only alphanumeric characters and underscores allowed');
+        }
+
+        const query = `
+            SELECT
+                s.TABLE_NAME as table_name,
+                s.INDEX_NAME as index_name,
+                GROUP_CONCAT(s.COLUMN_NAME ORDER BY s.SEQ_IN_INDEX) as columns,
+                COUNT(*) as column_count,
+                s.INDEX_TYPE as index_type,
+                s.CARDINALITY as cardinality
+            FROM information_schema.STATISTICS s
+            LEFT JOIN performance_schema.table_io_waits_summary_by_index_usage i
+                ON s.TABLE_SCHEMA = i.object_schema
+                AND s.TABLE_NAME = i.object_name
+                AND s.INDEX_NAME = i.index_name
+            WHERE s.TABLE_SCHEMA = ?
+                AND s.INDEX_NAME != 'PRIMARY'
+                AND (
+                    i.count_read IS NULL
+                    OR i.count_read = 0
+                )
+            GROUP BY s.TABLE_NAME, s.INDEX_NAME
+            HAVING COUNT(*) > 0
+            ORDER BY s.TABLE_NAME, s.INDEX_NAME
+        `;
+
+        const result = await adapter.query<any>(query, [schemaName]);
         return Array.isArray(result) ? result : ((result as any).rows || []);
     }
 }

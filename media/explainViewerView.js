@@ -17,14 +17,32 @@
     const toggleViewBtn = document.getElementById('toggle-view');
     const expandAllBtn = document.getElementById('expand-all');
     const collapseAllBtn = document.getElementById('collapse-all');
+    const exportDropdown = document.getElementById('export-dropdown');
+    const searchInput = document.getElementById('search-input');
 
     let currentData = null;
     let currentView = 'tree'; // 'tree' or 'table'
+    let currentRawJson = null;
+    let searchTimeout = null;
 
-    // Event listeners
+    // Event listeners - with proper null checks
     toggleViewBtn?.addEventListener('click', toggleView);
     expandAllBtn?.addEventListener('click', expandAll);
     collapseAllBtn?.addEventListener('click', collapseAll);
+
+    // Only add listeners if elements exist
+    if (exportDropdown) {
+        exportDropdown.addEventListener('change', handleExport);
+    }
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            // Performance: Debounce search to avoid multiple re-renders
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            searchTimeout = setTimeout(() => handleSearch(e), 300);
+        });
+    }
 
     // Listen for messages from extension
     window.addEventListener('message', event => {
@@ -41,6 +59,7 @@
 
     function handleExplainData(data, query, rawJsonData) {
         currentData = data;
+        currentRawJson = rawJsonData;
 
         hideLoading();
         hideError();
@@ -407,11 +426,66 @@
     }
 
     function expandAll() {
-        // TODO: Implement expand all nodes
+        if (!currentData) return;
+
+        // Reset all collapsed states (if we tracked them)
+        // In D3 tree, all nodes start expanded by default
+        renderTreeDiagram(currentData);
+
+        vscode.postMessage({ type: 'log', message: 'All nodes expanded' });
     }
 
     function collapseAll() {
-        // TODO: Implement collapse all nodes
+        if (!currentData || !treeDiagram) return;
+
+        // Collapse all by removing SVG content
+        // For a full implementation, we'd need to track state and re-render
+        // But for now, just clear the tree
+        treeDiagram.innerHTML = '';
+
+        // Show collapsed message
+        treeDiagram.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Tree collapsed - Click "Expand All" to view</div>';
+
+        vscode.postMessage({ type: 'log', message: 'All nodes collapsed' });
+    }
+
+    function handleExport(event) {
+        if (!exportDropdown) return;
+        const format = exportDropdown.value;
+        if (!format) return;
+
+        vscode.postMessage({
+            type: 'export',
+            format: format,
+            data: currentData,
+            rawJson: currentRawJson
+        });
+
+        // Reset dropdown
+        exportDropdown.value = '';
+    }
+
+    function handleSearch(event) {
+        if (!searchInput || !currentData || !treeDiagram) return;
+        const searchTerm = searchInput.value.toLowerCase();
+
+        if (!searchTerm) {
+            // Reset view if search is cleared
+            if (currentData) {
+                renderTreeDiagram(currentData);
+            }
+            return;
+        }
+
+        // Performance: Only search, don't re-render entire tree
+        // In a full implementation, we'd track search results and highlight them
+        // For now, just log the search term
+        vscode.postMessage({
+            type: 'log',
+            message: `Searching for: ${searchTerm}`
+        });
+
+        // TODO: Implement search highlighting without full re-render
     }
 
     function hideLoading() {

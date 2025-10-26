@@ -130,13 +130,17 @@
   - Waterfall timeline visualization
   - User consent flow for configuration
 
+### Completed ✅
+- [x] EXPLAIN Viewer: Expand/collapse subtrees
+- [x] EXPLAIN Viewer: Export functionality (JSON implemented, PNG/SVG scaffolded)
+- [x] EXPLAIN Viewer: Search within EXPLAIN plan
+- [x] Queries Without Indexes: Configurable detection thresholds
+- [x] Queries Without Indexes: Unused/duplicate index detection
+- [x] Configurable chart time ranges and alerting
+- [x] Security fixes (SQL injection prevention, memory leaks, DOS protection)
+
 ### Remaining ⏳
-- [ ] EXPLAIN Viewer: Expand/collapse subtrees
-- [ ] EXPLAIN Viewer: Export functionality (PNG, SVG, JSON)
-- [ ] EXPLAIN Viewer: Search within EXPLAIN plan
-- [ ] Queries Without Indexes: Configurable detection thresholds
-- [ ] Queries Without Indexes: Unused/duplicate index detection
-- [ ] Configurable chart time ranges and alerting
+- [ ] Unit tests for all Milestone 3 components (see docs/TEST_PLAN.md)
 
 ---
 

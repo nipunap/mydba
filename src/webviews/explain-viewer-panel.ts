@@ -57,6 +57,7 @@ export class ExplainViewerPanel {
     ) {
         this.panel = panel;
         this.panel.webview.html = this.getHtml();
+        this.setupMessageHandlers();
         this.processAndSendExplainData();
         this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     }
@@ -549,6 +550,9 @@ export class ExplainViewerPanel {
                 <h2>Query Execution Plan</h2>
             </div>
             <div class="toolbar-actions">
+                <vscode-text-field id="search-input" placeholder="Search in plan..." style="width: 200px;">
+                    <span slot="start" class="codicon codicon-search"></span>
+                </vscode-text-field>
                 <vscode-button id="toggle-view" appearance="secondary">
                     <span class="codicon codicon-layout"></span>
                     Toggle View
@@ -561,6 +565,12 @@ export class ExplainViewerPanel {
                     <span class="codicon codicon-collapse-all"></span>
                     Collapse All
                 </vscode-button>
+                <vscode-dropdown id="export-dropdown">
+                    <span slot="indicator">Export</span>
+                    <vscode-option value="png">Export as PNG</vscode-option>
+                    <vscode-option value="svg">Export as SVG</vscode-option>
+                    <vscode-option value="json">Export as JSON</vscode-option>
+                </vscode-dropdown>
             </div>
         </div>
 
@@ -607,6 +617,75 @@ export class ExplainViewerPanel {
     <script nonce="${nonce}" src="${scriptUri}?v=${cacheBuster}"></script>
 </body>
 </html>`;
+    }
+
+    private setupMessageHandlers(): void {
+        this.panel.webview.onDidReceiveMessage(
+            async (message: any) => {
+                switch (message.type) {
+                    case 'export':
+                        await this.handleExport(message.format, message.data as ExplainNode, message.rawJson as unknown);
+                        break;
+                    case 'log':
+                        this.logger.debug(message.message as string);
+                        break;
+                }
+            },
+            null,
+            this.disposables
+        );
+    }
+
+    private async handleExport(format: 'png' | 'svg' | 'json', data?: ExplainNode, rawJson?: unknown): Promise<void> {
+        this.logger.info(`Exporting EXPLAIN plan as ${format}`);
+
+        try {
+            const fileName = `explain-plan-${Date.now()}.${format}`;
+
+            if (format === 'json') {
+                // Security: Validate data exists before export
+                const jsonData = rawJson || this.explainData;
+                if (!jsonData) {
+                    vscode.window.showErrorMessage('No data available for export');
+                    return;
+                }
+
+                const content = JSON.stringify(jsonData, null, 2);
+
+                // Security: Limit export size to prevent DOS
+                const MAX_EXPORT_SIZE = 10 * 1024 * 1024; // 10MB
+                if (content.length > MAX_EXPORT_SIZE) {
+                    vscode.window.showErrorMessage(
+                        `Export data too large (${(content.length / 1024 / 1024).toFixed(2)}MB). Maximum allowed: ${MAX_EXPORT_SIZE / 1024 / 1024}MB`
+                    );
+                    return;
+                }
+
+                const uri = await vscode.window.showSaveDialog({
+                    defaultUri: vscode.Uri.file(fileName),
+                    filters: {
+                        'JSON': ['json']
+                    }
+                });
+
+                if (uri) {
+                    const encoder = new TextEncoder();
+                    await vscode.workspace.fs.writeFile(uri, encoder.encode(content));
+                    vscode.window.showInformationMessage(`Exported to ${uri.fsPath}`);
+                }
+            } else if (format === 'png' || format === 'svg') {
+                // For PNG/SVG export, we'll need to capture the SVG from the webview
+                // This would require html2canvas for PNG
+                this.panel.webview.postMessage({
+                    type: 'exportRequest',
+                    format: format
+                });
+                vscode.window.showInformationMessage(`Export to ${format.toUpperCase()} initiated.`);
+            }
+        } catch (error) {
+            this.logger.error('Failed to export:', error as Error);
+            vscode.window.showErrorMessage(`Failed to export: ${(error as Error).message}`);
+        }
     }
 
     dispose(): void {

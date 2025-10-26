@@ -356,6 +356,12 @@ export class QueriesWithoutIndexesPanel {
             <div class="info-panel">
                 <p><strong>Note:</strong> This analysis uses MySQL Performance Schema to identify queries that may benefit from indexing.</p>
                 <p>Queries are sorted by the number of rows examined (highest impact first).</p>
+                <p id="threshold-info" style="margin-top: 8px; font-size: 12px; color: var(--vscode-descriptionForeground);">Detection thresholds: Configure in settings (mydba.qwi.*)</p>
+            </div>
+
+            <div id="index-health-section" style="display: none;">
+                <h3 style="margin: 20px 0 10px 0;">Index Health</h3>
+                <div id="index-health-content"></div>
             </div>
 
             <div id="queries-list"></div>

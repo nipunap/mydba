@@ -49,6 +49,7 @@ export class MetricsDashboardPanel {
     private isRefreshing = false;
     private metricsHistory: MetricsHistoryPoint[] = [];
     private maxHistoryPoints = 720; // 1 hour at 5-second intervals
+    private alertStates: Map<string, boolean> = new Map();
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -173,6 +174,9 @@ export class MetricsDashboardPanel {
             if (this.metricsHistory.length > this.maxHistoryPoints) {
                 this.metricsHistory = this.metricsHistory.slice(-this.maxHistoryPoints);
             }
+
+            // Check for alerts
+            await this.checkAlerts(metrics);
 
             // Send current metrics and history to webview
             this.panel.webview.postMessage({
@@ -536,7 +540,69 @@ export class MetricsDashboardPanel {
         return text;
     }
 
+    private async checkAlerts(metrics: DatabaseMetrics): Promise<void> {
+        const config = vscode.workspace.getConfiguration('mydba');
+        const connectionUsage = Math.round((metrics.connections.current / metrics.connections.max) * 100);
+
+        // Check connection usage
+        const criticalThreshold = config.get<number>('metrics.connectionUsageCritical', 95);
+        const warningThreshold = config.get<number>('metrics.connectionUsageWarning', 80);
+
+        if (connectionUsage >= criticalThreshold) {
+            if (!this.alertStates.get('connectionCritical')) {
+                vscode.window.showErrorMessage(
+                    `CRITICAL: Connection usage at ${connectionUsage}%! (Threshold: ${criticalThreshold}%)`
+                );
+                this.alertStates.set('connectionCritical', true);
+            }
+        } else {
+            this.alertStates.set('connectionCritical', false);
+        }
+
+        if (connectionUsage >= warningThreshold && connectionUsage < criticalThreshold) {
+            if (!this.alertStates.get('connectionWarning')) {
+                vscode.window.showWarningMessage(
+                    `WARNING: Connection usage at ${connectionUsage}% (Threshold: ${warningThreshold}%)`
+                );
+                this.alertStates.set('connectionWarning', true);
+            }
+        } else if (connectionUsage < warningThreshold) {
+            this.alertStates.set('connectionWarning', false);
+        }
+
+        // Check buffer pool hit rate
+        const bufferPoolThreshold = config.get<number>('metrics.bufferPoolHitRateWarning', 90);
+        if (metrics.bufferPool && metrics.bufferPool.hitRate < bufferPoolThreshold) {
+            if (!this.alertStates.get('bufferPoolWarning')) {
+                vscode.window.showWarningMessage(
+                    `WARNING: Buffer pool hit rate is ${metrics.bufferPool.hitRate.toFixed(2)}% (Threshold: ${bufferPoolThreshold}%)`
+                );
+                this.alertStates.set('bufferPoolWarning', true);
+            }
+        } else if (metrics.bufferPool && metrics.bufferPool.hitRate >= bufferPoolThreshold) {
+            this.alertStates.set('bufferPoolWarning', false);
+        }
+
+        // Check slow queries rate (tracked over time)
+        const slowQueriesThreshold = config.get<number>('metrics.slowQueriesThreshold', 10);
+        // Note: metrics.queries.slow is a cumulative counter, not a rate
+        // For proper rate calculation, we'd need to track slow query count over time
+        // This is a simplified implementation that won't spam alerts
+        if (metrics.queries.slow > slowQueriesThreshold * 10) {
+            if (!this.alertStates.get('slowQueriesWarning')) {
+                vscode.window.showWarningMessage(
+                    `WARNING: Slow queries counter high: ${metrics.queries.slow} (Check threshold: ${slowQueriesThreshold}/min)`
+                );
+                this.alertStates.set('slowQueriesWarning', true);
+            }
+        } else {
+            this.alertStates.set('slowQueriesWarning', false);
+        }
+    }
+
     dispose(): void {
+        // Security: Clear alert states to prevent memory leak
+        this.alertStates.clear();
         this.stopAutoRefresh();
         MetricsDashboardPanel.panels.delete(`metrics-${this.connectionId}`);
         this.panel.dispose();
