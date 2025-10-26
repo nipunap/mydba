@@ -1,0 +1,8 @@
+.container { padding: 12px; color: var(--vscode-foreground); }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.loading { display: flex; gap: 8px; align-items: center; }
+.error { display: flex; gap: 8px; align-items: center; background: rgba(139,0,0,.25); border-left: 3px solid #8b0000; padding: 8px 12px; border-radius: 4px; }
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; background: rgba(90,90,90,.2); border-left: 3px solid rgba(90,90,90,.6); padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; }
+.stages-table { width: 100%; border-collapse: collapse; }
+.stages-table th, .stages-table td { border-bottom: 1px solid var(--vscode-editorWidget-border); padding: 6px; text-align: left; }
+.query-block pre { white-space: pre-wrap; margin: 6px 0; font-family: var(--vscode-editor-font-family); font-size: 12px; }

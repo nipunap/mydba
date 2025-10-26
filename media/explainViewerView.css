@@ -1,0 +1,535 @@
+body {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-foreground);
+    background-color: var(--vscode-editor-background);
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 0;
+    max-width: 100%;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background-color: var(--vscode-editor-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+    height: 50px;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toolbar h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px;
+}
+
+.error {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    margin: 16px;
+    background-color: var(--vscode-inputValidation-errorBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+    border-radius: 4px;
+}
+
+.error .codicon-error {
+    color: var(--vscode-errorForeground);
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+#error-message {
+    margin: 0;
+}
+
+#content {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+}
+
+.query-section {
+    margin-bottom: 20px;
+    padding: 16px;
+    background-color: var(--vscode-textCodeBlock-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+}
+
+.query-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #cccccc;
+}
+
+.query-section pre {
+    margin: 0;
+    padding: 12px;
+    background-color: var(--vscode-editor-background);
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+    line-height: 1.6;
+}
+
+.visualization-container {
+    margin-bottom: 20px;
+}
+
+.view-panel {
+    padding: 16px;
+    background-color: var(--vscode-textCodeBlock-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+}
+
+.view-panel h3 {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #cccccc;
+}
+
+#tree-diagram {
+    width: 100%;
+    overflow: auto;
+    background-color: var(--vscode-editor-background);
+    border-radius: 4px;
+}
+
+#tree-diagram svg {
+    display: block;
+}
+
+.explain-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--vscode-editor-background);
+    margin-top: 12px;
+}
+
+.explain-table th {
+    background-color: var(--vscode-editorGroupHeader-tabsBackground);
+    color: #cccccc;
+    padding: 10px;
+    text-align: left;
+    border: 1px solid var(--vscode-panel-border);
+    font-weight: 600;
+    font-size: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.explain-table td {
+    padding: 10px;
+    border: 1px solid var(--vscode-panel-border);
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    vertical-align: top;
+}
+
+.explain-table .number-cell {
+    text-align: right;
+    font-family: var(--vscode-editor-font-family);
+}
+
+.explain-table tr.severity-critical {
+    background-color: rgba(255, 99, 132, 0.1);
+}
+
+.explain-table tr.severity-warning {
+    background-color: rgba(255, 206, 86, 0.1);
+}
+
+.explain-table tr.severity-good {
+    background-color: rgba(75, 255, 192, 0.05);
+}
+
+.explain-table tr.issues-row {
+    background-color: rgba(255, 206, 86, 0.05);
+}
+
+.explain-table tr.issues-row td {
+    border-top: none;
+    padding-top: 0;
+}
+
+.explain-table .issues-cell {
+    font-size: 11px;
+    color: #cccccc;
+    line-height: 1.6;
+}
+
+.explain-table .issues-list {
+    padding: 8px 12px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.explain-table .issue-item {
+    margin: 4px 0;
+    padding-left: 16px;
+    position: relative;
+}
+
+.explain-table .issue-item::before {
+    content: '•';
+    position: absolute;
+    left: 4px;
+    color: #999;
+}
+
+.explain-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--vscode-editor-background);
+}
+
+.explain-detail-table th,
+.explain-detail-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--vscode-panel-border);
+    font-size: 12px;
+    text-align: left;
+}
+
+.explain-detail-table th {
+    background-color: var(--vscode-editorGroupHeader-tabsBackground);
+    color: #cccccc;
+    font-weight: 600;
+    width: 200px;
+}
+
+.explain-detail-table .cost-critical {
+    color: rgb(255, 99, 132);
+    font-weight: 700;
+}
+
+.explain-detail-table .cost-warning {
+    color: rgb(255, 206, 86);
+    font-weight: 600;
+}
+
+.explain-detail-table .cost-good {
+    color: rgb(75, 255, 192);
+    font-weight: 500;
+}
+
+.explain-section {
+    margin-bottom: 24px;
+}
+
+.explain-section h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #cccccc;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--vscode-panel-border);
+}
+
+.table-view-content {
+    padding: 16px;
+}
+
+.explain-table .access-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+
+.explain-table .access-type.all,
+.explain-table .access-type.ALL {
+    background-color: rgba(255, 99, 132, 0.3);
+    color: #fff;
+}
+
+.explain-table .access-type.index,
+.explain-table .access-type.INDEX {
+    background-color: rgba(255, 206, 86, 0.3);
+    color: #333;
+}
+
+.explain-table .access-type.range,
+.explain-table .access-type.RANGE {
+    background-color: rgba(54, 162, 235, 0.3);
+    color: #fff;
+}
+
+.explain-table .access-type.ref,
+.explain-table .access-type.REF,
+.explain-table .access-type.eq_ref,
+.explain-table .access-type.EQ_REF,
+.explain-table .access-type.const,
+.explain-table .access-type.CONST {
+    background-color: rgba(75, 255, 192, 0.3);
+    color: #333;
+}
+
+.raw-json-section {
+    margin-top: 20px;
+    padding: 16px;
+    background-color: var(--vscode-textCodeBlock-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+}
+
+.raw-json-section summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: #cccccc;
+    padding: 8px;
+    margin: -8px;
+    border-radius: 4px;
+}
+
+.raw-json-section summary:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.raw-json-section pre {
+    margin: 12px 0 0 0;
+    padding: 12px;
+    background-color: var(--vscode-editor-background);
+    border-radius: 4px;
+    overflow: auto;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 11px;
+    line-height: 1.5;
+    max-height: 400px;
+}
+
+/* Node Detail Popup */
+.node-detail-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: var(--vscode-editor-background);
+    border: 2px solid var(--vscode-panel-border);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 600px;
+    min-width: 400px;
+    z-index: 10000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    transition: all 0.2s ease-out;
+}
+
+.node-detail-popup.visible {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+}
+
+.detail-close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    border: none;
+    background: none;
+    color: #999;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    line-height: 28px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.detail-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--vscode-panel-border);
+}
+
+.detail-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.severity-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.severity-badge.severity-critical {
+    background-color: rgba(255, 99, 132, 0.2);
+    color: rgb(255, 99, 132);
+    border: 1px solid rgb(255, 99, 132);
+}
+
+.severity-badge.severity-warning {
+    background-color: rgba(255, 206, 86, 0.2);
+    color: rgb(255, 206, 86);
+    border: 1px solid rgb(255, 206, 86);
+}
+
+.severity-badge.severity-good {
+    background-color: rgba(75, 255, 192, 0.2);
+    color: rgb(75, 255, 192);
+    border: 1px solid rgb(75, 255, 192);
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.detail-item {
+    padding: 10px 12px;
+    background: var(--vscode-textCodeBlock-background);
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.detail-label {
+    color: #999;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.detail-item strong {
+    color: #fff;
+}
+
+.detail-item .critical {
+    color: rgb(255, 99, 132);
+    font-weight: 600;
+}
+
+.detail-item .warning {
+    color: rgb(255, 206, 86);
+    font-weight: 600;
+}
+
+.detail-item .good {
+    color: rgb(75, 255, 192);
+    font-weight: 600;
+}
+
+.access-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.access-type-badge.ALL,
+.access-type-badge.all {
+    background-color: rgba(255, 99, 132, 0.3);
+    color: #fff;
+}
+
+.access-type-badge.INDEX,
+.access-type-badge.index {
+    background-color: rgba(255, 206, 86, 0.3);
+    color: #333;
+}
+
+.access-type-badge.RANGE,
+.access-type-badge.range {
+    background-color: rgba(54, 162, 235, 0.3);
+    color: #fff;
+}
+
+.access-type-badge.REF,
+.access-type-badge.ref,
+.access-type-badge.EQ_REF,
+.access-type-badge.eq_ref,
+.access-type-badge.CONST,
+.access-type-badge.const {
+    background-color: rgba(75, 255, 192, 0.3);
+    color: #333;
+}
+
+.detail-issues {
+    background: rgba(75, 255, 192, 0.05);
+    border: 1px solid rgba(75, 255, 192, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.detail-issues h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: rgb(75, 255, 192);
+}
+
+.detail-issues ul {
+    margin: 0;
+    padding-left: 24px;
+}
+
+.detail-issues li {
+    margin: 8px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cccccc;
+}
+
+/* Codicon styles */
+.codicon {
+    font-family: codicon;
+    font-size: 16px;
+    line-height: 1;
+}

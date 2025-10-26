@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  mysql-8.0:
+    image: mysql:8.0
+    container_name: mydba-mysql-8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: test_password
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_password
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  mariadb-10.11:
+    image: mariadb:10.11
+    container_name: mydba-mariadb-10.11
+    environment:
+      MYSQL_ROOT_PASSWORD: test_password
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_password
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Test data setup
+  mysql-init:
+    image: mysql:8.0
+    depends_on:
+      mysql-8.0:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: test_password
+      MYSQL_HOST: mysql-8.0
+    volumes:
+      - ./test/sql:/docker-entrypoint-initdb.d
+    command: >
+      bash -c "
+        mysql -h mysql-8.0 -u root -ptest_password -e 'CREATE DATABASE IF NOT EXISTS test_db;'
+        mysql -h mysql-8.0 -u root -ptest_password test_db < /docker-entrypoint-initdb.d/sample-data.sql
+      "
