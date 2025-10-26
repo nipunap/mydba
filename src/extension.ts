@@ -37,9 +37,79 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const commandRegistry = serviceContainer.get(SERVICE_TOKENS.CommandRegistry) as CommandRegistry;
         commandRegistry.registerCommands(context, treeViewProvider);
 
+        // Register AI configuration command
+        context.subscriptions.push(
+            vscode.commands.registerCommand('mydba.configureAIProvider', async () => {
+                try {
+                    const { configureAIProvider } = await import('./commands/configure-ai-provider');
+                    await configureAIProvider(context, logger, serviceContainer);
+                } catch (error) {
+                    logger.error('AI configuration command failed:', error as Error);
+                    vscode.window.showErrorMessage('Failed to open AI configuration wizard');
+                }
+            })
+        );
+
         // Initialize webview manager
         const webviewManager = serviceContainer.get(SERVICE_TOKENS.WebviewManager) as WebviewManager;
         webviewManager.initialize();
+
+        // Create AI provider status bar item
+        const aiStatusBar = vscode.window.createStatusBarItem(
+            vscode.StatusBarAlignment.Right, 
+            100
+        );
+        aiStatusBar.command = 'mydba.configureAIProvider';
+        aiStatusBar.tooltip = 'Click to configure AI Provider';
+        context.subscriptions.push(aiStatusBar);
+
+        // Update status bar with current provider
+        const updateAIStatus = async () => {
+            try {
+                const config = vscode.workspace.getConfiguration('mydba.ai');
+                const provider = config.get<string>('provider', 'auto');
+                const enabled = config.get<boolean>('enabled', true);
+                
+                if (!enabled || provider === 'none') {
+                    aiStatusBar.text = '$(circle-slash) AI: Off';
+                    aiStatusBar.backgroundColor = undefined;
+                    aiStatusBar.tooltip = 'AI features disabled. Click to configure.';
+                } else {
+                    // Show provider name
+                    const providerNames: Record<string, string> = {
+                        'auto': 'Auto',
+                        'vscode-lm': 'Copilot',
+                        'openai': 'OpenAI',
+                        'anthropic': 'Claude',
+                        'ollama': 'Ollama'
+                    };
+                    const displayName = providerNames[provider] || provider;
+                    aiStatusBar.text = `$(sparkle) AI: ${displayName}`;
+                    aiStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
+                    aiStatusBar.tooltip = `AI Provider: ${displayName} (Click to reconfigure)`;
+
+                }
+                aiStatusBar.show();
+            } catch (error) {
+                logger.error('Failed to update AI status:', error as Error);
+                aiStatusBar.text = '$(error) AI: Error';
+                aiStatusBar.tooltip = 'Error checking AI status';
+                aiStatusBar.show();
+            }
+        };
+
+        // Initial update with delay to allow service initialization
+        setTimeout(updateAIStatus, 1000);
+
+        // Listen for config changes
+        context.subscriptions.push(
+            vscode.workspace.onDidChangeConfiguration(e => {
+                if (e.affectsConfiguration('mydba.ai')) {
+                    updateAIStatus();
+                }
+            })
+        );
+
 
         // Set up event listeners
         setupEventListeners(context, logger);

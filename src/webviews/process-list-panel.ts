@@ -222,6 +222,21 @@ export class ProcessListPanel {
                 <h2>MySQL Process List</h2>
                 <span id="last-updated" class="last-updated"></span>
             </div>
+            <div class="toolbar-controls">
+                <label for="group-by">Group By:</label>
+                <select id="group-by" class="dropdown" aria-label="Group processes by">
+                    <option value="none">None</option>
+                    <option value="user">User</option>
+                    <option value="host">Host</option>
+                    <option value="query">Query Fingerprint</option>
+                </select>
+                <input 
+                    type="text" 
+                    id="filter-input" 
+                    placeholder="Filter processes..." 
+                    class="filter-input"
+                    aria-label="Filter processes by text" />
+            </div>
             <div class="toolbar-actions">
                 <vscode-button id="refresh-btn" appearance="secondary" title="Refresh Now">
                     <span class="codicon codicon-refresh"></span>
@@ -254,6 +269,7 @@ export class ProcessListPanel {
                         <th data-sort="command">Command</th>
                         <th data-sort="time">Time (s)</th>
                         <th data-sort="state">State</th>
+                        <th data-sort="inTransaction">Transaction</th>
                         <th data-sort="info">Info</th>
                         <th>Actions</th>
                     </tr>

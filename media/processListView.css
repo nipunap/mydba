@@ -227,3 +227,142 @@ vscode-button {
 vscode-checkbox {
     margin: 0;
 }
+
+/* Toolbar Controls */
+.toolbar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.toolbar-controls label {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.dropdown {
+    padding: 4px 8px;
+    background-color: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 2px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.dropdown:hover {
+    background-color: var(--vscode-dropdown-listBackground);
+}
+
+.dropdown:focus {
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: 2px;
+}
+
+.filter-input {
+    padding: 4px 8px;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    font-size: 13px;
+    min-width: 200px;
+    transition: border-color 0.2s;
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+/* Group Headers */
+.group-header {
+    background-color: var(--vscode-list-hoverBackground);
+    cursor: pointer;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    transition: background-color 0.2s;
+}
+
+.group-header:hover {
+    background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.group-header:focus {
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: -2px;
+}
+
+.group-header-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+}
+
+.group-expand-icon {
+    font-size: 10px;
+    color: var(--vscode-foreground);
+    display: inline-block;
+    width: 12px;
+    transition: transform 0.2s;
+}
+
+.group-stats {
+    font-size: 12px;
+    font-weight: normal;
+    color: var(--vscode-descriptionForeground);
+    margin-left: auto;
+}
+
+.grouped-row {
+    background-color: var(--vscode-editor-background);
+}
+
+.grouped-row:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Transaction Badges */
+.transaction-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.transaction-active {
+    background-color: rgba(255, 165, 0, 0.2);
+    color: #ffa500;
+    border: 1px solid #ffa500;
+}
+
+.transaction-long {
+    background-color: rgba(255, 0, 0, 0.2);
+    color: #ff4444;
+    border: 1px solid #ff4444;
+    animation: pulse 2s infinite;
+}
+
+.transaction-autocommit {
+    background-color: rgba(0, 255, 0, 0.1);
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Performance optimization for large lists */
+.process-list-table {
+    will-change: scroll-position;
+}

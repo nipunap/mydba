@@ -183,7 +183,7 @@ export class AIService {
      */
     private getConfig(): AIProviderConfig {
         const config = vscode.workspace.getConfiguration('mydba.ai');
-        
+
         return {
             provider: config.get<'auto' | 'vscode-lm' | 'openai' | 'anthropic' | 'ollama' | 'none'>('provider', 'auto'),
             enabled: config.get<boolean>('enabled', true),
