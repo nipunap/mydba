@@ -1,10 +1,10 @@
-# MyDBA Phase Progress Tracker
+# MyDBA Product Roadmap & Progress
 
-## Current Status: Milestone 1 & 2 Partially Complete
+## Current Status: Phase 1 MVP - 90% Complete (Dec 26, 2025)
 
 ---
 
-## ✅ **Milestone 1: Foundation** (MOSTLY COMPLETE)
+## ✅ **Milestone 1: Foundation** (100% COMPLETE)
 
 ### Completed ✅
 - [x] Project setup and architecture
@@ -23,100 +23,120 @@
   - Event emission on state changes
   - In-memory config storage
 - [x] Secure credential storage
-  - SecretStorage API integration (stubbed)
+  - SecretStorage API integration
   - Password handling architecture
-
-### In Progress 🔄
-- [ ] MySQL driver integration
-  - **Status**: Mock adapter works, real mysql2 implementation needed
-  - **Next**: Implement MySQLAdapter with actual mysql2/promise
-
-### Remaining ⏳
-- [ ] Connection persistence
+- [x] MySQL driver integration
+  - MySQL/MariaDB adapter with mysql2
+  - Connection pooling
+  - Query execution with parameterized queries
+  - Version detection
+- [x] Connection persistence
   - Save connections to workspace state
   - Load connections on activation
+- [x] SSL/TLS configuration support
+
+### Remaining ⏳
 - [ ] SSH tunneling support
-- [ ] SSL/TLS configuration
 - [ ] AWS RDS IAM authentication
+- [ ] Azure MySQL authentication
 
 ---
 
-## ✅ **Milestone 2: Core UI** (PARTIALLY COMPLETE)
+## ✅ **Milestone 2: Core UI** (100% COMPLETE)
 
 ### Completed ✅
 - [x] Tree view implementation
-  - Connection tree
-  - Database expansion
-  - Table expansion
-  - Columns/Indexes nodes
-  - Process List & Variables nodes
+  - Connection tree with expand/collapse
+  - Database listing with row counts
+  - Table listing with columns and indexes
+  - Query Editor node
+  - Process List node
+  - Variables node
+  - Metrics Dashboard node
+  - Queries Without Indexes node
+  - Slow Queries node
+  - Context menu actions
 - [x] Database explorer
   - List databases
   - List tables with row counts
   - Navigate schema hierarchy
-- [x] Basic webview panels
-  - Webview provider base class
-  - EXPLAIN viewer provider
-  - Profiling viewer provider
-  - Activity bar integration
-
-### Remaining ⏳
-- [ ] Process list view implementation
-  - Show active connections
-  - Display query text
-  - Show execution time
-  - Group by transaction (Phase 3 feature)
-  - Kill query functionality
-- [ ] System variables viewer
-  - Global variables
-  - Session variables
+- [x] Process list view
+  - Show active connections with `SHOW FULL PROCESSLIST`
+  - Display query text and execution time
+  - Kill query functionality with confirmation
+  - Auto-refresh every 5 seconds
+  - Manual refresh button
+  - Sortable columns
+- [x] System variables viewer
+  - Global variables display
+  - Session variables display
+  - Tabbed interface (Global/Session)
   - Search/filter functionality
-  - Edit variables (with warnings)
-- [ ] Table data preview
+- [x] Table data preview
   - Show top 1000 rows
-  - Column sorting
-  - Filter/search
-- [ ] Query editor
+  - Automatic LIMIT for SELECT queries
+  - Opens in Query Editor with pre-filled query
+- [x] Query editor
   - SQL syntax highlighting
   - Execute selected query
-  - Results grid
-  - Export results (CSV/JSON)
+  - Results grid with vertical scrolling
+  - Execution time and row count display
+  - Export results (CSV, JSON, SQL INSERT)
+  - Multiple query support
+  - Query execution cancellation
+
+### Remaining ⏳
+- [ ] Group by transaction in Process List (Phase 3 feature)
+- [ ] Edit variables functionality (Phase 3 feature)
 
 ---
 
-## ⏳ **Milestone 3: Monitoring** (NOT STARTED)
+## ✅ **Milestone 3: Monitoring** (90% COMPLETE)
 
-### Phase 1 Scope
-- [ ] Database metrics dashboard
-  - Connection count
-  - Queries per second
+### Completed ✅
+- [x] Database metrics dashboard
+  - Connection count (current, max, max used)
+  - Queries per second (QPS)
   - Slow queries count
-  - Uptime
+  - Uptime display
   - Buffer pool hit rate
   - Thread cache hit rate
-- [ ] Queries without indexes detection
-  - Parse slow query log
-  - Identify full table scans
-  - Show affected queries
-  - AI suggestions for indexes
-- [ ] Performance data collection
-  - Use `performance_schema`
-  - Collect metrics every 5 seconds
-  - Store in local cache
-  - Chart over time (last hour/day)
-- [ ] Chart visualizations
-  - Line charts for time-series
-  - Bar charts for top queries
-  - Pie charts for query types
-  - Using Chart.js or D3.js
+  - Table cache hit rate
+  - Query cache hit rate (if enabled)
+  - Historical trend charts with Chart.js
+  - Auto-refresh every 5 seconds
+  - Manual refresh button
+  - Last updated timestamp
+- [x] Queries without indexes detection
+  - Performance Schema integration
+  - Full table scan identification
+  - Webview panel with auto-refresh
+  - Integration with EXPLAIN viewer
+  - User consent flow for Performance Schema configuration
+  - Index suggestion preview
+- [x] Slow Queries panel
+  - Performance Schema-based detection
+  - Ranking by execution time
+  - Auto-refresh and manual refresh
+  - Integration with EXPLAIN and Profiling viewers
+- [x] EXPLAIN visualization
+  - D3.js tree diagram
+  - Interactive node exploration
+  - Dual view mode (tree + table)
+  - Severity-based color coding
+  - Performance hotspot highlighting
+- [x] Query Profiling with Performance Schema
+  - Stage-by-stage execution breakdown
+  - Waterfall timeline visualization
+  - User consent flow for configuration
 
-### Phase 2+ Scope (Deferred)
-- [ ] Host-level dashboard
-  - CPU usage
-  - Memory usage
-  - Disk I/O
-  - Network I/O
-  - Requires external metrics (Prometheus/node_exporter)
+### Remaining ⏳
+- [ ] EXPLAIN Viewer: Expand/collapse subtrees
+- [ ] EXPLAIN Viewer: Export functionality (PNG, SVG, JSON)
+- [ ] EXPLAIN Viewer: Search within EXPLAIN plan
+- [ ] Queries Without Indexes: Configurable detection thresholds
+- [ ] Queries Without Indexes: Unused/duplicate index detection
+- [ ] Configurable chart time ranges and alerting
 
 ---
 

@@ -2460,10 +2460,10 @@ The database management tool market is diverse, ranging from heavyweight standal
 
 ## 7. Implementation Status & Progress
 
-### 7.1 Current Phase: Milestone 1 & 2 (Foundation + Core UI)
+### 7.1 Current Phase: Milestone 1, 2 & 3 (Foundation + Core UI + Monitoring)
 
-**Last Updated**: October 26, 2025
-**Current Status**: Phase 1 MVP - 75% Complete
+**Last Updated**: December 26, 2025
+**Current Status**: Phase 1 MVP - 90% Complete
 
 ---
 
@@ -2577,7 +2577,7 @@ The database management tool market is diverse, ranging from heavyweight standal
   - Opens in Query Editor with pre-filled query
   - Metadata passing via tree item context
 
-#### Milestone 3: Monitoring (60% Complete)
+#### Milestone 3: Monitoring (90% Complete)
 - ✅ **Database Metrics Dashboard**
   - Webview panel (editor-style)
   - Real-time metrics collection from:
@@ -2603,9 +2603,47 @@ The database management tool market is diverse, ranging from heavyweight standal
   - Chart.js integration with proper canvas cleanup
   - Category scale for time labels (no date adapter needed)
   - Responsive chart sizing
+  - Chart update mechanism (refresh data without recreating charts)
 
-- ⏳ **Queries Without Indexes** (Not Started)
-- ⏳ **Query Profiling with Performance Schema** (Not Started)
+- ✅ **Queries Without Indexes Detection**
+  - Performance Schema integration (`performance_schema.events_statements_summary_by_digest`)
+  - Detection of full table scans (`rows_examined` vs `rows_examined_est` gap)
+  - Webview panel with auto-refresh (10 seconds)
+  - Manual refresh button
+  - Integration with EXPLAIN viewer (direct optimization analysis)
+  - User consent flow for Performance Schema configuration
+  - Error handling and graceful degradation
+  - Visualization of unindexed queries with execution metrics
+  - Suggest indexes with `CREATE INDEX` SQL preview
+
+- ✅ **Slow Queries Panel**
+  - Performance Schema-based slow query detection
+  - Ranking by `AVG_TIMER_WAIT`
+  - Webview panel with auto-refresh (30 seconds)
+  - Manual refresh button
+  - Integration with EXPLAIN and Profiling viewers
+  - Display query digest, execution count, avg time, total time
+  - Visual indicators for severity levels
+
+- ✅ **Query Profiling with Performance Schema**
+  - MySQL 8.0+ Performance Schema integration
+  - Stage-by-stage execution breakdown (`events_stages_history_long`)
+  - Waterfall timeline visualization
+  - Webview panel for profiling results
+  - Performance Schema configuration check with user consent
+  - Graceful error handling for unsupported versions
+
+- ⏳ **EXPLAIN Viewer Enhancements** (Partial - 80% Complete)
+  - ✅ D3.js tree diagram implementation
+  - ✅ Interactive node exploration with hover effects
+  - ✅ Performance hotspot highlighting (color-coded severity)
+  - ✅ Detailed table view with all EXPLAIN columns
+  - ✅ Toggle between tree and table views
+  - ✅ Node details popup with severity badges
+  - ✅ Responsive layout and animations
+  - ⏳ Expand/collapse subtree functionality (not implemented yet)
+  - ⏳ Export functionality for diagrams (not implemented yet)
+  - ⏳ Search within EXPLAIN plan (not implemented yet)
 
 #### Milestone 4: AI Integration (0% Complete)
 - ⏳ **VSCode AI API Integration** (Not Started)
@@ -2615,48 +2653,52 @@ The database management tool market is diverse, ranging from heavyweight standal
 
 ---
 
-### 7.3 In Progress 🔄
+### 7.3 Recently Completed 🔄
 
-Currently focusing on completing Milestone 3 (Monitoring):
+Major features completed in the last development cycle:
 
-1. **EXPLAIN Visualization Enhancement** (Next Priority)
-   - Add D3.js/Mermaid tree diagram for query execution plan
-   - Visual node representation with drag/zoom
-   - Color-coded severity levels
-   - One-click optimization suggestions
+1. ✅ **Queries Without Indexes Detection**
+   - Performance Schema integration with user consent flow
+   - Full table scan detection and visualization
+   - Webview panel with auto-refresh
+   - Integration with EXPLAIN viewer for optimization analysis
 
-2. **Queries Without Indexes Detection**
-   - Query `performance_schema.events_statements_summary_by_digest`
-   - Filter for full table scans
-   - Display in dedicated webview
-   - AI-powered index suggestions
+2. ✅ **Slow Queries Panel**
+   - Performance Schema-based detection
+   - Auto-refresh and manual refresh capabilities
+   - Integration with EXPLAIN and Profiling viewers
 
-3. **Query Profiling**
-   - MySQL 8.0+ Performance Schema profiling
+3. ✅ **Query Profiling with Performance Schema**
    - Stage-by-stage execution breakdown
    - Waterfall timeline visualization
-   - MariaDB Optimizer Trace support
+   - User consent flow for configuration
+
+4. ✅ **EXPLAIN Viewer Enhancements**
+   - D3.js tree diagram implementation
+   - Interactive node exploration
+   - Dual view mode (tree + table)
+   - Severity-based color coding
+   - Performance hotspot highlighting
 
 ---
 
 ### 7.4 Pending Features ⏳
 
 #### High Priority (Phase 1 Remaining)
-- [ ] **Enhanced EXPLAIN Visualization**
-  - D3.js/Mermaid.js tree diagram
-  - Interactive node exploration
-  - Performance hotspot highlighting
-  - Estimated: 6-8 hours
-
-- [ ] **Queries Without Indexes Detection**
-  - Performance Schema integration
-  - Full table scan identification
-  - Index suggestion engine
+- [ ] **EXPLAIN Viewer Improvements**
+  - Expand/collapse subtree functionality
+  - Export functionality for diagrams (PNG, SVG, JSON)
+  - Search within EXPLAIN plan
   - Estimated: 4-6 hours
 
-- [ ] **Query Profiling**
-  - Performance Schema profiling
-  - Waterfall chart visualization
+- [ ] **Queries Without Indexes - Advanced**
+  - Configurable detection thresholds
+  - Unused/duplicate index detection
+  - Index suggestion optimization
+  - Estimated: 6-8 hours
+
+- [ ] **Query Profiling Enhancements**
+  - Expand/collapse subtree functionality
   - Stage duration analysis
   - Estimated: 8-10 hours
 
