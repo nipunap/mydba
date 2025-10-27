@@ -210,10 +210,142 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
+  integration-tests-docker:
+    name: Integration Tests (Docker)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -ptest_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+        volumes:
+          - ${{ github.workspace }}/test/sql:/docker-entrypoint-initdb.d:ro
+
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -ptest_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Wait for MySQL to be ready
+        run: |
+          timeout 60 bash -c 'until mysqladmin ping -h 127.0.0.1 -P 3306 -u root -ptest_password --silent; do sleep 2; done'
+          echo "MySQL is ready"
+
+      - name: Wait for MariaDB to be ready
+        run: |
+          timeout 60 bash -c 'until mysqladmin ping -h 127.0.0.1 -P 3307 -u root -ptest_password --silent; do sleep 2; done'
+          echo "MariaDB is ready"
+
+      - name: Initialize test data
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/sample-data.sql
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
+          echo "Test data initialized"
+
+      - name: Run Integration Tests with XVFB
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: npm test
+
+      - name: Run Test Coverage
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: npm run test:coverage
+
+      - name: Generate Coverage Report
+        if: always()
+        run: npm run test:coverage:report
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      - name: Check Coverage Thresholds
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "Coverage report generated successfully"
+            cat coverage/coverage-summary.json
+          else
+            echo "⚠️ Coverage report not found"
+          fi
+
+  license-compliance:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check licenses
+        run: |
+          npx license-checker \
+            --failOn "GPL;AGPL;LGPL;SSPL;CC-BY-NC" \
+            --summary || {
+              echo "❌ License compliance check failed!"
+              echo "Found disallowed licenses. Run 'npm run license:check' locally for details."
+              exit 1
+            }
+          echo "✅ License compliance check passed!"
+
   status-check:
     name: Status Check
     runs-on: ubuntu-latest
-    needs: [build-and-test, package, lint-report]
+    needs: [build-and-test, package, lint-report, integration-tests-docker, license-compliance]
     permissions:
       contents: read
     if: always()
@@ -228,6 +360,16 @@ jobs:
           # Package job is skipped on main branch (handled by publish-release.yml)
           if [ "${{ needs.package.result }}" != "success" ] && [ "${{ needs.package.result }}" != "skipped" ]; then
             echo "❌ Package failed"
+            exit 1
+          fi
+          # Integration tests with Docker
+          if [ "${{ needs.integration-tests-docker.result }}" != "success" ]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          fi
+          # License compliance
+          if [ "${{ needs.license-compliance.result }}" != "success" ]; then
+            echo "❌ License compliance check failed"
             exit 1
           fi
           echo "✅ All checks passed - PR is ready to merge!"

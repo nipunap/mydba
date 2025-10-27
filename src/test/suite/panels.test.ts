@@ -7,7 +7,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 
 suite('Panel Lifecycle Tests', () => {
-    test.skip('Process List panel opens successfully', async function() {
+    test('Process List panel opens successfully', async function() {
         // SKIPPED: This test requires an active database connection
         // Process List panel creation is tested in integration tests with Docker
         // The command is registered and functional, but requires a valid connectionId
@@ -21,10 +21,10 @@ suite('Panel Lifecycle Tests', () => {
                 vscode.commands.executeCommand('mydba.showProcessList', undefined),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Command timeout')), 2000))
             ]);
-            
+
             // Give the panel time to open or show error message
             await new Promise(resolve => setTimeout(resolve, 500));
-            
+
             // If we get here, the command executed (may show "no connection" message)
             assert.ok(true, 'Process List command executed without hanging');
         } catch (error: any) {
@@ -37,7 +37,7 @@ suite('Panel Lifecycle Tests', () => {
         }
     });
 
-    test.skip('Metrics Dashboard panel refreshes correctly', async function() {
+    test('Metrics Dashboard panel refreshes correctly', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(10000);
 
@@ -51,7 +51,7 @@ suite('Panel Lifecycle Tests', () => {
         assert.ok(true, 'Metrics Dashboard panel opened without error');
     });
 
-    test.skip('EXPLAIN Viewer panel opens with query', async function() {
+    test('EXPLAIN Viewer panel opens with query', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(10000);
 
@@ -67,7 +67,7 @@ suite('Panel Lifecycle Tests', () => {
         assert.ok(true, 'EXPLAIN Viewer panel opened without error');
     });
 
-    test.skip('Query Editor panel opens successfully', async function() {
+    test('Query Editor panel opens successfully', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(10000);
 
@@ -81,7 +81,7 @@ suite('Panel Lifecycle Tests', () => {
         assert.ok(true, 'Query Editor panel opened without error');
     });
 
-    test.skip('Variables panel opens successfully', async function() {
+    test('Variables panel opens successfully', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(10000);
 
@@ -95,7 +95,7 @@ suite('Panel Lifecycle Tests', () => {
         assert.ok(true, 'Variables panel opened without error');
     });
 
-    test.skip('Slow Queries panel opens successfully', async function() {
+    test('Slow Queries panel opens successfully', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(10000);
 
@@ -109,7 +109,7 @@ suite('Panel Lifecycle Tests', () => {
         assert.ok(true, 'Slow Queries panel opened without error');
     });
 
-    test.skip('Queries Without Indexes panel opens successfully', async function() {
+    test('Queries Without Indexes panel opens successfully', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(10000);
 
@@ -123,7 +123,7 @@ suite('Panel Lifecycle Tests', () => {
         assert.ok(true, 'Queries Without Indexes panel opened without error');
     });
 
-    test.skip('Multiple panels can coexist', async function() {
+    test('Multiple panels can coexist', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(15000);
 
@@ -141,7 +141,7 @@ suite('Panel Lifecycle Tests', () => {
         assert.ok(true, 'Multiple panels coexist without error');
     });
 
-    test.skip('Panel disposal cleanup', async function() {
+    test('Panel disposal cleanup', async function() {
         // SKIPPED: Requires active database connection
         this.timeout(10000);
 

@@ -6,198 +6,227 @@
 
 import * as assert from 'assert';
 import { MySQLAdapter } from '../../adapters/mysql-adapter';
-import { Logger } from '../../utils/logger';
-import { ConnectionConfig } from '../../types';
+import {
+    createTestConnection,
+    disconnectAdapter,
+    isPerformanceSchemaEnabled,
+    waitForPerformanceSchema,
+    executeSlowQuery,
+    executeUnindexedQuery,
+    cleanupTestData
+} from '../helpers/database-helper';
 
 suite('Database Operations Tests', () => {
     let adapter: MySQLAdapter;
-    let logger: Logger;
 
-    const testConfig: ConnectionConfig = {
-        id: 'test-connection',
-        name: 'Test MySQL',
-        type: 'mysql',
-        host: 'localhost',
-        port: 3307, // Using port 3307 for test database
-        user: 'root',
-        password: 'test',
-        database: 'testdb',
-        environment: 'dev'
-    };
-
-    suiteSetup(function() {
+    suiteSetup(async function() {
         this.timeout(30000);
-        logger = new Logger('test');
-        adapter = new MySQLAdapter(testConfig, logger);
+        try {
+            adapter = await createTestConnection({
+                waitForInit: true,
+                maxRetries: 10
+            });
+        } catch (error) {
+            console.error('Failed to create test connection:', error);
+            this.skip();
+        }
     });
 
     suiteTeardown(async function() {
         this.timeout(10000);
         if (adapter) {
-            await adapter.disconnect();
+            await disconnectAdapter(adapter);
         }
     });
 
     test('Connect to test database', async function() {
         this.timeout(10000);
 
-        try {
-            await adapter.connect(testConfig);
-            assert.ok(adapter.isConnected(), 'Connection should succeed');
-        } catch (error) {
-            // If test DB is not available, skip the test
-            this.skip();
-        }
+        assert.ok(adapter, 'Adapter should be initialized');
+        assert.ok(adapter.isConnected(), 'Connection should be active');
     });
 
     test('Execute simple query with proper escaping', async function() {
         this.timeout(10000);
 
-        try {
-            await adapter.connect(testConfig);
+        // Test parameterized query (safe from SQL injection)
+        const safeValue = '1\' OR \'1\'=\'1';
+        const result = await adapter.query('SELECT ? as safe_value', [safeValue]);
 
-            // Test parameterized query (safe from SQL injection)
-            const safeValue = '1\' OR \'1\'=\'1';
-            const result = await adapter.query('SELECT ? as safe_value', [safeValue]);
-
-            assert.ok(result, 'Query should return result');
-            assert.ok(Array.isArray(result), 'Result should be an array');
-        } catch (error) {
-            this.skip();
-        }
+        assert.ok(result, 'Query should return result');
+        assert.ok(Array.isArray(result), 'Result should be an array');
+        assert.strictEqual((result[0] as any).safe_value, safeValue, 'Value should be properly escaped');
     });
 
     test('Get process list', async function() {
         this.timeout(10000);
 
-        try {
-            await adapter.connect(testConfig);
-            const processes = await adapter.getProcessList();
+        const processes = await adapter.getProcessList();
 
-            assert.ok(Array.isArray(processes), 'Process list should be an array');
-            assert.ok(processes.length > 0, 'Should have at least one process (current connection)');
+        assert.ok(Array.isArray(processes), 'Process list should be an array');
+        assert.ok(processes.length > 0, 'Should have at least one process (current connection)');
 
-            // Check process structure
-            const process = processes[0];
-            assert.ok(typeof process.id === 'number', 'Process should have id');
-            assert.ok(typeof process.user === 'string', 'Process should have user');
-            assert.ok(typeof process.host === 'string', 'Process should have host');
-        } catch (error) {
-            this.skip();
-        }
+        // Check process structure
+        const process = processes[0];
+        assert.ok(typeof process.id === 'number', 'Process should have id');
+        assert.ok(typeof process.user === 'string', 'Process should have user');
+        assert.ok(typeof process.host === 'string', 'Process should have host');
+
+        // Check for transaction detection fields
+        assert.ok('inTransaction' in process, 'Process should have inTransaction field');
+        assert.ok('autocommit' in process, 'Process should have autocommit field');
     });
 
     test('Get server version', async function() {
         this.timeout(10000);
 
-        try {
-            await adapter.connect(testConfig);
-            const version = adapter.version;
+        const version = adapter.version;
 
-            assert.ok(version, 'Should return version string');
-            assert.ok(version.length > 0, 'Version should not be empty');
-            assert.ok(version.match(/\d+\.\d+/), 'Version should have format x.y');
-        } catch (error) {
-            this.skip();
-        }
+        assert.ok(version, 'Should return version string');
+        assert.ok(version.length > 0, 'Version should not be empty');
+        assert.ok(version.match(/\d+\.\d+/), 'Version should have format x.y');
+
+        // Should be MySQL 8.x
+        assert.ok(version.startsWith('8.'), 'Should be MySQL 8.x');
     });
 
     test('Get database list', async function() {
         this.timeout(10000);
 
-        try {
-            await adapter.connect(testConfig);
-            const databases = await adapter.getDatabases();
+        const databases = await adapter.getDatabases();
 
-            assert.ok(Array.isArray(databases), 'Databases should be an array');
-            assert.ok(databases.length > 0, 'Should have at least one database');
+        assert.ok(Array.isArray(databases), 'Databases should be an array');
+        assert.ok(databases.length > 0, 'Should have at least one database');
 
-            // Check that test database exists
-            const testDb = databases.find(db => db.name === 'testdb');
-            assert.ok(testDb, 'Test database should exist');
-        } catch (error) {
-            this.skip();
-        }
+        // Check that test database exists
+        const testDb = databases.find(db => db.name === 'test_db');
+        assert.ok(testDb, 'Test database should exist');
+
+        // Standard system databases should exist
+        const systemDbs = ['information_schema', 'mysql', 'performance_schema'];
+        systemDbs.forEach(dbName => {
+            const db = databases.find(d => d.name === dbName);
+            assert.ok(db, `System database ${dbName} should exist`);
+        });
     });
 
     test('Transaction detection with Performance Schema', async function() {
         this.timeout(15000);
 
-        try {
-            await adapter.connect(testConfig);
-
-            // Check if Performance Schema is enabled
-            const [psConfig] = await adapter.query<any[]>(
-                "SELECT @@global.performance_schema AS enabled"
-            ) as any[];
-
-            if (!psConfig || psConfig[0]?.enabled !== 1) {
-                // Performance Schema not enabled, skip test
-                this.skip();
-                return;
-            }
-
-            // Start a transaction
-            await adapter.query('START TRANSACTION');
-
-            // Get process list with transaction detection
-            const processes = await adapter.getProcessList();
-
-            // Find current connection
-            const currentProcess = processes.find(p => p.command !== 'Sleep');
-
-            // Transaction detection may not be immediate
-            // This is a best-effort test
-            assert.ok(processes, 'Process list should be retrieved');
-
-            // Rollback transaction
-            await adapter.query('ROLLBACK');
-        } catch (error) {
+        // Check if Performance Schema is enabled
+        const psEnabled = await isPerformanceSchemaEnabled(adapter);
+        if (!psEnabled) {
             this.skip();
+            return;
         }
+
+        // Wait for Performance Schema to be ready
+        await waitForPerformanceSchema(adapter);
+
+        // Start a transaction
+        await adapter.query('START TRANSACTION');
+        await adapter.query('SELECT * FROM users WHERE id = 1 FOR UPDATE');
+
+        // Give Performance Schema time to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Get process list with transaction detection
+        const processes = await adapter.getProcessList();
+
+        // Find current connection process
+        const currentProcess = processes.find(p => p.user === 'root' && p.db === 'test_db');
+
+        assert.ok(currentProcess, 'Current process should be found');
+
+        // Note: Transaction detection depends on Performance Schema configuration
+        // The process should have transaction information if available
+        if (currentProcess.inTransaction !== undefined) {
+            // Transaction detection is working
+            console.log('Transaction detected:', currentProcess.inTransaction);
+        }
+
+        // Rollback transaction
+        await adapter.query('ROLLBACK');
     });
 
     test('Handle connection errors gracefully', async function() {
         this.timeout(10000);
 
-        const invalidConfig: ConnectionConfig = {
-            ...testConfig,
-            port: 9999, // Invalid port
-            id: 'invalid-connection',
-            name: 'Invalid Connection'
-        };
-
-        const testAdapter = new MySQLAdapter(invalidConfig, logger);
+        let testAdapter: MySQLAdapter | null = null;
 
         try {
-            await testAdapter.connect(invalidConfig);
+            // Try to connect to invalid port
+            testAdapter = await createTestConnection({
+                port: 9999,
+                maxRetries: 1
+            });
             assert.fail('Connection should have failed');
         } catch (error) {
             // Expected to fail
-            assert.ok(true, 'Connection failed as expected');
+            assert.ok(error instanceof Error, 'Should throw an Error');
+            assert.ok(
+                (error as Error).message.includes('Failed to connect'),
+                'Error message should indicate connection failure'
+            );
         } finally {
-            await testAdapter.disconnect();
+            if (testAdapter) {
+                await disconnectAdapter(testAdapter);
+            }
         }
     });
 
     test('Disconnect properly cleans up resources', async function() {
         this.timeout(10000);
 
-        const testAdapter = new MySQLAdapter(testConfig, logger);
+        const testAdapter = await createTestConnection();
 
+        assert.ok(testAdapter.isConnected(), 'Should be connected initially');
+
+        await disconnectAdapter(testAdapter);
+
+        assert.ok(!testAdapter.isConnected(), 'Should be disconnected');
+
+        // Try to query after disconnect (should fail)
         try {
-            await testAdapter.connect(testConfig);
-            await testAdapter.disconnect();
-
-            // Try to query after disconnect (should fail)
-            try {
-                await testAdapter.query('SELECT 1', []);
-                assert.fail('Query should fail after disconnect');
-            } catch (error) {
-                assert.ok(true, 'Query failed after disconnect as expected');
-            }
+            await testAdapter.query('SELECT 1', []);
+            assert.fail('Query should fail after disconnect');
         } catch (error) {
-            this.skip();
+            assert.ok(error instanceof Error, 'Should throw an Error');
         }
+    });
+
+    test('Query with test data', async function() {
+        this.timeout(10000);
+
+        const users = await adapter.query('SELECT * FROM users LIMIT 5');
+
+        assert.ok(Array.isArray(users), 'Users should be an array');
+        assert.ok(users.length > 0, 'Should have users from sample data');
+
+        const user = users[0] as any;
+        assert.ok(user.id, 'User should have id');
+        assert.ok(user.username, 'User should have username');
+        assert.ok(user.email, 'User should have email');
+    });
+
+    test('Execute slow query', async function() {
+        this.timeout(10000);
+
+        const startTime = Date.now();
+        await executeSlowQuery(adapter, 1);
+        const duration = Date.now() - startTime;
+
+        assert.ok(duration >= 1000, 'Slow query should take at least 1 second');
+        assert.ok(duration < 2000, 'Slow query should complete in reasonable time');
+    });
+
+    test('Execute unindexed query', async function() {
+        this.timeout(10000);
+
+        // This should execute without errors
+        await executeUnindexedQuery(adapter);
+
+        // Query should complete (even if slow)
+        assert.ok(true, 'Unindexed query should complete');
     });
 });

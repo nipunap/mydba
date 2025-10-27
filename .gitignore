@@ -23,3 +23,9 @@ lerna-debug.log*
 docs/tmp/
 temp/
 *.tmp
+
+# License reports (generated in CI)
+license-report.json
+license-report.csv
+license-summary.txt
+license-detailed-report.md

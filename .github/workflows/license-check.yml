@@ -1,0 +1,395 @@
+name: License Compliance Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, develop]
+  schedule:
+    # Run weekly on Monday at 00:00 UTC to catch new dependency issues
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  license-check:
+    name: Check Dependency Licenses
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install license-checker
+        run: npm install -g license-checker
+
+      - name: Check licenses
+        id: license_check
+        run: |
+          echo "Running license compliance check..."
+
+          # Generate full license report
+          license-checker --json --out license-report.json || true
+          license-checker --csv --out license-report.csv || true
+
+          # Check for disallowed licenses
+          # Fail if we find GPL, AGPL, or other copyleft licenses
+          license-checker \
+            --failOn "GPL;AGPL;LGPL;SSPL;CC-BY-NC;Unlicense" \
+            --summary > license-summary.txt 2>&1 || {
+              echo "❌ License compliance check failed!"
+              echo "Found disallowed licenses. See summary below:"
+              cat license-summary.txt
+              echo "license_failed=true" >> $GITHUB_OUTPUT
+              exit 1
+            }
+
+          # Check for packages without licenses
+          license-checker \
+            --excludePrivatePackages \
+            --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;BlueOak-1.0.0;Python-2.0;CC0-1.0;Unlicense" \
+            --summary >> license-summary.txt 2>&1 || {
+              echo "⚠️ Some packages have unverified licenses"
+              cat license-summary.txt
+              echo "license_warning=true" >> $GITHUB_OUTPUT
+            }
+
+          echo "✅ License compliance check passed!"
+          echo "license_passed=true" >> $GITHUB_OUTPUT
+
+      - name: Generate detailed license report
+        if: always()
+        run: |
+          echo "# License Report" > license-detailed-report.md
+          echo "" >> license-detailed-report.md
+          echo "Generated: $(date)" >> license-detailed-report.md
+          echo "" >> license-detailed-report.md
+
+          # Add summary
+          echo "## Summary" >> license-detailed-report.md
+          echo '```' >> license-detailed-report.md
+          cat license-summary.txt >> license-detailed-report.md
+          echo '```' >> license-detailed-report.md
+          echo "" >> license-detailed-report.md
+
+          # Add allowed licenses list
+          echo "## Allowed Licenses" >> license-detailed-report.md
+          echo "The following licenses are approved for use:" >> license-detailed-report.md
+          echo "- MIT" >> license-detailed-report.md
+          echo "- Apache-2.0" >> license-detailed-report.md
+          echo "- BSD-2-Clause" >> license-detailed-report.md
+          echo "- BSD-3-Clause" >> license-detailed-report.md
+          echo "- ISC" >> license-detailed-report.md
+          echo "- 0BSD" >> license-detailed-report.md
+          echo "- CC0-1.0" >> license-detailed-report.md
+          echo "- Python-2.0" >> license-detailed-report.md
+          echo "" >> license-detailed-report.md
+
+          # Add disallowed licenses list
+          echo "## Disallowed Licenses" >> license-detailed-report.md
+          echo "The following licenses are NOT allowed (copyleft, proprietary, or restrictive):" >> license-detailed-report.md
+          echo "- GPL (all versions)" >> license-detailed-report.md
+          echo "- AGPL (all versions)" >> license-detailed-report.md
+          echo "- LGPL (all versions)" >> license-detailed-report.md
+          echo "- SSPL (Server Side Public License)" >> license-detailed-report.md
+          echo "- CC-BY-NC (Non-Commercial Creative Commons)" >> license-detailed-report.md
+          echo "" >> license-detailed-report.md
+
+          # Count licenses by type
+          echo "## License Distribution" >> license-detailed-report.md
+          echo '```' >> license-detailed-report.md
+          license-checker --summary >> license-detailed-report.md 2>&1 || true
+          echo '```' >> license-detailed-report.md
+
+      - name: Upload license reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: |
+            license-report.json
+            license-report.csv
+            license-summary.txt
+            license-detailed-report.md
+          retention-days: 90
+
+      - name: Post PR comment on license violations
+        if: github.event_name == 'pull_request' && steps.license_check.outputs.license_failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('license-summary.txt', 'utf8');
+
+            // Delete previous bot comments to avoid spam
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            for (const comment of comments) {
+              if (comment.user.type === 'Bot' && comment.body.includes('License Compliance Check')) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            // Post new comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ❌ License Compliance Check Failed
+
+              This PR introduces dependencies with **disallowed licenses** and cannot be merged.
+
+              ### License Summary
+              \`\`\`
+              ${summary}
+              \`\`\`
+
+              ### Action Required
+              Please review the dependencies and either:
+              1. **Replace packages** with disallowed licenses (recommended)
+              2. **Remove the dependency** if not critical
+              3. **Request an exception** if the license is necessary (requires legal review)
+
+              ### How to Fix
+              \`\`\`bash
+              # Check which packages have issues locally
+              npm run license:check
+
+              # Verify after making changes
+              npm run license:verify
+              \`\`\`
+
+              ### Allowed Licenses ✅
+              - MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, CC0-1.0, Python-2.0
+
+              ### Disallowed Licenses ❌
+              - **GPL, AGPL, LGPL** - Copyleft licenses (require derivative works to be open source)
+              - **SSPL** - Server Side Public License (restrictive for SaaS)
+              - **CC-BY-NC** - Non-Commercial (prohibits commercial use)
+
+              ### Additional Resources
+              - 📖 [License Compliance Policy](https://github.com/${{ github.repository }}/blob/${{ github.head_ref || github.ref_name }}/docs/LICENSE_COMPLIANCE.md)
+              - 📊 [Detailed License Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+              ---
+              *This check is required for merging. The PR will remain blocked until resolved.*`
+            });
+
+      - name: Post PR comment on license warnings
+        if: github.event_name == 'pull_request' && steps.license_check.outputs.license_warning == 'true' && steps.license_check.outputs.license_failed != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('license-summary.txt', 'utf8');
+
+            // Delete previous bot comments
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            for (const comment of comments) {
+              if (comment.user.type === 'Bot' && comment.body.includes('License Compliance')) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            // Post new comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ⚠️ License Compliance Warning
+
+              Some dependencies have unverified or non-standard licenses. Please review before merging.
+
+              ### License Summary
+              \`\`\`
+              ${summary}
+              \`\`\`
+
+              ### Recommended Actions
+              - Review each package's license manually
+              - Verify licenses are compatible with commercial use
+              - Check if alternatives with clearer licenses exist
+
+              ### How to Check Locally
+              \`\`\`bash
+              npm run license:check
+              npm run license:report  # Generate detailed reports
+              \`\`\`
+
+              📊 [View detailed license report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+              ---
+              *This is a warning only. The PR can still be merged, but please verify licenses are acceptable.*`
+            });
+
+      - name: Post success comment on PR
+        if: github.event_name == 'pull_request' && steps.license_check.outputs.license_passed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Delete previous bot comments
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            for (const comment of comments) {
+              if (comment.user.type === 'Bot' && comment.body.includes('License Compliance')) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            // Post success comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ✅ License Compliance Check Passed
+
+              All dependencies use approved licenses. This PR is compliant with the license policy.
+
+              ### Status
+              - All licenses are compatible with commercial and open-source distribution
+              - No copyleft or restrictive licenses detected
+              - Ready to merge from a license perspective
+
+              📊 [View detailed license report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+              ---
+              *License compliance verified automatically.*`
+            });
+
+      - name: Add PR label on success
+        if: github.event_name == 'pull_request' && steps.license_check.outputs.license_passed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['license:compliant']
+              });
+            } catch (error) {
+              console.log('Label may not exist, skipping...');
+            }
+
+      - name: Add PR label on failure
+        if: github.event_name == 'pull_request' && steps.license_check.outputs.license_failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['license:violation', 'blocked']
+              });
+            } catch (error) {
+              console.log('Labels may not exist, skipping...');
+            }
+
+      - name: Fail on license violations
+        if: steps.license_check.outputs.license_failed == 'true'
+        run: |
+          echo "❌ License compliance check failed. Cannot merge with disallowed licenses."
+          echo ""
+          echo "This PR is blocked due to license violations."
+          echo "See the PR comment for details and remediation steps."
+          exit 1
+
+  license-report:
+    name: Generate License Attribution Report
+    runs-on: ubuntu-latest
+    needs: license-check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate THIRD_PARTY_LICENSES.md
+        run: |
+          npx license-checker --markdown --out THIRD_PARTY_LICENSES.md || true
+
+          # Add header
+          echo "# Third Party Licenses" > THIRD_PARTY_LICENSES_FINAL.md
+          echo "" >> THIRD_PARTY_LICENSES_FINAL.md
+          echo "This document contains the licenses of all third-party dependencies used in MyDBA." >> THIRD_PARTY_LICENSES_FINAL.md
+          echo "" >> THIRD_PARTY_LICENSES_FINAL.md
+          echo "Generated: $(date)" >> THIRD_PARTY_LICENSES_FINAL.md
+          echo "" >> THIRD_PARTY_LICENSES_FINAL.md
+          echo "---" >> THIRD_PARTY_LICENSES_FINAL.md
+          echo "" >> THIRD_PARTY_LICENSES_FINAL.md
+          cat THIRD_PARTY_LICENSES.md >> THIRD_PARTY_LICENSES_FINAL.md
+
+          mv THIRD_PARTY_LICENSES_FINAL.md THIRD_PARTY_LICENSES.md
+
+      - name: Upload Third Party Licenses
+        uses: actions/upload-artifact@v4
+        with:
+          name: third-party-licenses
+          path: THIRD_PARTY_LICENSES.md
+          retention-days: 365
+
+  status-check:
+    name: License Check Status
+    runs-on: ubuntu-latest
+    needs: [license-check, license-report]
+    if: always()
+
+    steps:
+      - name: Check license status
+        run: |
+          if [ "${{ needs.license-check.result }}" != "success" ]; then
+            echo "❌ License check failed"
+            exit 1
+          fi
+
+          echo "✅ All license checks passed"

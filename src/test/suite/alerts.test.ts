@@ -42,7 +42,7 @@ suite('Alert System Tests', () => {
 
         // Re-read configuration after update
         const updatedConfig = vscode.workspace.getConfiguration('mydba.alerts');
-        
+
         // Note: In real testing, we would need to mock the database adapter
         // to return metrics that exceed the threshold. For now, we verify
         // that the configuration is set correctly.

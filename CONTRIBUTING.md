@@ -474,18 +474,103 @@ npm run test:e2e
 
 ### Test Database Setup
 
-Integration tests use Docker containers:
+Integration tests use Docker containers with MySQL 8.0 and MariaDB 10.11:
 
 ```bash
-# Start test databases
+# Start test databases (MySQL 8.0 on port 3306, MariaDB 10.11 on port 3307)
 docker-compose -f docker-compose.test.yml up -d
+
+# Wait for databases to be ready (health checks take ~30 seconds)
+docker-compose -f docker-compose.test.yml ps
+
+# Verify test data was initialized
+docker exec mydba-mysql-8.0 mysql -u root -ptest_password test_db -e "SELECT COUNT(*) FROM users"
 
 # Run integration tests
 npm run test:integration
 
+# Run with coverage
+npm run test:coverage
+
 # Stop test databases
 docker-compose -f docker-compose.test.yml down
 ```
+
+**Test Database Configuration:**
+- **MySQL 8.0**: localhost:3306, user: `root`, password: `test_password`, database: `test_db`
+- **MariaDB 10.11**: localhost:3307, user: `root`, password: `test_password`, database: `test_db`
+- **Performance Schema**: Enabled on MySQL 8.0 for transaction detection tests
+- **Test Data**: Automatically loaded from `test/sql/sample-data.sql` on startup
+
+**Troubleshooting Docker Tests:**
+```bash
+# View MySQL logs
+docker logs mydba-mysql-8.0
+
+# View MariaDB logs
+docker logs mydba-mariadb-10.11
+
+# Connect to MySQL directly
+docker exec -it mydba-mysql-8.0 mysql -u root -ptest_password test_db
+
+# Reset containers (if data gets corrupted)
+docker-compose -f docker-compose.test.yml down -v
+docker-compose -f docker-compose.test.yml up -d
+```
+
+---
+
+## License Compliance
+
+MyDBA enforces strict license compliance for all dependencies. Before adding new dependencies, verify they use compatible licenses.
+
+### Allowed Licenses
+- **Permissive:** MIT, Apache-2.0, BSD-2/3-Clause, ISC, 0BSD, CC0-1.0
+- **Python:** Python-2.0
+
+### Disallowed Licenses (Copyleft/Restrictive)
+- **GPL, AGPL, LGPL** - Viral copyleft licenses
+- **SSPL** - Server-Side Public License
+- **CC-BY-NC** - Non-commercial restrictions
+
+### Check Licenses Locally
+```bash
+# Quick summary of all licenses
+npm run license:check
+
+# Verify no disallowed licenses (same as CI)
+npm run license:verify
+
+# Generate detailed reports
+npm run license:report
+```
+
+### Adding Dependencies
+Before installing a new package:
+```bash
+# Check package license
+npm info <package-name> license
+
+# Install and verify
+npm install <package-name>
+npm run license:verify
+```
+
+**PR-Level Enforcement:**
+- ✅ **Pass:** Green check, `license:compliant` label added, PR comment posted
+- ❌ **Fail:** Red X, `license:violation` and `blocked` labels added, detailed PR comment with remediation steps
+- ⚠️ **Warning:** Yellow warning, PR comment posted, can still merge
+
+**What Happens on Your PR:**
+1. License check runs automatically when you open/update a PR
+2. Bot posts a comment with detailed status (✅/❌/⚠️)
+3. PR is blocked if disallowed licenses are found
+4. Labels are automatically added for tracking
+5. Detailed reports available as CI artifacts
+
+For more details, see:
+- [License Compliance Policy](docs/LICENSE_COMPLIANCE.md)
+- [PR Checks Guide](docs/PR_CHECKS.md)
 
 ---
 
@@ -496,6 +581,7 @@ docker-compose -f docker-compose.test.yml down
 - [ ] Code compiles without errors (`npm run compile`)
 - [ ] All tests pass (`npm test`)
 - [ ] Linting passes (`npm run lint`)
+- [ ] License compliance verified (`npm run license:verify`)
 - [ ] Code is formatted (`npm run format`)
 - [ ] Documentation is updated (if applicable)
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
