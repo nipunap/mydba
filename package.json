@@ -4,7 +4,7 @@
   "description": "AI-powered database management and optimization for MySQL, MariaDB, PostgreSQL, Redis, and Valkey",
   "version": "0.1.0",
   "publisher": "mydba",
-  "icon": "resources/mydba-icon.png",
+  "icon": "resources/mydba.svg",
   "engines": {
     "vscode": "^1.85.0"
   },
