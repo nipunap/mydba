@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="resources/mydba.png" alt="MyDBA Logo" width="200">
+</p>
+
 # MyDBA - AI-Powered Database Assistant
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=mydba.mydba)
@@ -35,12 +39,6 @@ Real-time monitoring dashboard showing:
 - Queries per second with slow query detection
 - Buffer pool hit rate
 - Thread activity (running vs connected)
-
-### Coming Soon (Phase 2)
-- PostgreSQL, Redis, Valkey support
-- Host-level metrics integration
-- Advanced AI features with semantic search
-- Percona Toolkit inspired features
 
 ## 📋 Requirements
 
@@ -409,33 +407,6 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for detai
 - Monitoring database performance after changes
 
 See [SECURITY.md](SECURITY.md) for security policies and supported versions.
-
-## 🗺️ Roadmap
-
-### Phase 1 (Weeks 1-20) - MVP
-- [x] Project architecture and documentation
-- [ ] Core extension framework
-- [ ] MySQL/MariaDB adapter
-- [ ] Basic tree view and database explorer
-- [ ] AI integration with VSCode LM API
-- [ ] Visual EXPLAIN plan viewer
-- [ ] Query profiling with Performance Schema
-- [ ] VSCode chat integration (@mydba)
-- [ ] Security safeguards and production guardrails
-
-### Phase 2 (Weeks 21-40) - Enhancements
-- [ ] PostgreSQL adapter
-- [ ] Redis/Valkey adapter
-- [ ] Host-level metrics integration
-- [ ] Advanced AI features (semantic RAG)
-- [ ] Percona Toolkit inspired features
-- [ ] Enhanced dashboards and visualizations
-
-### Phase 3 (Weeks 41-60) - Multi-Database
-- [ ] Unified metrics interface
-- [ ] Cross-database query analysis
-- [ ] Advanced profiling features
-- [ ] Cloud-native deployment support
 
 ## 📞 Support
 
