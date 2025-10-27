@@ -403,6 +403,16 @@
           "type": "number",
           "default": 10,
           "description": "Alert when slow queries per minute exceeds this value"
+        },
+        "mydba.alerts.slowQueryThreshold": {
+          "type": "number",
+          "default": 1000,
+          "description": "Alert when query execution time exceeds this value (milliseconds)"
+        },
+        "mydba.alerts.bufferPoolHitRateThreshold": {
+          "type": "number",
+          "default": 90,
+          "description": "Alert when buffer pool hit rate falls below this percentage"
         }
       }
     },

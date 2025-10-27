@@ -95,7 +95,7 @@ suite('AI Service Integration Tests', () => {
         const analysis = analyzer.analyze(query);
 
         const missingWherePattern = analysis.antiPatterns.find(
-            ap => ap.type === 'missing_where_delete_update'
+            ap => ap.type === 'missing_where'
         );
 
         assert.ok(missingWherePattern, 'Should detect missing WHERE in DELETE');
@@ -209,7 +209,7 @@ suite('AI Service Integration Tests', () => {
         // Both should return valid arrays (may be empty if no keyword matches)
         assert.ok(Array.isArray(mysqlDocs), 'Should return MySQL docs array');
         assert.ok(Array.isArray(mariadbDocs), 'Should return MariaDB docs array');
-        
+
         // At least one should have results with index-related keywords
         assert.ok(mysqlDocs.length >= 0 && mariadbDocs.length >= 0, 'Should return valid results');
     });
@@ -242,8 +242,8 @@ suite('AI Service Integration Tests', () => {
         assert.ok(upperAnon.includes('LIMIT'), 'Should preserve LIMIT');
 
         // Check literal replacement (literals should be replaced or query should have placeholders)
-        const hasReplacements = !anonymized.includes('test@example.com') || 
-                               !anonymized.includes('100.50') || 
+        const hasReplacements = !anonymized.includes('test@example.com') ||
+                               !anonymized.includes('100.50') ||
                                !anonymized.includes('2024-01-01') ||
                                anonymized.includes('?');
         assert.ok(hasReplacements, 'Should replace literals with placeholders');
