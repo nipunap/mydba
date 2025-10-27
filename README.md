@@ -10,8 +10,8 @@
 [![Phase 1](https://img.shields.io/badge/Phase%201-Complete-brightgreen.svg)](docs/PHASE1_COMPLETION_PLAN.md)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/your-org/mydba/actions)
 [![Coverage](https://img.shields.io/badge/coverage-%3E70%25-brightgreen.svg)](coverage/index.html)
-[![License Compliance](https://img.shields.io/badge/licenses-compliant-brightgreen.svg)](docs/LICENSE_COMPLIANCE.md)
-[![PR Checks](https://img.shields.io/badge/PR%20checks-automated-blue.svg)](docs/PR_CHECKS.md)
+[![License Compliance](https://img.shields.io/badge/licenses-compliant-brightgreen.svg)](https://github.com/your-org/mydba/actions)
+[![PR Checks](https://img.shields.io/badge/PR%20checks-automated-blue.svg)](https://github.com/your-org/mydba/actions)
 
 MyDBA is an AI-powered VSCode extension that brings database management, monitoring, and optimization directly into your development environment. Built for developers and database administrators who want intelligent insights without leaving their IDE.
 
@@ -416,7 +416,6 @@ See [SECURITY.md](SECURITY.md) for security policies and supported versions.
   - [Database Setup Guide](docs/DATABASE_SETUP.md)
   - [Quick Reference](docs/QUICK_REFERENCE.md)
   - [Testing Guide](test/MARIADB_TESTING.md)
-  - [Product Roadmap](docs/PRODUCT_ROADMAP.md)
 
 ## 🙏 Acknowledgments
 

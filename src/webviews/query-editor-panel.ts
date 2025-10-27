@@ -184,18 +184,29 @@ export class QueryEditorPanel {
                 throw new Error('Connection not found');
             }
 
+            // Remove any existing EXPLAIN prefix to avoid double EXPLAIN
+            let cleanQuery = query.trim();
+            const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
+            cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
+
             // Execute EXPLAIN
-            const explainQuery = `EXPLAIN FORMAT=JSON ${query}`;
+            const explainQuery = `EXPLAIN FORMAT=JSON ${cleanQuery}`;
             const result = await adapter.query<any>(explainQuery);
 
-            // Open the enhanced EXPLAIN viewer panel
+            // Create AI service for enhanced analysis
+            const { AIService } = await import('../services/ai-service');
+            const aiService = new AIService(this.logger, this.context);
+            await aiService.initialize();
+
+            // Open the enhanced EXPLAIN viewer panel with AI insights
             ExplainViewerPanel.show(
                 this.context,
                 this.logger,
                 this.connectionManager,
                 this.connectionId,
-                query,
-                result.rows?.[0] || {}
+                cleanQuery,
+                result.rows?.[0] || {},
+                aiService
             );
 
         } catch (error) {

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
+import { AIService } from '../services/ai-service';
 
 interface ExplainNode {
     id: string;
@@ -53,7 +54,8 @@ export class ExplainViewerPanel {
         private connectionManager: ConnectionManager,
         private connectionId: string,
         private query: string,
-        private explainData: any
+        private explainData: any,
+        private aiService?: AIService
     ) {
         this.panel = panel;
         this.panel.webview.html = this.getHtml();
@@ -68,7 +70,8 @@ export class ExplainViewerPanel {
         connectionManager: ConnectionManager,
         connectionId: string,
         query: string,
-        explainData: any
+        explainData: any,
+        aiService?: AIService
     ): void {
         const panelKey = `explainViewer-${connectionId}-${Date.now()}`;
         const connection = connectionManager.getConnection(connectionId);
@@ -100,7 +103,8 @@ export class ExplainViewerPanel {
             connectionManager,
             connectionId,
             query,
-            explainData
+            explainData,
+            aiService
         );
         ExplainViewerPanel.panelRegistry.set(panelKey, explainViewerPanel);
     }
@@ -115,12 +119,23 @@ export class ExplainViewerPanel {
                 explainJson = JSON.parse(explainJson.EXPLAIN);
             }
 
+            // Validate EXPLAIN data structure
+            if (!explainJson || typeof explainJson !== 'object') {
+                this.panel.webview.postMessage({
+                    type: 'error',
+                    message: 'Invalid EXPLAIN data received. The query may not have been executed properly.'
+                });
+                this.logger.error('Invalid EXPLAIN data:', explainJson);
+                return;
+            }
+
             // Check if this is a Performance Schema or system table query (no EXPLAIN available)
-            if (!explainJson || !explainJson.query_block) {
+            if (!explainJson.query_block) {
                 this.panel.webview.postMessage({
                     type: 'error',
                     message: 'EXPLAIN is not available for Performance Schema or system tables. Please try with a regular user table query.'
                 });
+                this.logger.warn('No query_block found in EXPLAIN data:', explainJson);
                 return;
             }
 
@@ -138,6 +153,9 @@ export class ExplainViewerPanel {
                 query: this.query,
                 rawJson: explainJson
             });
+
+            // Get AI insights asynchronously (don't block the UI)
+            this.getAIInsights(explainJson, treeData);
         } catch (error) {
             this.logger.error('Failed to process EXPLAIN data:', error as Error);
             this.panel.webview.postMessage({
@@ -145,6 +163,145 @@ export class ExplainViewerPanel {
                 message: `Failed to process EXPLAIN data: ${(error as Error).message}`
             });
         }
+    }
+
+    private async getAIInsights(explainJson: any, treeData: ExplainNode): Promise<void> {
+        if (!this.aiService) {
+            this.logger.debug('AI service not available, skipping AI insights');
+            return;
+        }
+
+        try {
+            this.logger.info('Requesting AI analysis for execution plan...');
+
+            // Send loading state to webview
+            this.panel.webview.postMessage({
+                type: 'aiInsightsLoading'
+            });
+
+            // Build a comprehensive context for AI
+            const issues = this.collectAllIssues(treeData);
+            const tables = this.extractTableNames(explainJson);
+            const totalCost = treeData.cost || 0;
+            const estimatedRows = this.getTotalRowCount(treeData);
+
+            // Create a detailed prompt context
+            const explainSummary = this.buildExplainSummary(explainJson, treeData, issues);
+            const analysisPrompt = `${this.query}\n\n--- EXECUTION PLAN ANALYSIS ---\n${explainSummary}`;
+
+            // Get AI analysis
+            const aiResult = await this.aiService.analyzeQuery(analysisPrompt);
+
+            // Send AI insights to webview
+            this.panel.webview.postMessage({
+                type: 'aiInsights',
+                data: {
+                    summary: aiResult.summary,
+                    antiPatterns: aiResult.antiPatterns,
+                    optimizationSuggestions: aiResult.optimizationSuggestions,
+                    estimatedComplexity: aiResult.estimatedComplexity,
+                    citations: aiResult.citations,
+                    metadata: {
+                        totalCost,
+                        estimatedRows,
+                        tablesCount: tables.size,
+                        issuesCount: issues.length
+                    }
+                }
+            });
+
+            this.logger.info('AI insights sent successfully');
+        } catch (error) {
+            this.logger.error('Failed to get AI insights:', error as Error);
+            this.panel.webview.postMessage({
+                type: 'aiInsightsError',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    private buildExplainSummary(explainJson: any, treeData: ExplainNode, issues: string[]): string {
+        const lines: string[] = [];
+
+        lines.push('Execution Plan Summary:');
+
+        if (treeData.cost) {
+            lines.push(`- Total Estimated Cost: ${treeData.cost.toFixed(2)}`);
+        }
+
+        const totalRows = this.getTotalRowCount(treeData);
+        if (totalRows > 0) {
+            lines.push(`- Total Rows to Examine: ${totalRows.toLocaleString()}`);
+        }
+
+        lines.push('\nTable Access Details:');
+        this.collectTableAccessDetails(treeData, lines, 0);
+
+        if (issues.length > 0) {
+            lines.push('\nDetected Issues:');
+            issues.forEach(issue => lines.push(`- ${issue}`));
+        }
+
+        return lines.join('\n');
+    }
+
+    private collectTableAccessDetails(node: ExplainNode, lines: string[], depth: number): void {
+        const indent = '  '.repeat(depth);
+
+        if (node.table) {
+            const accessInfo = [
+                `${indent}- Table: ${node.table}`,
+                `  ${indent}Access Type: ${node.accessType || 'N/A'}`,
+            ];
+
+            if (node.key) {
+                accessInfo.push(`  ${indent}Index: ${node.key}`);
+            } else if (node.possibleKeys && node.possibleKeys.length > 0) {
+                accessInfo.push(`  ${indent}Possible Keys: ${node.possibleKeys.join(', ')}`);
+            }
+
+            if (node.rows) {
+                accessInfo.push(`  ${indent}Rows: ${node.rows.toLocaleString()}`);
+            }
+
+            if (node.filtered !== undefined) {
+                accessInfo.push(`  ${indent}Filtered: ${node.filtered}%`);
+            }
+
+            lines.push(accessInfo.join('\n'));
+        }
+
+        if (node.children && node.children.length > 0) {
+            node.children.forEach(child => this.collectTableAccessDetails(child, lines, depth + 1));
+        }
+    }
+
+    private collectAllIssues(node: ExplainNode): string[] {
+        const allIssues: string[] = [];
+
+        if (node.issues && node.issues.length > 0) {
+            allIssues.push(...node.issues);
+        }
+
+        if (node.children && node.children.length > 0) {
+            node.children.forEach(child => {
+                allIssues.push(...this.collectAllIssues(child));
+            });
+        }
+
+        return allIssues;
+    }
+
+    private getTotalRowCount(node: ExplainNode): number {
+        let total = node.rows || 0;
+
+        if (node.children && node.children.length > 0) {
+            node.children.forEach(child => {
+                total += this.getTotalRowCount(child);
+            });
+        }
+
+        return total;
     }
 
     private convertToTree(explainJson: any): ExplainNode {
@@ -565,20 +722,6 @@ export class ExplainViewerPanel {
                     <span class="codicon codicon-layout"></span>
                     Toggle View
                 </vscode-button>
-                <vscode-button id="expand-all" appearance="secondary">
-                    <span class="codicon codicon-expand-all"></span>
-                    Expand All
-                </vscode-button>
-                <vscode-button id="collapse-all" appearance="secondary">
-                    <span class="codicon codicon-collapse-all"></span>
-                    Collapse All
-                </vscode-button>
-                <vscode-dropdown id="export-dropdown">
-                    <span slot="indicator">Export</span>
-                    <vscode-option value="png">Export as PNG</vscode-option>
-                    <vscode-option value="svg">Export as SVG</vscode-option>
-                    <vscode-option value="json">Export as JSON</vscode-option>
-                </vscode-dropdown>
             </div>
         </div>
 
@@ -599,6 +742,24 @@ export class ExplainViewerPanel {
             <div class="query-section">
                 <h3>Query</h3>
                 <pre id="query-text"></pre>
+            </div>
+
+            <div id="ai-insights-section" class="ai-insights-section">
+                <div class="ai-insights-header">
+                    <h3>
+                        <span class="codicon codicon-sparkle"></span>
+                        AI-Powered Optimization Insights
+                    </h3>
+                </div>
+                <div id="ai-insights-loading" class="ai-insights-loading" style="display: none;">
+                    <vscode-progress-ring></vscode-progress-ring>
+                    <span>Analyzing execution plan with AI...</span>
+                </div>
+                <div id="ai-insights-error" class="ai-insights-error" style="display: none;">
+                    <span class="codicon codicon-warning"></span>
+                    <span id="ai-insights-error-message"></span>
+                </div>
+                <div id="ai-insights-content" class="ai-insights-content" style="display: none;"></div>
             </div>
 
             <div class="visualization-container">
@@ -631,9 +792,6 @@ export class ExplainViewerPanel {
         this.panel.webview.onDidReceiveMessage(
             async (message: any) => {
                 switch (message.type) {
-                    case 'export':
-                        await this.handleExport(message.format, message.data as ExplainNode, message.rawJson as unknown);
-                        break;
                     case 'log':
                         this.logger.debug(message.message as string);
                         break;
@@ -642,58 +800,6 @@ export class ExplainViewerPanel {
             null,
             this.disposables
         );
-    }
-
-    private async handleExport(format: 'png' | 'svg' | 'json', data?: ExplainNode, rawJson?: unknown): Promise<void> {
-        this.logger.info(`Exporting EXPLAIN plan as ${format}`);
-
-        try {
-            const fileName = `explain-plan-${Date.now()}.${format}`;
-
-            if (format === 'json') {
-                // Security: Validate data exists before export
-                const jsonData = rawJson || this.explainData;
-                if (!jsonData) {
-                    vscode.window.showErrorMessage('No data available for export');
-                    return;
-                }
-
-                const content = JSON.stringify(jsonData, null, 2);
-
-                // Security: Limit export size to prevent DOS
-                const MAX_EXPORT_SIZE = 10 * 1024 * 1024; // 10MB
-                if (content.length > MAX_EXPORT_SIZE) {
-                    vscode.window.showErrorMessage(
-                        `Export data too large (${(content.length / 1024 / 1024).toFixed(2)}MB). Maximum allowed: ${MAX_EXPORT_SIZE / 1024 / 1024}MB`
-                    );
-                    return;
-                }
-
-                const uri = await vscode.window.showSaveDialog({
-                    defaultUri: vscode.Uri.file(fileName),
-                    filters: {
-                        'JSON': ['json']
-                    }
-                });
-
-                if (uri) {
-                    const encoder = new TextEncoder();
-                    await vscode.workspace.fs.writeFile(uri, encoder.encode(content));
-                    vscode.window.showInformationMessage(`Exported to ${uri.fsPath}`);
-                }
-            } else if (format === 'png' || format === 'svg') {
-                // For PNG/SVG export, we'll need to capture the SVG from the webview
-                // This would require html2canvas for PNG
-                this.panel.webview.postMessage({
-                    type: 'exportRequest',
-                    format: format
-                });
-                vscode.window.showInformationMessage(`Export to ${format.toUpperCase()} initiated.`);
-            }
-        } catch (error) {
-            this.logger.error('Failed to export:', error as Error);
-            vscode.window.showErrorMessage(`Failed to export: ${(error as Error).message}`);
-        }
     }
 
     dispose(): void {

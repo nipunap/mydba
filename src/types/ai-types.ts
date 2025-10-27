@@ -3,15 +3,34 @@
  */
 
 export interface SchemaContext {
-    database: string;
-    tables: TableInfo[];
+    database?: string;
+    tables: { [tableName: string]: TableInfo } | TableInfo[];
+    performance?: PerformanceContext;
+}
+
+export interface PerformanceContext {
+    totalDuration?: number;
+    rowsExamined?: number;
+    rowsSent?: number;
+    efficiency?: number;
+    lockTime?: number;
+    stages?: Array<{
+        name: string;
+        duration: number;
+    }>;
 }
 
 export interface TableInfo {
-    name: string;
+    name?: string;
     columns: ColumnInfo[];
     indexes: IndexInfo[];
     rowCount?: number;
+    stats?: {
+        estimatedRows?: number;
+        avgRowLength?: number;
+        dataLength?: number;
+        indexLength?: number;
+    };
 }
 
 export interface ColumnInfo {
@@ -19,11 +38,13 @@ export interface ColumnInfo {
     type: string;
     nullable: boolean;
     key?: string;
+    default?: any;
+    extra?: string;
 }
 
 export interface IndexInfo {
     name: string;
-    columns: string[];
+    columns: Array<{ name: string; position: number }> | string[];
     type: string;
     unique: boolean;
 }

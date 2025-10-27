@@ -27,26 +27,89 @@ export class QueryProfilingService {
 
     /**
      * Profile a query using MySQL 8.0+ Performance Schema
+     * Uses a dedicated connection to ensure all queries run on the same thread
      */
     async profileQuery(adapter: IDatabaseAdapter, query: string): Promise<QueryProfile> {
         this.logger.info(`Profiling query: ${query.substring(0, 100)}`);
 
         try {
-            // Ensure Performance Schema is enabled
+            // Check if adapter supports withConnection (MySQLAdapter)
+            const mysqlAdapter = adapter as any;
+            if (typeof mysqlAdapter.withConnection !== 'function') {
+                throw new Error('Profiling requires MySQL adapter with connection pooling support');
+            }
+
+            // Ensure Performance Schema is enabled first
             await this.ensurePerformanceSchemaEnabled(adapter);
 
-            // Clear previous profiling data
-            await adapter.query('TRUNCATE TABLE performance_schema.events_statements_history_long');
-            await adapter.query('TRUNCATE TABLE performance_schema.events_stages_history_long');
+            // Step 1: Execute the query on a dedicated connection and get metrics
+            let threadId: number = 0;
+            let lastEventId: number = 0;
+            let totalDuration: number = 0;
 
-            // Execute the query to profile
-            const startTime = Date.now();
-            await adapter.query(query);
-            const endTime = Date.now();
-            const totalDuration = (endTime - startTime) * 1000; // Convert to microseconds
+            await mysqlAdapter.withConnection(async (conn: any) => {
+                // Get PROCESSLIST_ID (what CONNECTION_ID() returns)
+                const [connIdRows] = await conn.query('SELECT CONNECTION_ID() as connection_id');
+                const connectionId = connIdRows[0]?.connection_id || connIdRows[0]?.CONNECTION_ID;
 
-            // Get the statement event
-            const stmtQuery = `
+                // Map PROCESSLIST_ID to THREAD_ID (what Performance Schema uses)
+                const [threadMapRows] = await conn.query(`
+                    SELECT THREAD_ID
+                    FROM performance_schema.threads
+                    WHERE PROCESSLIST_ID = ?
+                `, [connectionId]);
+                threadId = threadMapRows[0]?.THREAD_ID || threadMapRows[0]?.thread_id;
+
+                this.logger.info(`Profiling on dedicated connection, PROCESSLIST_ID: ${connectionId}, THREAD_ID: ${threadId}`);
+
+                // Get the last EVENT_ID before executing our query
+                const lastEventQuery = `
+                    SELECT MAX(EVENT_ID) as last_event_id
+                    FROM performance_schema.events_statements_history_long
+                    WHERE THREAD_ID = ?
+                `;
+                const [lastEventRows] = await conn.query(lastEventQuery, [threadId]);
+                lastEventId = lastEventRows[0]?.last_event_id || lastEventRows[0]?.LAST_EVENT_ID || 0;
+
+                this.logger.info(`Last EVENT_ID before execution: ${lastEventId}`);
+
+                // Execute the query to profile ON THE SAME CONNECTION
+                const startTime = Date.now();
+                await conn.query(query);
+                const endTime = Date.now();
+                totalDuration = (endTime - startTime) * 1000; // Convert to microseconds
+
+                this.logger.info(`Query executed in ${endTime - startTime}ms on thread ${threadId}`);
+
+                // Execute one more simple query to force Performance Schema to flush
+                await conn.query('SELECT 1');
+
+                this.logger.info('Connection will be released to allow Performance Schema to flush');
+            });
+
+            // Step 2: Now that the connection is released, query Performance Schema from a different connection
+            // Wait a bit to allow Performance Schema to process
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Aggressive normalization for matching - remove ALL spaces, lowercase, remove quotes
+            const normalizeQueryForMatching = (q: string) => {
+                return q
+                    .replace(/`/g, '') // Remove backticks
+                    .replace(/"/g, '') // Remove double quotes
+                    .replace(/'/g, '') // Remove single quotes
+                    .replace(/\s+/g, '') // Remove ALL whitespace
+                    .toLowerCase(); // Convert to lowercase
+            };
+
+            const normalizedTargetQuery = normalizeQueryForMatching(query);
+            this.logger.info(`Normalized target query: ${normalizedTargetQuery.substring(0, 80)}`);
+
+            // Try to get statements from multiple sources (using regular adapter, different connection)
+            let stmtRows: any[] = [];
+            let sourceUsed = '';
+
+            // First try: events_statements_history_long with EVENT_ID filter
+            let stmtQuery = `
                 SELECT
                     EVENT_ID,
                     SQL_TEXT,
@@ -54,21 +117,154 @@ export class QueryProfilingService {
                     LOCK_TIME / 1000000 as lock_time_us,
                     ROWS_AFFECTED,
                     ROWS_SENT,
-                    ROWS_EXAMINED
+                    ROWS_EXAMINED,
+                    TIMER_START
                 FROM performance_schema.events_statements_history_long
-                WHERE SQL_TEXT LIKE ?
+                WHERE THREAD_ID = ?
+                    AND EVENT_ID > ?
                 ORDER BY EVENT_ID DESC
-                LIMIT 1
+                LIMIT 30
             `;
 
-            const stmtResult = await adapter.query<any>(stmtQuery, [`%${query.substring(0, 50)}%`]);
-            const stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
+            let stmtResult = await adapter.query<any>(stmtQuery, [threadId, lastEventId]);
+            stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
+            sourceUsed = 'events_statements_history_long (with EVENT_ID filter)';
 
+            this.logger.info(`Found ${stmtRows.length} new statements in ${sourceUsed} on thread ${threadId} after EVENT_ID ${lastEventId}`);
+
+            // Second try: events_statements_history_long without EVENT_ID filter
             if (stmtRows.length === 0) {
-                throw new Error('Could not find statement in Performance Schema');
+                this.logger.warn('Trying events_statements_history_long without EVENT_ID filter...');
+                stmtQuery = `
+                    SELECT
+                        EVENT_ID,
+                        SQL_TEXT,
+                        TIMER_WAIT / 1000000 as duration_us,
+                        LOCK_TIME / 1000000 as lock_time_us,
+                        ROWS_AFFECTED,
+                        ROWS_SENT,
+                        ROWS_EXAMINED,
+                        TIMER_START
+                    FROM performance_schema.events_statements_history_long
+                    WHERE THREAD_ID = ?
+                    ORDER BY EVENT_ID DESC
+                    LIMIT 30
+                `;
+
+                stmtResult = await adapter.query<any>(stmtQuery, [threadId]);
+                stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
+                sourceUsed = 'events_statements_history_long (no EVENT_ID filter)';
+                this.logger.info(`Found ${stmtRows.length} statements in ${sourceUsed}`);
             }
 
-            const stmt = stmtRows[0];
+            // Third try: events_statements_history
+            if (stmtRows.length === 0) {
+                this.logger.warn('Trying events_statements_history...');
+                stmtQuery = `
+                    SELECT
+                        EVENT_ID,
+                        SQL_TEXT,
+                        TIMER_WAIT / 1000000 as duration_us,
+                        LOCK_TIME / 1000000 as lock_time_us,
+                        ROWS_AFFECTED,
+                        ROWS_SENT,
+                        ROWS_EXAMINED,
+                        TIMER_START
+                    FROM performance_schema.events_statements_history
+                    WHERE THREAD_ID = ?
+                    ORDER BY EVENT_ID DESC
+                    LIMIT 10
+                `;
+
+                stmtResult = await adapter.query<any>(stmtQuery, [threadId]);
+                stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
+                sourceUsed = 'events_statements_history';
+                this.logger.info(`Found ${stmtRows.length} statements in ${sourceUsed}`);
+            }
+
+            // Fourth try: events_statements_current
+            if (stmtRows.length === 0) {
+                this.logger.warn('Trying events_statements_current...');
+                stmtQuery = `
+                    SELECT
+                        EVENT_ID,
+                        SQL_TEXT,
+                        TIMER_WAIT / 1000000 as duration_us,
+                        LOCK_TIME / 1000000 as lock_time_us,
+                        ROWS_AFFECTED,
+                        ROWS_SENT,
+                        ROWS_EXAMINED,
+                        TIMER_START
+                    FROM performance_schema.events_statements_current
+                    WHERE THREAD_ID = ?
+                `;
+
+                stmtResult = await adapter.query<any>(stmtQuery, [threadId]);
+                stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
+                sourceUsed = 'events_statements_current';
+                this.logger.info(`Found ${stmtRows.length} statements in ${sourceUsed}`);
+            }
+
+            // Log all found statements for debugging
+            if (stmtRows.length > 0) {
+                stmtRows.forEach((row: any, index: number) => {
+                    const sqlText = (row.SQL_TEXT || row.sql_text || '').substring(0, 80);
+                    this.logger.info(`  [${index}] EVENT_ID ${row.EVENT_ID || row.event_id}: ${sqlText}`);
+                });
+            }
+
+            // Filter in memory with aggressive normalization
+            let stmt = stmtRows.find((row: any) => {
+                const sqlText = row.SQL_TEXT || row.sql_text || '';
+                const normalizedSql = normalizeQueryForMatching(sqlText);
+
+                // Log for debugging
+                this.logger.info(`Comparing:\n  SQL: ${normalizedSql.substring(0, 60)}\n  Target: ${normalizedTargetQuery.substring(0, 60)}`);
+
+                // Match if normalized queries are equal (or contain each other for partial matches)
+                const compareLength = Math.min(Math.min(normalizedSql.length, normalizedTargetQuery.length), 100);
+
+                return normalizedSql.substring(0, compareLength) === normalizedTargetQuery.substring(0, compareLength) ||
+                       normalizedSql.includes(normalizedTargetQuery.substring(0, 50)) ||
+                       normalizedTargetQuery.includes(normalizedSql.substring(0, 50));
+            });
+
+            // Fallback: if not found, use the most recent query on this thread (excluding setup queries)
+            if (!stmt && stmtRows.length > 0) {
+                this.logger.warn('Exact query match not found, filtering out setup queries...');
+                // Filter out performance_schema setup queries
+                const nonSetupQueries = stmtRows.filter((row: any) => {
+                    const sqlText = (row.SQL_TEXT || row.sql_text || '').toLowerCase();
+                    const isSetup = sqlText.includes('performance_schema') ||
+                                   sqlText.includes('connection_id()') ||
+                                   sqlText.includes('select 1') ||
+                                   sqlText.trim().length === 0;
+                    if (!isSetup) {
+                        this.logger.info(`  Candidate non-setup query: ${sqlText.substring(0, 80)}`);
+                    }
+                    return !isSetup;
+                });
+
+                if (nonSetupQueries.length > 0) {
+                    this.logger.warn(`Using most recent non-setup statement (${nonSetupQueries.length} candidates)`);
+                    stmt = nonSetupQueries[0];
+                } else {
+                    this.logger.error('All queries were setup queries!');
+                }
+            }
+
+            if (!stmt) {
+                this.logger.error(`Failed to find statement. Total rows: ${stmtRows.length}, Thread: ${threadId}, Last Event ID: ${lastEventId}, Source: ${sourceUsed}`);
+                throw new Error(`Could not find statement in Performance Schema (tried multiple sources: ${sourceUsed}). This could mean:
+1. Performance Schema is not retaining statement history. Try: SET GLOBAL performance_schema_events_statements_history_long_size = 10000;
+2. The events_statements_history_long consumer is not properly enabled.
+3. The query executed on a different thread or before monitoring was set up.
+
+To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_history_long WHERE THREAD_ID = ${threadId};`);
+            }
+
+            this.logger.info(`Successfully matched statement with EVENT_ID: ${stmt.EVENT_ID || stmt.event_id} from ${sourceUsed}`);
+
             const eventId = stmt.EVENT_ID || stmt.event_id;
 
             // Get stage events for this statement

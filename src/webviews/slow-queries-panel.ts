@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
-import { SlowQueriesService, SlowQueryDigestInfo } from '../services/slow-queries-service';
+import { SlowQueriesService, SlowQueryDigestInfo, SlowQuerySortBy } from '../services/slow-queries-service';
 
 export class SlowQueriesPanel {
     private static panelRegistry: Map<string, SlowQueriesPanel> = new Map();
@@ -9,6 +9,7 @@ export class SlowQueriesPanel {
     private disposables: vscode.Disposable[] = [];
     private isRefreshing = false;
     private autoRefreshInterval?: NodeJS.Timeout;
+    private currentSortBy: SlowQuerySortBy = 'impact';
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -75,11 +76,15 @@ export class SlowQueriesPanel {
                     case 'toggleAutoRefresh':
                         this.toggleAutoRefresh();
                         break;
+                    case 'changeSortOrder':
+                        this.currentSortBy = message.sortBy as SlowQuerySortBy;
+                        await this.loadSlowQueries();
+                        break;
                     case 'explainQuery':
-                        await this.explainQuery(message.digestText);
+                        await this.explainQuery(message.digestText, message.schema);
                         break;
                     case 'profileQuery':
-                        await this.profileQuery(message.digestText);
+                        await this.profileQuery(message.digestText, message.schema);
                         break;
                 }
             },
@@ -88,20 +93,68 @@ export class SlowQueriesPanel {
         );
     }
 
-    private async explainQuery(queryText: string): Promise<void> {
+    private async explainQuery(queryText: string, schema?: string): Promise<void> {
         try {
+            this.logger.info(`Explaining query: ${queryText.substring(0, 100)} (schema: ${schema || 'default'})`);
+
+            const adapter = this.connectionManager.getAdapter(this.connectionId);
+            if (!adapter) {
+                throw new Error('Connection not found');
+            }
+
+            // Switch to the correct database if schema is provided
+            if (schema) {
+                this.logger.info(`Switching to database: ${schema}`);
+                await adapter.query(`USE \`${schema}\``);
+            }
+
+            // Remove any existing EXPLAIN prefix to avoid double EXPLAIN
+            let cleanQuery = queryText.trim();
+            const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
+            cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
+
+            // Execute EXPLAIN query with FORMAT=JSON
+            const explainQuery = `EXPLAIN FORMAT=JSON ${cleanQuery}`;
+            const result = await adapter.query<any>(explainQuery);
+
+            // Extract the EXPLAIN data from the result
+            const explainData = result.rows?.[0] || {};
+
+            // Show the EXPLAIN viewer with actual data and AI insights
             const { ExplainViewerPanel } = await import('./explain-viewer-panel');
-            ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, {});
+            const { AIService } = await import('../services/ai-service');
+
+            // Create AI service instance for analysis
+            const aiService = new AIService(this.logger, this.context);
+            await aiService.initialize();
+
+            ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiService);
         } catch (error) {
-            this.logger.error('Failed to open EXPLAIN:', error as Error);
-            vscode.window.showErrorMessage(`Failed to open EXPLAIN: ${(error as Error).message}`);
+            this.logger.error('Failed to EXPLAIN query:', error as Error);
+            vscode.window.showErrorMessage(`Failed to EXPLAIN query: ${(error as Error).message}`);
         }
     }
 
-    private async profileQuery(queryText: string): Promise<void> {
+    private async profileQuery(queryText: string, schema?: string): Promise<void> {
         try {
+            this.logger.info(`Profiling query: ${queryText.substring(0, 100)} (schema: ${schema || 'default'})`);
+
+            const adapter = this.connectionManager.getAdapter(this.connectionId);
+            if (!adapter) {
+                throw new Error('Connection not found');
+            }
+
+            // Switch to the correct database if schema is provided
+            if (schema) {
+                this.logger.info(`Switching to database: ${schema}`);
+                await adapter.query(`USE \`${schema}\``);
+            }
+
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
-            QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText);
+            const { AIService } = await import('../services/ai-service');
+            const aiService = new AIService(this.logger, this.context);
+            await aiService.initialize();
+            QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiService);
         } catch (error) {
             this.logger.error('Failed to open Profiling:', error as Error);
             vscode.window.showErrorMessage(`Failed to open Profiling: ${(error as Error).message}`);
@@ -111,13 +164,18 @@ export class SlowQueriesPanel {
     private async loadSlowQueries(): Promise<void> {
         if (this.isRefreshing) return;
         this.isRefreshing = true;
-        this.logger.info(`Loading slow queries for connection: ${this.connectionId}`);
+        this.logger.info(`Loading slow queries for connection: ${this.connectionId} (sort by: ${this.currentSortBy})`);
         try {
             const adapter = this.connectionManager.getAdapter(this.connectionId);
             if (!adapter) throw new Error('Connection not found');
 
-            const rows: SlowQueryDigestInfo[] = await this.service.detectSlowQueries(adapter as any);
-            this.panel.webview.postMessage({ type: 'slowQueriesLoaded', rows, timestamp: new Date().toISOString() });
+            const rows: SlowQueryDigestInfo[] = await this.service.detectSlowQueries(adapter as any, 100, this.currentSortBy);
+            this.panel.webview.postMessage({
+                type: 'slowQueriesLoaded',
+                rows,
+                timestamp: new Date().toISOString(),
+                sortBy: this.currentSortBy
+            });
         } catch (error) {
             this.logger.error('Failed to load slow queries:', error as Error);
             this.panel.webview.postMessage({ type: 'error', message: (error as Error).message });
@@ -171,6 +229,16 @@ export class SlowQueriesPanel {
         <span id="row-count" class="count-badge">0</span>
       </div>
       <div class="toolbar-actions">
+        <div class="sort-control">
+          <label for="sort-select">Sort by:</label>
+          <vscode-dropdown id="sort-select">
+            <vscode-option value="impact" selected>Impact Score</vscode-option>
+            <vscode-option value="totalTime">Total Time</vscode-option>
+            <vscode-option value="avgTime">Avg Time</vscode-option>
+            <vscode-option value="count">Frequency</vscode-option>
+            <vscode-option value="rowsExamined">Rows Examined</vscode-option>
+          </vscode-dropdown>
+        </div>
         <vscode-button id="refresh-btn" appearance="secondary"><span class="codicon codicon-refresh"></span> Refresh</vscode-button>
         <vscode-button id="auto-refresh-btn" appearance="secondary"><span class="codicon codicon-play"></span> Auto-refresh (30s)</vscode-button>
       </div>

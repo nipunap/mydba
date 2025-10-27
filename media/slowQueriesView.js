@@ -13,6 +13,7 @@
     const lastUpdated = document.getElementById('last-updated');
     const refreshBtn = document.getElementById('refresh-btn');
     const autoRefreshBtn = document.getElementById('auto-refresh-btn');
+    const sortSelect = document.getElementById('sort-select');
 
     // Error boundary
     window.addEventListener('error', (event) => {
@@ -20,6 +21,8 @@
     }, { once: true });
 
     let autoRefreshEnabled = true;
+    let currentSortBy = 'impact';
+
     refreshBtn?.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
     autoRefreshBtn?.addEventListener('click', () => {
         autoRefreshEnabled = !autoRefreshEnabled;
@@ -27,11 +30,16 @@
         updateAutoRefreshButton();
     });
 
+    sortSelect?.addEventListener('change', (e) => {
+        currentSortBy = e.target.value;
+        vscode.postMessage({ type: 'changeSortOrder', sortBy: currentSortBy });
+    });
+
     window.addEventListener('message', event => {
         const message = event.data;
         switch (message.type) {
             case 'slowQueriesLoaded':
-                handleLoaded(message.rows, message.timestamp);
+                handleLoaded(message.rows, message.timestamp, message.sortBy);
                 break;
             case 'error':
                 showError(message.message);
@@ -45,13 +53,19 @@
         }
     });
 
-    function handleLoaded(rows, timestamp) {
+    function handleLoaded(rows, timestamp, sortBy) {
         hideLoading();
         hideError();
         content.style.display = 'block';
 
         if (rowCount) rowCount.textContent = rows.length.toString();
         if (lastUpdated) lastUpdated.textContent = `Last updated: ${new Date(timestamp).toLocaleString()}`;
+
+        // Update sort dropdown to match server state
+        if (sortSelect && sortBy) {
+            sortSelect.value = sortBy;
+            currentSortBy = sortBy;
+        }
 
         if (!rows || rows.length === 0) {
             rowsList.style.display = 'none';
@@ -66,12 +80,16 @@
 
     function renderRows(rows) {
         let html = '';
-        rows.forEach((r) => {
+        rows.forEach((r, index) => {
+            // Determine impact badge color based on rank
+            const impactBadgeClass = index < 5 ? 'impact-critical' : (index < 15 ? 'impact-high' : 'impact-medium');
+
             html += `
             <div class="query-card">
                 <div class="query-header">
                     <div class="query-title">
                         <span class="schema">${escapeHtml(r.schema || '-')}</span>
+                        ${r.impactScore !== undefined ? `<span class="impact-badge ${impactBadgeClass}">Impact: ${Math.round(r.impactScore)}</span>` : ''}
                         <span class="meta">avg: ${r.avgMs.toFixed(2)} ms · total: ${r.totalMs.toFixed(2)} ms · count: ${r.count}</span>
                     </div>
                 </div>
@@ -83,8 +101,8 @@
                     ${r.lastSeen ? `<span>last: ${new Date(r.lastSeen).toLocaleString()}</span>` : ''}
                 </div>
                 <div class="query-actions">
-                    <vscode-button class="explain-btn" data-query="${escapeHtml(r.digestText)}"><span class="codicon codicon-graph"></span> Explain</vscode-button>
-                    <vscode-button class="profile-btn" appearance="secondary" data-query="${escapeHtml(r.digestText)}"><span class="codicon codicon-pulse"></span> Profile</vscode-button>
+                    <vscode-button class="explain-btn" data-query="${escapeHtml(r.digestText)}" data-schema="${escapeHtml(r.schema || '')}"><span class="codicon codicon-graph"></span> Explain</vscode-button>
+                    <vscode-button class="profile-btn" appearance="secondary" data-query="${escapeHtml(r.digestText)}" data-schema="${escapeHtml(r.schema || '')}"><span class="codicon codicon-pulse"></span> Profile</vscode-button>
                 </div>
             </div>`;
         });
@@ -93,13 +111,15 @@
         document.querySelectorAll('.explain-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const queryText = e.currentTarget.getAttribute('data-query');
-                vscode.postMessage({ type: 'explainQuery', digestText: queryText });
+                const schema = e.currentTarget.getAttribute('data-schema');
+                vscode.postMessage({ type: 'explainQuery', digestText: queryText, schema: schema });
             });
         });
         document.querySelectorAll('.profile-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const queryText = e.currentTarget.getAttribute('data-query');
-                vscode.postMessage({ type: 'profileQuery', digestText: queryText });
+                const schema = e.currentTarget.getAttribute('data-schema');
+                vscode.postMessage({ type: 'profileQuery', digestText: queryText, schema: schema });
             });
         });
     }

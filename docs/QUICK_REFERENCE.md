@@ -277,7 +277,6 @@ ollama pull llama3.1
 
 - **Full Setup Guide**: [docs/DATABASE_SETUP.md](DATABASE_SETUP.md)
 - **Testing Guide**: [test/MARIADB_TESTING.md](../test/MARIADB_TESTING.md)
-- **Product Roadmap**: [docs/PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - **Security**: [SECURITY.md](../SECURITY.md)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 

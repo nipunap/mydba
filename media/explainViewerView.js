@@ -19,6 +19,10 @@
     const collapseAllBtn = document.getElementById('collapse-all');
     const exportDropdown = document.getElementById('export-dropdown');
     const searchInput = document.getElementById('search-input');
+    const aiInsightsLoading = document.getElementById('ai-insights-loading');
+    const aiInsightsError = document.getElementById('ai-insights-error');
+    const aiInsightsErrorMessage = document.getElementById('ai-insights-error-message');
+    const aiInsightsContent = document.getElementById('ai-insights-content');
 
     let currentData = null;
     let currentView = 'tree'; // 'tree' or 'table'
@@ -53,6 +57,15 @@
                 break;
             case 'error':
                 showError(message.message);
+                break;
+            case 'aiInsightsLoading':
+                showAIInsightsLoading();
+                break;
+            case 'aiInsights':
+                showAIInsights(message.data);
+                break;
+            case 'aiInsightsError':
+                showAIInsightsError(message.message);
                 break;
         }
     });
@@ -501,6 +514,150 @@
         if (error && errorMessage) {
             errorMessage.textContent = message;
             error.style.display = 'flex';
+        }
+    }
+
+    function showAIInsightsLoading() {
+        if (aiInsightsLoading) {
+            aiInsightsLoading.style.display = 'flex';
+        }
+        if (aiInsightsError) {
+            aiInsightsError.style.display = 'none';
+        }
+        if (aiInsightsContent) {
+            aiInsightsContent.style.display = 'none';
+        }
+    }
+
+    function showAIInsights(data) {
+        if (aiInsightsLoading) {
+            aiInsightsLoading.style.display = 'none';
+        }
+        if (aiInsightsError) {
+            aiInsightsError.style.display = 'none';
+        }
+        if (!aiInsightsContent) return;
+
+        aiInsightsContent.style.display = 'block';
+
+        let html = '';
+
+        // Summary section
+        if (data.summary) {
+            html += '<div class="ai-summary">';
+            html += '<h4><span class="codicon codicon-info"></span> Summary</h4>';
+            html += `<p>${escapeHtml(data.summary)}</p>`;
+            html += '</div>';
+        }
+
+        // Metadata badges
+        if (data.metadata) {
+            html += '<div class="ai-metadata">';
+            if (data.metadata.totalCost > 0) {
+                const costClass = data.metadata.totalCost > 10000 ? 'critical' : (data.metadata.totalCost > 1000 ? 'warning' : 'good');
+                html += `<span class="metric-badge ${costClass}">Cost: ${data.metadata.totalCost.toFixed(2)}</span>`;
+            }
+            if (data.metadata.estimatedRows > 0) {
+                const rowsClass = data.metadata.estimatedRows > 10000 ? 'warning' : 'good';
+                html += `<span class="metric-badge ${rowsClass}">Rows: ${data.metadata.estimatedRows.toLocaleString()}</span>`;
+            }
+            if (data.metadata.tablesCount > 0) {
+                html += `<span class="metric-badge">Tables: ${data.metadata.tablesCount}</span>`;
+            }
+            if (data.estimatedComplexity) {
+                const complexityClass = data.estimatedComplexity > 7 ? 'critical' : (data.estimatedComplexity > 4 ? 'warning' : 'good');
+                html += `<span class="metric-badge ${complexityClass}">Complexity: ${data.estimatedComplexity}/10</span>`;
+            }
+            html += '</div>';
+        }
+
+        // Anti-patterns section
+        if (data.antiPatterns && data.antiPatterns.length > 0) {
+            html += '<div class="ai-antipatterns">';
+            html += '<h4><span class="codicon codicon-warning"></span> Anti-Patterns Detected</h4>';
+            html += '<div class="antipatterns-list">';
+
+            data.antiPatterns.forEach(pattern => {
+                const severityIcon = pattern.severity === 'critical' ? '🔴' : pattern.severity === 'warning' ? '🟡' : 'ℹ️';
+                html += `<div class="antipattern-item severity-${pattern.severity}">`;
+                html += `<div class="antipattern-header">`;
+                html += `<span class="severity-icon">${severityIcon}</span>`;
+                html += `<strong>${escapeHtml(pattern.type || 'Issue')}</strong>`;
+                html += `<span class="severity-badge-small">${escapeHtml(pattern.severity)}</span>`;
+                html += `</div>`;
+                html += `<div class="antipattern-message">${escapeHtml(pattern.message)}</div>`;
+                if (pattern.suggestion) {
+                    html += `<div class="antipattern-suggestion">`;
+                    html += `<span class="codicon codicon-lightbulb"></span>`;
+                    html += `<span>${escapeHtml(pattern.suggestion)}</span>`;
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            });
+
+            html += '</div>';
+            html += '</div>';
+        }
+
+        // Optimization suggestions section
+        if (data.optimizationSuggestions && data.optimizationSuggestions.length > 0) {
+            html += '<div class="ai-optimizations">';
+            html += '<h4><span class="codicon codicon-rocket"></span> Optimization Suggestions</h4>';
+            html += '<div class="optimizations-list">';
+
+            data.optimizationSuggestions.forEach((suggestion, index) => {
+                const impactColor = suggestion.impact === 'high' ? 'critical' : suggestion.impact === 'medium' ? 'warning' : 'good';
+                const difficultyColor = suggestion.difficulty === 'hard' ? 'critical' : suggestion.difficulty === 'medium' ? 'warning' : 'good';
+
+                html += `<div class="optimization-item">`;
+                html += `<div class="optimization-header">`;
+                html += `<span class="optimization-number">${index + 1}</span>`;
+                html += `<strong>${escapeHtml(suggestion.title)}</strong>`;
+                html += `<div class="optimization-badges">`;
+                html += `<span class="badge badge-impact ${impactColor}">Impact: ${escapeHtml(suggestion.impact)}</span>`;
+                html += `<span class="badge badge-difficulty ${difficultyColor}">Difficulty: ${escapeHtml(suggestion.difficulty)}</span>`;
+                html += `</div>`;
+                html += `</div>`;
+                html += `<div class="optimization-description">${escapeHtml(suggestion.description)}</div>`;
+
+                // Show before/after code if available
+                if (suggestion.before || suggestion.after) {
+                    html += `<div class="optimization-code">`;
+                    if (suggestion.before) {
+                        html += `<div class="code-block">`;
+                        html += `<div class="code-label">Before:</div>`;
+                        html += `<pre>${escapeHtml(suggestion.before)}</pre>`;
+                        html += `</div>`;
+                    }
+                    if (suggestion.after) {
+                        html += `<div class="code-block">`;
+                        html += `<div class="code-label">After:</div>`;
+                        html += `<pre>${escapeHtml(suggestion.after)}</pre>`;
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+            });
+
+            html += '</div>';
+            html += '</div>';
+        }
+
+        aiInsightsContent.innerHTML = html;
+    }
+
+    function showAIInsightsError(message) {
+        if (aiInsightsLoading) {
+            aiInsightsLoading.style.display = 'none';
+        }
+        if (aiInsightsContent) {
+            aiInsightsContent.style.display = 'none';
+        }
+        if (aiInsightsError && aiInsightsErrorMessage) {
+            aiInsightsErrorMessage.textContent = message;
+            aiInsightsError.style.display = 'flex';
         }
     }
 })();

@@ -241,17 +241,30 @@ export class QueriesWithoutIndexesPanel {
                 throw new Error('Connection not found');
             }
 
-            const explainResult = await adapter.query<any>(`EXPLAIN FORMAT=JSON ${queryText}`);
+            // Remove any existing EXPLAIN prefix to avoid double EXPLAIN
+            let cleanQuery = queryText.trim();
+            const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
+            cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
 
-            // Import and use ExplainViewerPanel
+            const explainResult = await adapter.query<any>(`EXPLAIN FORMAT=JSON ${cleanQuery}`);
+
+            // Import ExplainViewerPanel and AIService
             const { ExplainViewerPanel } = await import('./explain-viewer-panel');
+            const { AIService } = await import('../services/ai-service');
+
+            // Create AI service for enhanced analysis
+            const aiService = new AIService(this.logger, this.context);
+            await aiService.initialize();
+
+            // Show EXPLAIN viewer with AI insights
             ExplainViewerPanel.show(
                 this.context,
                 this.logger,
                 this.connectionManager,
                 this.connectionId,
-                queryText,
-                Array.isArray(explainResult) ? explainResult[0] : (explainResult.rows?.[0] || {})
+                cleanQuery,
+                Array.isArray(explainResult) ? explainResult[0] : (explainResult.rows?.[0] || {}),
+                aiService
             );
 
         } catch (error) {
@@ -267,12 +280,16 @@ export class QueriesWithoutIndexesPanel {
                 throw new Error('Connection not found');
             }
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
+            const { AIService } = await import('../services/ai-service');
+            const aiService = new AIService(this.logger, this.context);
+            await aiService.initialize();
             QueryProfilingPanel.show(
                 this.context,
                 this.logger,
                 this.connectionManager,
                 this.connectionId,
-                queryText
+                queryText,
+                aiService
             );
         } catch (error) {
             this.logger.error('Failed to profile query:', error as Error);

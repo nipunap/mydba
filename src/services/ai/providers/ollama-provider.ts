@@ -94,7 +94,9 @@ export class OllamaProvider implements AIProvider {
      * Build prompt for AI analysis
      */
     private buildPrompt(context: QueryContext): string {
-        let prompt = `Analyze this SQL query for MySQL/MariaDB and provide optimization suggestions.
+        let prompt = `You are a Senior Database Administrator with 15+ years of experience managing high-performance MySQL and MariaDB systems in production environments.
+
+As a DBA, you provide practical, production-ready advice. Analyze this query:
 
 Query:
 ${context.anonymizedQuery || context.query}
@@ -102,25 +104,49 @@ ${context.anonymizedQuery || context.query}
 
         // Add schema context if available
         if (context.schema) {
+            const tables = Array.isArray(context.schema.tables)
+                ? context.schema.tables
+                : Object.entries(context.schema.tables).map(([name, info]) => ({ name, ...info }));
+
             prompt += `
 Schema Context:
-Database: ${context.schema.database}
-Tables: ${context.schema.tables.map((t: { name: string; columns: Array<{ name: string; type: string }> }) => {
-                const cols = t.columns.slice(0, 5).map((c) => `${c.name}:${c.type}`).join(', ');
-                const more = t.columns.length > 5 ? ` (+${t.columns.length - 5} more)` : '';
+Database: ${context.schema.database || 'N/A'}
+Tables: ${tables.map((t: any) => {
+                const cols = (t.columns || []).slice(0, 5).map((c: any) => `${c.name}:${c.type}`).join(', ');
+                const more = (t.columns?.length || 0) > 5 ? ` (+${t.columns.length - 5} more)` : '';
                 return `${t.name}(${cols}${more})`;
             }).join(', ')}
 `;
+
+            // Add performance/profiling analysis if available
+            if (context.schema.performance) {
+                const perf = context.schema.performance;
+                prompt += `
+Query Performance Analysis:
+- Execution Time: ${perf.totalDuration ? `${perf.totalDuration.toLocaleString()}µs (${(perf.totalDuration / 1000).toFixed(2)}ms)` : 'N/A'}
+- Rows Examined: ${perf.rowsExamined?.toLocaleString() || 'N/A'}
+- Rows Sent: ${perf.rowsSent?.toLocaleString() || 'N/A'}
+- Efficiency: ${perf.efficiency ? `${perf.efficiency.toFixed(1)}%` : 'N/A'}${perf.efficiency && perf.efficiency < 50 ? ' (Low efficiency)' : ''}
+- Lock Time: ${perf.lockTime ? `${perf.lockTime.toLocaleString()}µs` : 'N/A'}
+`;
+                if (perf.stages && perf.stages.length > 0) {
+                    const topStages = [...perf.stages].sort((a, b) => b.duration - a.duration).slice(0, 5);
+                    prompt += `\nTop Execution Stages:\n`;
+                    topStages.forEach(stage => {
+                        prompt += `  - ${stage.name}: ${stage.duration.toLocaleString()}µs\n`;
+                    });
+                }
+            }
         }
 
-        // Add RAG documentation if available
+        // Add RAG documentation if available (for AI context, not shown to user)
         if (context.ragDocs && context.ragDocs.length > 0) {
             prompt += `
-Reference Documentation:
+Reference Documentation (use this to inform your recommendations):
 `;
             for (const doc of context.ragDocs) {
                 prompt += `
-${doc.title} (${doc.source}):
+${doc.title}:
 ${doc.content.substring(0, 500)}...
 
 `;
@@ -128,13 +154,14 @@ ${doc.content.substring(0, 500)}...
         }
 
         prompt += `
+IMPORTANT: If "Query Performance Analysis" section is present above, your summary MUST analyze the performance metrics including execution time, efficiency, and execution bottlenecks.
+
 Respond with ONLY a JSON object in this exact format:
 {
-  "summary": "what the query does",
+  "summary": "Your DBA assessment and performance analysis",
   "antiPatterns": [{"type": "name", "severity": "critical|warning|info", "message": "issue", "suggestion": "fix"}],
-  "optimizationSuggestions": [{"title": "name", "description": "details", "impact": "high|medium|low", "difficulty": "easy|medium|hard"}],
-  "estimatedComplexity": 3,
-  "citations": [{"title": "doc", "source": "url", "relevance": 0.8}]
+  "optimizationSuggestions": [{"title": "name", "description": "details", "impact": "high|medium|low", "difficulty": "easy|medium|hard", "before": "optional", "after": "optional"}],
+  "estimatedComplexity": 3
 }
 
 Return ONLY the JSON, no explanatory text.`;

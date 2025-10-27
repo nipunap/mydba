@@ -63,7 +63,7 @@ If you discover a security vulnerability, **do not** open a public GitHub issue.
 
 ### How to Report
 
-**Email**: security@mydba.dev
+**Email**: security-mydba+nipunap@gmail.com
 
 **PGP Key**: [Download public key](https://mydba.dev/security/pgp-key.asc) (optional, for encrypted communication)
 
@@ -195,7 +195,7 @@ We are committed to addressing security issues promptly:
 #### 2. AI Features
 
 ✅ **DO**:
-- Review the [Privacy Policy](docs/PRIVACY.md) before enabling AI
+- Review the AI data handling section in this document before enabling AI
 - Enable anonymization: `"mydba.ai.anonymizeData": true`
 - Use `confirmBeforeSend` for sensitive environments
 - Disable AI entirely for HIPAA/PCI-DSS data: `"mydba.ai.enabled": false`
@@ -313,7 +313,7 @@ When AI features are enabled, query structure is sent to VSCode Language Model A
 - AI disabled by default (opt-in)
 - Query templating protects sensitive values
 - Users can disable: `"mydba.ai.enabled": false`
-- Full details in [Privacy Policy](docs/PRIVACY.md)
+- Full details in this Security Policy document
 
 ### 3. Database Credentials
 
@@ -490,9 +490,9 @@ We currently do not offer a bug bounty program, but we:
 
 ## Additional Resources
 
-- **Privacy Policy**: [docs/PRIVACY.md](docs/PRIVACY.md)
 - **Contributing Guidelines**: [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Code of Conduct**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) *(coming soon)*
+- **Database Setup**: [docs/DATABASE_SETUP.md](docs/DATABASE_SETUP.md)
+- **Quick Reference**: [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)
 - **VSCode Extension Security**: https://code.visualstudio.com/api/references/extension-guidelines#security
 
 ---

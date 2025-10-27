@@ -80,7 +80,11 @@ export class OpenAIProvider implements AIProvider {
      * Build prompt for AI analysis
      */
     private buildPrompt(context: QueryContext): string {
-        let prompt = `Analyze the following SQL query and provide optimization suggestions.
+        let prompt = `You are a Senior Database Administrator with 15+ years of experience managing high-performance MySQL and MariaDB systems in production environments. Your expertise includes query optimization, index design, performance tuning, and troubleshooting.
+
+As a DBA, you provide practical, production-ready advice based on real-world experience. You understand the trade-offs between performance, maintainability, and resource utilization.
+
+Analyze the following query as a Senior DBA:
 
 **Query:**
 \`\`\`sql
@@ -90,21 +94,45 @@ ${context.anonymizedQuery || context.query}
 
         // Add schema context if available
         if (context.schema) {
+            const tables = Array.isArray(context.schema.tables)
+                ? context.schema.tables
+                : Object.entries(context.schema.tables).map(([name, info]) => ({ name, ...info }));
+
             prompt += `
 **Schema Context:**
-Database: ${context.schema.database}
-Tables: ${context.schema.tables.map((t: { name: string; columns: Array<{ name: string }> }) => `${t.name} (${t.columns.map((c) => c.name).join(', ')})`).join(', ')}
+Database: ${context.schema.database || 'N/A'}
+Tables: ${tables.map((t: any) => `${t.name} (${t.columns?.map((c: any) => c.name).join(', ') || ''})`).join(', ')}
 `;
+
+            // Add performance/profiling analysis if available
+            if (context.schema.performance) {
+                const perf = context.schema.performance;
+                prompt += `
+**Query Performance Analysis:**
+- Execution Time: ${perf.totalDuration ? `${perf.totalDuration.toLocaleString()}µs (${(perf.totalDuration / 1000).toFixed(2)}ms)` : 'N/A'}
+- Rows Examined: ${perf.rowsExamined?.toLocaleString() || 'N/A'}
+- Rows Sent: ${perf.rowsSent?.toLocaleString() || 'N/A'}
+- Efficiency: ${perf.efficiency ? `${perf.efficiency.toFixed(1)}%` : 'N/A'}${perf.efficiency && perf.efficiency < 50 ? ' ⚠️ Low efficiency' : ''}
+- Lock Time: ${perf.lockTime ? `${perf.lockTime.toLocaleString()}µs` : 'N/A'}
+`;
+                if (perf.stages && perf.stages.length > 0) {
+                    const topStages = [...perf.stages].sort((a, b) => b.duration - a.duration).slice(0, 5);
+                    prompt += `\nTop Execution Stages:\n`;
+                    topStages.forEach(stage => {
+                        prompt += `  - ${stage.name}: ${stage.duration.toLocaleString()}µs\n`;
+                    });
+                }
+            }
         }
 
-        // Add RAG documentation if available
+        // Add RAG documentation if available (for AI context, not shown to user)
         if (context.ragDocs && context.ragDocs.length > 0) {
             prompt += `
-**Reference Documentation:**
+**Reference Documentation (use this to inform your recommendations, but don't cite sources):**
 `;
             for (const doc of context.ragDocs) {
                 prompt += `
-**${doc.title}** (${doc.source})
+${doc.title}:
 ${doc.content}
 
 `;
@@ -112,9 +140,12 @@ ${doc.content}
         }
 
         prompt += `
+**As a Senior DBA, provide:**
+IMPORTANT: If "Query Performance Analysis" section is present above, your summary MUST analyze the performance metrics including execution time, efficiency (rows examined vs sent), and execution stage bottlenecks.
+
 Provide your response as a JSON object with this exact structure:
 {
-  "summary": "Brief description of what the query does",
+  "summary": "Your DBA assessment and performance analysis",
   "antiPatterns": [
     {
       "type": "string",
@@ -133,14 +164,7 @@ Provide your response as a JSON object with this exact structure:
       "after": "optional: optimized code"
     }
   ],
-  "estimatedComplexity": 5,
-  "citations": [
-    {
-      "title": "reference title",
-      "source": "URL",
-      "relevance": 0.9
-    }
-  ]
+  "estimatedComplexity": 5
 }
 `;
 

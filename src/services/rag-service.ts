@@ -63,10 +63,10 @@ export class RAGService {
             return [];
         }
 
-        // Select document source
-        const docs = dbType === 'mariadb'
-            ? [...this.mariadbDocs, ...this.mysqlDocs] // MariaDB-specific first
-            : this.allDocs;
+        // Select document source based on database type
+        // Only return docs for the connected database type
+        const docs = dbType === 'mariadb' ? this.mariadbDocs : this.mysqlDocs;
+        this.logger.debug(`RAG: Using ${dbType === 'mariadb' ? 'MariaDB' : 'MySQL'} docs (${docs.length} available)`);
 
         // Score documents by keyword relevance
         const scored = docs.map(doc => ({
@@ -81,7 +81,10 @@ export class RAGService {
             .slice(0, maxDocs)
             .map(item => item.doc);
 
-        this.logger.debug(`Retrieved ${relevant.length} relevant docs for query (top score: ${scored[0]?.score || 0})`);
+        this.logger.debug(`Retrieved ${relevant.length} relevant ${dbType === 'mariadb' ? 'MariaDB' : 'MySQL'} docs for query (top score: ${scored[0]?.score || 0})`);
+        if (relevant.length > 0) {
+            this.logger.debug(`RAG doc titles: ${relevant.map(d => d.title).join(', ')}`);
+        }
 
         return relevant;
     }

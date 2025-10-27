@@ -54,8 +54,9 @@ suite('Database Operations Tests', () => {
         const result = await adapter.query('SELECT ? as safe_value', [safeValue]);
 
         assert.ok(result, 'Query should return result');
-        assert.ok(Array.isArray(result), 'Result should be an array');
-        assert.strictEqual((result[0] as any).safe_value, safeValue, 'Value should be properly escaped');
+        assert.ok(result.rows, 'Result should have rows property');
+        assert.ok(Array.isArray(result.rows), 'Rows should be an array');
+        assert.strictEqual((result.rows[0] as any).safe_value, safeValue, 'Value should be properly escaped');
     });
 
     test('Get process list', async function() {
@@ -123,30 +124,44 @@ suite('Database Operations Tests', () => {
         // Wait for Performance Schema to be ready
         await waitForPerformanceSchema(adapter);
 
-        // Start a transaction
-        await adapter.query('START TRANSACTION');
-        await adapter.query('SELECT * FROM users WHERE id = 1 FOR UPDATE');
+        // Create a second connection for the transaction
+        // (getProcessList excludes the current connection by design)
+        const transactionAdapter = await createTestConnection();
 
-        // Give Performance Schema time to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+            // Get the transaction connection's ID
+            const connIdResult = await transactionAdapter.query<{ id: number }>('SELECT CONNECTION_ID() as id');
+            const connectionId = connIdResult.rows?.[0]?.id;
+            assert.ok(connectionId, 'Should have a connection ID');
 
-        // Get process list with transaction detection
-        const processes = await adapter.getProcessList();
+            // Start a transaction on the second connection
+            await transactionAdapter.query('START TRANSACTION');
+            await transactionAdapter.query('SELECT * FROM users WHERE id = 1 FOR UPDATE');
 
-        // Find current connection process
-        const currentProcess = processes.find(p => p.user === 'root' && p.db === 'test_db');
+            // Give Performance Schema time to update
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-        assert.ok(currentProcess, 'Current process should be found');
+            // Get process list from the first connection (which will show the second connection)
+            const processes = await adapter.getProcessList();
 
-        // Note: Transaction detection depends on Performance Schema configuration
-        // The process should have transaction information if available
-        if (currentProcess.inTransaction !== undefined) {
-            // Transaction detection is working
-            console.log('Transaction detected:', currentProcess.inTransaction);
+            // Find the transaction connection process by ID
+            const transactionProcess = processes.find(p => p.id === connectionId);
+
+            assert.ok(transactionProcess, 'Transaction process should be found in process list');
+
+            // Note: Transaction detection depends on Performance Schema configuration
+            // The process should have transaction information if available
+            if (transactionProcess.inTransaction !== undefined) {
+                // Transaction detection is working
+                console.log('Transaction detected:', transactionProcess.inTransaction);
+            }
+
+            // Rollback transaction
+            await transactionAdapter.query('ROLLBACK');
+        } finally {
+            // Clean up the second connection
+            await disconnectAdapter(transactionAdapter);
         }
-
-        // Rollback transaction
-        await adapter.query('ROLLBACK');
     });
 
     test('Handle connection errors gracefully', async function() {
@@ -198,12 +213,13 @@ suite('Database Operations Tests', () => {
     test('Query with test data', async function() {
         this.timeout(10000);
 
-        const users = await adapter.query('SELECT * FROM users LIMIT 5');
+        const result = await adapter.query('SELECT * FROM users LIMIT 5');
 
-        assert.ok(Array.isArray(users), 'Users should be an array');
-        assert.ok(users.length > 0, 'Should have users from sample data');
+        assert.ok(result.rows, 'Result should have rows property');
+        assert.ok(Array.isArray(result.rows), 'Rows should be an array');
+        assert.ok(result.rows.length > 0, 'Should have users from sample data');
 
-        const user = users[0] as any;
+        const user = result.rows[0] as any;
         assert.ok(user.id, 'User should have id');
         assert.ok(user.username, 'User should have username');
         assert.ok(user.email, 'User should have email');

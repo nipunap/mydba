@@ -139,12 +139,16 @@ export class WebviewManager {
     }
 
     async showQueryProfiling(connectionId: string, query: string): Promise<void> {
+        const { AIService } = await import('../services/ai-service');
+        const aiService = new AIService(this.logger, this.context);
+        await aiService.initialize();
         QueryProfilingPanel.show(
             this.context,
             this.logger,
             this.connectionManager,
             connectionId,
-            query
+            query,
+            aiService
         );
     }
 

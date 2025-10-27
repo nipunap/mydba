@@ -15,6 +15,12 @@
   const queryText = document.getElementById('query-text');
   const reprofileBtn = document.getElementById('reprofile-btn');
 
+  // AI insights elements
+  const aiInsightsLoading = document.getElementById('ai-insights-loading');
+  const aiInsightsError = document.getElementById('ai-insights-error');
+  const aiInsightsErrorMessage = document.getElementById('ai-insights-error-message');
+  const aiInsightsContent = document.getElementById('ai-insights-content');
+
   window.addEventListener('error', (e) => showError(e.error?.message || e.message || 'Unknown error'), { once: true });
   reprofileBtn?.addEventListener('click', () => vscode.postMessage({ type: 'reprofile' }));
 
@@ -26,6 +32,15 @@
         break;
       case 'error':
         showError(message.message);
+        break;
+      case 'aiInsightsLoading':
+        showAIInsightsLoading();
+        break;
+      case 'aiInsights':
+        showAIInsights(message.insights);
+        break;
+      case 'aiInsightsError':
+        showAIInsightsError(message.error);
         break;
     }
   });
@@ -54,4 +69,110 @@
   }
   function hideError() { if (errorBox) errorBox.style.display = 'none'; }
   function hideLoading() { if (loading) loading.style.display = 'none'; }
+
+  // AI Insights Functions
+  function showAIInsightsLoading() {
+    if (aiInsightsLoading) aiInsightsLoading.style.display = 'flex';
+    if (aiInsightsError) aiInsightsError.style.display = 'none';
+    if (aiInsightsContent) aiInsightsContent.style.display = 'none';
+  }
+
+  function showAIInsightsError(error) {
+    if (aiInsightsLoading) aiInsightsLoading.style.display = 'none';
+    if (aiInsightsError) aiInsightsError.style.display = 'flex';
+    if (aiInsightsErrorMessage) aiInsightsErrorMessage.textContent = error;
+    if (aiInsightsContent) aiInsightsContent.style.display = 'none';
+  }
+
+  function showAIInsights(insights) {
+    if (aiInsightsLoading) aiInsightsLoading.style.display = 'none';
+    if (aiInsightsError) aiInsightsError.style.display = 'none';
+    if (aiInsightsContent) {
+      aiInsightsContent.style.display = 'block';
+      aiInsightsContent.innerHTML = renderAIInsights(insights);
+    }
+  }
+
+  function renderAIInsights(insights) {
+    if (!insights) return '<p>No insights available.</p>';
+
+    let html = '';
+
+    // Summary
+    if (insights.summary) {
+      html += `<div class="ai-summary"><p>${escapeHtml(insights.summary)}</p></div>`;
+    }
+
+    // Metadata badges
+    if (insights.metadata) {
+      html += '<div class="ai-metadata">';
+      if (insights.metadata.complexity) {
+        html += `<span class="metric-badge complexity-${insights.metadata.complexity.toLowerCase()}">${insights.metadata.complexity} Complexity</span>`;
+      }
+      if (insights.metadata.estimatedImpact) {
+        html += `<span class="metric-badge impact-${insights.metadata.estimatedImpact.toLowerCase()}">${insights.metadata.estimatedImpact} Impact</span>`;
+      }
+      html += '</div>';
+    }
+
+    // Anti-patterns
+    if (insights.antiPatterns && insights.antiPatterns.length > 0) {
+      html += '<div class="ai-antipatterns"><h4>⚠️ Issues Found</h4>';
+      insights.antiPatterns.forEach(ap => {
+        const severityClass = ap.severity?.toLowerCase() || 'low';
+        html += `
+          <div class="antipattern-item">
+            <div class="antipattern-header">
+              <span class="severity-icon severity-${severityClass}">●</span>
+              <strong>${escapeHtml(ap.pattern)}</strong>
+              <span class="severity-badge-small severity-${severityClass}">${ap.severity || 'Low'}</span>
+            </div>
+            <p class="antipattern-message">${escapeHtml(ap.message)}</p>
+            ${ap.suggestion ? `<p class="antipattern-suggestion">💡 ${escapeHtml(ap.suggestion)}</p>` : ''}
+          </div>`;
+      });
+      html += '</div>';
+    }
+
+    // Optimizations
+    if (insights.optimizations && insights.optimizations.length > 0) {
+      html += '<div class="ai-optimizations"><h4>✨ Optimization Suggestions</h4>';
+      insights.optimizations.forEach((opt, idx) => {
+        html += `
+          <div class="optimization-item">
+            <div class="optimization-header">
+              <span class="optimization-number">${idx + 1}</span>
+              <strong>${escapeHtml(opt.suggestion)}</strong>
+              <div class="optimization-badges">
+                ${opt.priority ? `<span class="badge priority-${opt.priority.toLowerCase()}">${opt.priority}</span>` : ''}
+                ${opt.estimatedImprovement ? `<span class="badge improvement">~${opt.estimatedImprovement}</span>` : ''}
+              </div>
+            </div>
+            <p class="optimization-description">${escapeHtml(opt.reasoning)}</p>`;
+
+        if (opt.before || opt.after) {
+          html += '<div class="optimization-code">';
+          if (opt.before) {
+            html += `<div class="code-block"><div class="code-label">Before:</div><pre><code>${escapeHtml(opt.before)}</code></pre></div>`;
+          }
+          if (opt.after) {
+            html += `<div class="code-block"><div class="code-label">After:</div><pre><code>${escapeHtml(opt.after)}</code></pre></div>`;
+          }
+          html += '</div>';
+        }
+
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    return html;
+  }
+
+  function escapeHtml(text) {
+    if (typeof text !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
 })();

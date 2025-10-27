@@ -312,6 +312,31 @@ export class MySQLAdapter {
     }
 
     /**
+     * Execute a function with a single dedicated connection from the pool.
+     * This ensures all queries within the function run on the same thread.
+     * Useful for operations that need thread consistency (like profiling).
+     */
+    async withConnection<T>(fn: (conn: mysql.PoolConnection) => Promise<T>): Promise<T> {
+        this.ensureConnected();
+
+        let connection: mysql.PoolConnection | null = null;
+        try {
+            connection = await this.pool!.getConnection();
+            this.logger.debug('Acquired dedicated connection from pool');
+            const result = await fn(connection);
+            return result;
+        } catch (error) {
+            this.logger.error('Error in withConnection:', error as Error);
+            throw error;
+        } finally {
+            if (connection) {
+                connection.release();
+                this.logger.debug('Released dedicated connection back to pool');
+            }
+        }
+    }
+
+    /**
      * Checks if a query is a system/admin query that should bypass validation
      */
     private isSystemQuery(sql: string): boolean {

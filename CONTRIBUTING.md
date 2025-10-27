@@ -147,9 +147,8 @@ mydba/
 │   ├── integration/          # Integration tests
 │   └── e2e/                  # End-to-end tests
 ├── docs/                     # Documentation
-│   ├── PRD.md                # Product Requirements Document
-│   ├── PRIVACY.md            # Privacy Policy
-│   └── ANONYMIZATION_STRATEGY.md  # Query templating spec
+│   ├── DATABASE_SETUP.md     # Database configuration guide
+│   └── QUICK_REFERENCE.md    # Quick reference guide
 ├── resources/                # Icons, images, CSS
 ├── package.json              # Extension manifest and dependencies
 ├── tsconfig.json             # TypeScript configuration
@@ -568,9 +567,7 @@ npm run license:verify
 4. Labels are automatically added for tracking
 5. Detailed reports available as CI artifacts
 
-For more details, see:
-- [License Compliance Policy](docs/LICENSE_COMPLIANCE.md)
-- [PR Checks Guide](docs/PR_CHECKS.md)
+All license compliance checks are automated in CI. See the Actions tab for detailed reports.
 
 ---
 
@@ -699,9 +696,8 @@ export function templateQuery(sql: string): string {
 ### README and Docs
 
 - **Update README.md**: For user-facing features
-- **Update docs/**: For technical documentation
+- **Update docs/**: For setup and reference guides
 - **Add examples**: Show how to use new features
-- **Update PRD**: For significant features or changes
 
 ---
 
