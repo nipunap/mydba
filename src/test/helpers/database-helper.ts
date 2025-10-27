@@ -73,9 +73,9 @@ async function waitForTestData(adapter: MySQLAdapter, maxWait: number = 30000): 
             // Check if sample data exists
             const result = await adapter.query<{ count: number }>(
                 'SELECT COUNT(*) as count FROM users'
-            ) as Array<{ count: number }>;
+            );
 
-            if (result && result.length > 0 && result[0].count > 0) {
+            if (result.rows && result.rows.length > 0 && result.rows[0].count > 0) {
                 return; // Data is ready
             }
         } catch (error) {
@@ -125,9 +125,9 @@ export async function waitForPerformanceSchema(
         try {
             const result = await adapter.query<{ count: number }>(
                 'SELECT COUNT(*) as count FROM performance_schema.events_statements_current'
-            ) as Array<{ count: number }>;
+            );
 
-            if (result && result.length > 0 && result[0].count >= minStatements) {
+            if (result.rows && result.rows.length > 0 && result.rows[0].count >= minStatements) {
                 return;
             }
         } catch (error) {
@@ -147,9 +147,9 @@ export async function isPerformanceSchemaEnabled(adapter: MySQLAdapter): Promise
     try {
         const result = await adapter.query<{ Value: string }>(
             "SHOW VARIABLES LIKE 'performance_schema'"
-        ) as Array<{ Value: string }>;
+        );
 
-        return Array.isArray(result) && result.length > 0 && result[0].Value === 'ON';
+        return !!(result.rows && Array.isArray(result.rows) && result.rows.length > 0 && result.rows[0].Value === 'ON');
     } catch (error) {
         return false;
     }
@@ -261,10 +261,10 @@ export async function insertTestTransaction(adapter: MySQLAdapter): Promise<numb
         `INSERT INTO users (username, email, password_hash, first_name, last_name)
          VALUES (?, ?, ?, ?, ?)`,
         ['test_user_' + Date.now(), 'test@example.com', 'hash123', 'Test', 'User']
-    ) as Array<{ insertId: number }>;
+    );
 
     // Don't commit - leave transaction open for testing
-    return (Array.isArray(result) && result.length > 0) ? result[0].insertId : 0;
+    return (result.rows && Array.isArray(result.rows) && result.rows.length > 0) ? result.rows[0].insertId : 0;
 }
 
 /**

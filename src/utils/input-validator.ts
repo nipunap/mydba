@@ -168,15 +168,12 @@ export class InputValidator {
     /**
      * Detects potential SQL injection patterns
      */
-    static hasSQLInjectionPattern(sql: string): boolean {
+    static hasSQLInjectionPattern(sql: string, allowDataModification: boolean = false): boolean {
         // Check for common SQL injection patterns
-        const dangerousPatterns = [
+        const alwaysDangerousPatterns = [
             /(\$\{|\$\w+)/,                    // Template literals or variables
             /(union\s+select)/i,                // UNION SELECT
             /(drop\s+table)/i,                  // DROP TABLE
-            /(insert\s+into)/i,                 // INSERT INTO
-            /(update\s+\w+\s+set)/i,           // UPDATE SET
-            /(delete\s+from)/i,                 // DELETE FROM
             /(-{2}|\/\*|\*\/)/,                 // SQL comments
             /\b(xp_|sp_)\w+/i,                  // Stored procedures (xp_, sp_ prefix)
             /\b(exec|execute)\s+/i,             // EXEC/EXECUTE followed by space (stored procedure call)
@@ -184,7 +181,24 @@ export class InputValidator {
             /('.*?or.*?'|".*?or.*?")/i         // OR-based injection
         ];
 
-        return dangerousPatterns.some(pattern => pattern.test(sql));
+        // These patterns are only dangerous if not properly parameterized
+        const conditionallyDangerousPatterns = [
+            /(insert\s+into)/i,                 // INSERT INTO
+            /(update\s+\w+\s+set)/i,           // UPDATE SET
+            /(delete\s+from)/i,                 // DELETE FROM
+        ];
+
+        // Always check for always-dangerous patterns
+        if (alwaysDangerousPatterns.some(pattern => pattern.test(sql))) {
+            return true;
+        }
+
+        // Only check conditionally dangerous patterns if not properly parameterized
+        if (!allowDataModification && conditionallyDangerousPatterns.some(pattern => pattern.test(sql))) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -211,7 +225,9 @@ export class InputValidator {
         }
 
         // Check for SQL injection patterns
-        if (this.hasSQLInjectionPattern(sql)) {
+        // If query is properly parameterized (has ? placeholders), allow INSERT/UPDATE/DELETE
+        const isProperlyParameterized = placeholderCount > 0 && placeholderCount === paramCount;
+        if (this.hasSQLInjectionPattern(sql, isProperlyParameterized)) {
             return {
                 valid: false,
                 error: 'Query contains potentially dangerous SQL patterns'

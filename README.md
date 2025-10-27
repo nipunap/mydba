@@ -25,6 +25,17 @@ MyDBA is an AI-powered VSCode extension that brings database management, monitor
 - **Editor Compatibility**: Works in VSCode, Cursor, Windsurf, and VSCodium
 - **Comprehensive Testing**: Integration tests with Docker, 70%+ code coverage
 
+### Metrics Dashboard
+
+![Database Metrics Dashboard](resources/metrics-dashboard-screenshot.png)
+
+Real-time monitoring dashboard showing:
+- Server information (version, uptime)
+- Connections over time (current vs max)
+- Queries per second with slow query detection
+- Buffer pool hit rate
+- Thread activity (running vs connected)
+
 ### Coming Soon (Phase 2)
 - PostgreSQL, Redis, Valkey support
 - Host-level metrics integration
@@ -33,9 +44,86 @@ MyDBA is an AI-powered VSCode extension that brings database management, monitor
 
 ## 📋 Requirements
 
-- **VSCode**: 1.85.0 or higher
-- **Node.js**: 18.x or higher
-- **Databases**: MySQL 8.0+, MariaDB 10.6+ (GA versions only)
+### Editor Requirements
+- **VSCode**: 1.85.0 or higher (also supports Cursor, Windsurf, VSCodium)
+- **Node.js**: 18.x or higher (for development)
+
+### Database Requirements
+
+#### Supported Versions
+- **MySQL**: 8.0+ (LTS and Innovation releases)
+- **MariaDB**: 10.6+, 10.11 LTS, 11.x+ (GA versions only)
+
+#### Performance Schema (Required)
+MyDBA requires Performance Schema to be enabled for monitoring features like:
+- Query profiling and execution analysis
+- Slow query detection
+- Queries without indexes detection
+- Transaction monitoring
+- Process list with transaction details
+
+**Enable Performance Schema:**
+
+For MySQL 8.0+:
+```ini
+# In my.cnf or my.ini
+[mysqld]
+performance_schema = ON
+```
+
+For MariaDB 10.6+:
+```ini
+# In my.cnf or mariadb.conf.d/50-server.cnf
+[mysqld]
+performance_schema = ON
+performance-schema-instrument = '%=ON'
+performance-schema-consumer-events-statements-current = ON
+performance-schema-consumer-events-statements-history = ON
+```
+
+**Restart your database server** after making configuration changes.
+
+**Verify Performance Schema is enabled:**
+```sql
+SHOW VARIABLES LIKE 'performance_schema';
+```
+
+Should return: `performance_schema | ON`
+
+#### User Permissions (Required)
+
+The database user needs the following privileges for full functionality:
+
+```sql
+-- Process monitoring (required for process list)
+GRANT PROCESS ON *.* TO 'mydba_user'@'%';
+
+-- Database listing
+GRANT SHOW DATABASES ON *.* TO 'mydba_user'@'%';
+
+-- Metadata access (for schema information)
+GRANT SELECT ON mysql.* TO 'mydba_user'@'%';
+
+-- Performance Schema access (for monitoring and profiling)
+-- UPDATE privilege is needed to configure instruments and consumers
+GRANT SELECT, UPDATE ON performance_schema.* TO 'mydba_user'@'%';
+
+-- Optional: Replication monitoring
+GRANT REPLICATION CLIENT ON *.* TO 'mydba_user'@'%';
+
+-- Database-specific access (adjust as needed)
+GRANT SELECT, INSERT, UPDATE, DELETE ON your_database.* TO 'mydba_user'@'%';
+
+-- Apply changes
+FLUSH PRIVILEGES;
+```
+
+**Note**: MyDBA automatically configures Performance Schema instruments and consumers when you use profiling features. The `UPDATE` privilege on `performance_schema.*` is required for this auto-configuration.
+
+**Quick Links**:
+- 📖 [Database Setup Guide](docs/DATABASE_SETUP.md) - Detailed setup instructions
+- ⚡ [Quick Reference](docs/QUICK_REFERENCE.md) - Quick setup checklist and commands
+- 🧪 [Testing Guide](test/MARIADB_TESTING.md) - Docker setup for development
 
 ## 🛠️ Installation
 
@@ -66,6 +154,24 @@ npm run install-extension
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+Before connecting, ensure:
+- ✅ **Performance Schema is enabled** in your database (see [Database Setup Guide](docs/DATABASE_SETUP.md))
+- ✅ **User has required permissions** (PROCESS, SELECT on performance_schema.*, etc.)
+- ✅ **Database version is supported** (MySQL 8.0+ or MariaDB 10.6+)
+
+Quick verification:
+```sql
+-- Check Performance Schema
+SHOW VARIABLES LIKE 'performance_schema';  -- Must return 'ON'
+
+-- Check your permissions
+SHOW GRANTS FOR CURRENT_USER();
+```
+
+### Getting Started
+
 1. **Connect to Database**
    - Open Command Palette (`Ctrl+Shift+P`)
    - Run `MyDBA: New Connection`
@@ -77,16 +183,26 @@ npm run install-extension
    - Click to expand and explore schema
    - Right-click for context actions
 
-3. **Analyze Queries**
+3. **View Metrics Dashboard**
+   - Click "Metrics Dashboard" in the sidebar
+   - Monitor real-time database performance
+   - Track connections, queries, buffer pool, and threads
+
+4. **Analyze Queries**
    - Select SQL query in editor
    - Run `MyDBA: Analyze Query` or use `@mydba /analyze`
    - View AI-powered insights and recommendations
 
-4. **Visual EXPLAIN Plans**
+5. **Visual EXPLAIN Plans**
    - Run `MyDBA: Explain Query`
    - See interactive tree diagram
    - Identify performance bottlenecks
    - Apply one-click fixes
+
+6. **Profile Slow Queries**
+   - Run `MyDBA: Profile Query`
+   - View execution stages with waterfall chart
+   - Identify time-consuming operations
 
 ## 🔧 Configuration
 
@@ -325,7 +441,11 @@ See [SECURITY.md](SECURITY.md) for security policies and supported versions.
 
 - **Issues**: [GitHub Issues](https://github.com/your-org/mydba/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/your-org/mydba/discussions)
-- **Documentation**: [Wiki](https://github.com/your-org/mydba/wiki)
+- **Documentation**:
+  - [Database Setup Guide](docs/DATABASE_SETUP.md)
+  - [Quick Reference](docs/QUICK_REFERENCE.md)
+  - [Testing Guide](test/MARIADB_TESTING.md)
+  - [Product Roadmap](docs/PRODUCT_ROADMAP.md)
 
 ## 🙏 Acknowledgments
 

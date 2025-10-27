@@ -41,6 +41,11 @@ services:
       - "3307:3306"
     volumes:
       - ./test/sql:/docker-entrypoint-initdb.d:ro
+    command: >
+      --performance-schema=ON
+      --performance-schema-instrument='%=ON'
+      --performance-schema-consumer-events-statements-current=ON
+      --performance-schema-consumer-events-statements-history=ON
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s

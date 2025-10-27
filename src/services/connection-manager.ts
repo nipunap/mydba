@@ -227,16 +227,29 @@ export class ConnectionManager {
             const adapterRegistry = new AdapterRegistry(this.logger);
             const adapter = adapterRegistry.create(config.type, config);
 
-            // Test connection
-            const result = { success: true, version: '8.0.35' };
+            // Actually test the connection (don't save it)
+            await adapter.connect(config);
 
-            if (result.success) {
-                this.logger.info(`Connection test successful: ${config.host}:${config.port}`);
-            } else {
-                this.logger.warn(`Connection test failed`);
+            // Get version info if possible
+            let version: string | undefined;
+            try {
+                const versionResult = await adapter.query('SELECT VERSION() as version');
+                if (versionResult?.rows && versionResult.rows.length > 0) {
+                    version = (versionResult.rows[0] as any).version;
+                }
+            } catch (versionError) {
+                // Version query failed, but connection was successful
+                this.logger.warn('Could not get database version:', versionError as Error);
             }
 
-            return result;
+            // Disconnect immediately - this was just a test
+            await adapter.disconnect();
+
+            this.logger.info(`Connection test successful: ${config.host}:${config.port}`);
+            return {
+                success: true,
+                version
+            };
 
         } catch (error) {
             this.logger.error(`Connection test error:`, error as Error);

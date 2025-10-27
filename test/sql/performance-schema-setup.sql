@@ -74,18 +74,18 @@ UPDATE performance_schema.setup_consumers
 SET ENABLED = 'YES'
 WHERE NAME = 'events_stages_history';
 
--- Configure statement digest
-SET GLOBAL performance_schema_max_digest_length = 1024;
+-- Configure statement digest (MySQL only - these are read-only in MariaDB)
+-- SET GLOBAL performance_schema_max_digest_length = 1024;
 
--- Configure max statement history
-SET GLOBAL performance_schema_events_statements_history_size = 100;
-SET GLOBAL performance_schema_events_statements_history_long_size = 10000;
+-- Configure max statement history (MySQL only - these are read-only in MariaDB)
+-- SET GLOBAL performance_schema_events_statements_history_size = 100;
+-- SET GLOBAL performance_schema_events_statements_history_long_size = 10000;
 
--- Configure max transaction history
-SET GLOBAL performance_schema_events_transactions_history_size = 100;
+-- Configure max transaction history (MySQL only - these are read-only in MariaDB)
+-- SET GLOBAL performance_schema_events_transactions_history_size = 100;
 
--- Configure max stage history
-SET GLOBAL performance_schema_events_stages_history_size = 100;
+-- Configure max stage history (MySQL only - these are read-only in MariaDB)
+-- SET GLOBAL performance_schema_events_stages_history_size = 100;
 
 -- Verify Performance Schema is enabled and configured
 SELECT

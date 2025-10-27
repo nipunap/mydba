@@ -117,7 +117,7 @@ export class ConnectionDialogPanel {
         this.logger.info(`Testing connection: ${config.name}`);
 
         try {
-            // Create a temporary connection config
+            // Create a temporary connection config for testing only
             const tempConfig: ConnectionConfig = {
                 id: 'temp-test-' + Date.now(),
                 name: config.name || 'Test Connection',
@@ -136,19 +136,28 @@ export class ConnectionDialogPanel {
                 } : undefined
             };
 
-            // Try to connect
-            const connection = await this.connectionManager.addConnection(tempConfig);
-            await this.connectionManager.connect(connection.id);
+            // Use the proper test method that doesn't save the connection
+            const result = await this.connectionManager.testConnection(tempConfig);
 
-            // Test successful
-            this.panel.webview.postMessage({
-                type: 'testResult',
-                success: true,
-                message: 'Connection successful!'
-            });
+            if (result.success) {
+                // Test successful
+                const message = result.version
+                    ? `Connection successful! (${result.version})`
+                    : 'Connection successful!';
 
-            // Clean up test connection
-            await this.connectionManager.deleteConnection(connection.id);
+                this.panel.webview.postMessage({
+                    type: 'testResult',
+                    success: true,
+                    message
+                });
+            } else {
+                // Test failed
+                this.panel.webview.postMessage({
+                    type: 'testResult',
+                    success: false,
+                    message: result.error || 'Connection test failed'
+                });
+            }
 
         } catch (error) {
             this.logger.error('Connection test failed:', error as Error);
