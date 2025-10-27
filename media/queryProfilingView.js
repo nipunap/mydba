@@ -93,6 +93,14 @@
     }
   }
 
+  // Sanitize metric levels to avoid XSS (allow only known expected values)
+  function sanitizeMetricLevel(str) {
+    if (typeof str !== 'string') return 'unknown';
+    const allowedValues = ['low', 'medium', 'high'];
+    const value = str.toLowerCase();
+    return allowedValues.includes(value) ? value : 'unknown';
+  }
+
   function renderAIInsights(insights) {
     if (!insights) return '<p>No insights available.</p>';
 
@@ -107,10 +115,14 @@
     if (insights.metadata) {
       html += '<div class="ai-metadata">';
       if (insights.metadata.complexity) {
-        html += `<span class="metric-badge complexity-${insights.metadata.complexity.toLowerCase()}">${insights.metadata.complexity} Complexity</span>`;
+        const safeComplexity = sanitizeMetricLevel(insights.metadata.complexity);
+        const labelComplexity = escapeHtml(insights.metadata.complexity);
+        html += `<span class="metric-badge complexity-${safeComplexity}">${labelComplexity} Complexity</span>`;
       }
       if (insights.metadata.estimatedImpact) {
-        html += `<span class="metric-badge impact-${insights.metadata.estimatedImpact.toLowerCase()}">${insights.metadata.estimatedImpact} Impact</span>`;
+        const safeImpact = sanitizeMetricLevel(insights.metadata.estimatedImpact);
+        const labelImpact = escapeHtml(insights.metadata.estimatedImpact);
+        html += `<span class="metric-badge impact-${safeImpact}">${labelImpact} Impact</span>`;
       }
       html += '</div>';
     }
