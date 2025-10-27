@@ -452,8 +452,8 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vscode/test-electron": "^2.3.0",
     "c8": "^8.0.1",
     "esbuild": "^0.25.11",
@@ -476,14 +476,10 @@
     "chart.js": "^4.5.1",
     "d3": "^7.9.0",
     "html2canvas": "^1.4.1",
-    "mapbox-gl": "^3.16.0",
     "mysql2": "^3.6.0",
     "node-sql-parser": "^5.3.3",
     "ollama": "^0.5.14",
-    "openai": "^4.77.0",
-    "plotly.js": "^2.25.0",
-    "react": "^19.2.0",
-    "webpack": "^5.102.1"
+    "openai": "^4.77.0"
   },
   "extensionDependencies": [],
   "repository": {
