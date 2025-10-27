@@ -278,10 +278,16 @@ export class ExplainViewerPanel {
             return;
         }
 
+        // Extract database name from the query if present
+        const dbMatch = this.query.match(/FROM\s+`?(\w+)`?\.`?(\w+)`?/i);
+        const database = dbMatch ? dbMatch[1] : null;
+
         for (const tableName of tableNames) {
             try {
-                // Fetch table schema
-                const schemaQuery = `DESCRIBE \`${tableName}\``;
+                // Fetch table schema - qualify with database if available
+                const schemaQuery = database 
+                    ? `DESCRIBE \`${database}\`.\`${tableName}\``
+                    : `DESCRIBE \`${tableName}\``;
                 const schemaResult = await adapter.query<any>(schemaQuery);
 
                 const schema: TableColumn[] = (schemaResult.rows || []).map((row: any) => ({
@@ -293,8 +299,10 @@ export class ExplainViewerPanel {
                     extra: row.Extra
                 }));
 
-                // Fetch index statistics
-                const indexQuery = `SHOW INDEX FROM \`${tableName}\``;
+                // Fetch index statistics - qualify with database if available
+                const indexQuery = database
+                    ? `SHOW INDEX FROM \`${database}\`.\`${tableName}\``
+                    : `SHOW INDEX FROM \`${tableName}\``;
                 const indexResult = await adapter.query<any>(indexQuery);
 
                 const indexMap = new Map<string, {
