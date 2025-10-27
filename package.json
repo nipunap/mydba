@@ -12,9 +12,8 @@
     "languageModels"
   ],
   "categories": [
-    "Other",
-    "Database",
-    "Machine Learning"
+    "Data Science",
+    "Formatters"
   ],
   "keywords": [
     "database",
@@ -28,10 +27,7 @@
     "performance",
     "dba"
   ],
-  "activationEvents": [
-    "onCommand:mydba.connect",
-    "onView:mydba.treeView"
-  ],
+  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
