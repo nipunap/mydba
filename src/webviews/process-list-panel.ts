@@ -230,10 +230,10 @@ export class ProcessListPanel {
                     <option value="host">Host</option>
                     <option value="query">Query Fingerprint</option>
                 </select>
-                <input 
-                    type="text" 
-                    id="filter-input" 
-                    placeholder="Filter processes..." 
+                <input
+                    type="text"
+                    id="filter-input"
+                    placeholder="Filter processes..."
                     class="filter-input"
                     aria-label="Filter processes by text" />
             </div>

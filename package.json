@@ -409,7 +409,7 @@
     "lint:fix": "eslint src --ext ts --fix",
     "test": "node ./out/test/runTest.js",
     "test:unit": "jest",
-    "test:integration": "jest --config jest.integration.config.js",
+    "test:integration": "npm run compile && npm test",
     "package": "vsce package",
     "install-extension": "code --install-extension mydba-*.vsix"
   },

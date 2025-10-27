@@ -65,11 +65,11 @@
     const filterInput = document.getElementById('filter-input');
     filterInput?.addEventListener('input', (e) => {
         const value = e.target.value.toLowerCase();
-        
+
         if (filterTimeout) {
             clearTimeout(filterTimeout);
         }
-        
+
         filterTimeout = setTimeout(() => {
             filterText = value;
             sortAndRenderProcesses();
@@ -181,7 +181,7 @@
                 default:
                     key = 'all';
             }
-            
+
             if (!groups[key]) {
                 groups[key] = [];
             }
@@ -254,14 +254,14 @@
         row.setAttribute('tabindex', '0');
         row.setAttribute('aria-expanded', expandedGroups.has(group.key) ? 'true' : 'false');
         row.dataset.groupKey = group.key;
-        
+
         const isExpanded = expandedGroups.has(group.key);
         const totalTime = group.processes.reduce((sum, p) => sum + (p.time || 0), 0);
-        const avgTime = group.processes.length > 0 
-            ? Math.round(totalTime / group.processes.length) 
+        const avgTime = group.processes.length > 0
+            ? Math.round(totalTime / group.processes.length)
             : 0;
         const inTransaction = group.processes.filter(p => p.inTransaction).length;
-        
+
         const cell = document.createElement('td');
         cell.colSpan = 10; // FIX: 10 columns (ID, User, Host, DB, Command, Time, State, Transaction, Info, Actions)
         cell.innerHTML = `
@@ -275,9 +275,9 @@
                 </span>
             </div>
         `;
-        
+
         row.addEventListener('click', () => toggleGroup(group.key, row));
-        
+
         return row;
     }
 
@@ -344,10 +344,10 @@
             const isLong = duration > 60;
             const badgeClass = isLong ? 'transaction-long' : 'transaction-active';
             const icon = isLong ? '⚠️' : '🔄';
-            const ariaLabel = isLong 
-                ? `Long running transaction: ${formatTime(duration)}` 
+            const ariaLabel = isLong
+                ? `Long running transaction: ${formatTime(duration)}`
                 : `Active transaction: ${formatTime(duration)}`;
-            const badge = `<span class="transaction-badge ${badgeClass}" 
+            const badge = `<span class="transaction-badge ${badgeClass}"
                 title="Transaction ID: ${escapeHtml(process.transactionId || 'N/A')}"
                 aria-label="${ariaLabel}">${icon} ${formatTime(duration)}</span>`;
             transactionCell.innerHTML = badge;

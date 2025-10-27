@@ -4,7 +4,7 @@ import { Logger } from '../utils/logger';
 
 /**
  * Configure AI Provider Command
- * 
+ *
  * Multi-step wizard for configuring AI providers with error handling
  */
 export async function configureAIProvider(
@@ -43,7 +43,7 @@ export async function configureAIProvider(
 
         // Step 4: Save configuration
         await saveConfiguration(provider, config, context);
-        
+
         vscode.window.showInformationMessage(
             `AI provider configured: ${provider}. Please reload the window to apply changes.`,
             'Reload Window'
@@ -173,10 +173,10 @@ async function configureVSCodeLM(logger: Logger): Promise<Record<string, string>
     // Check for available models with timeout
     try {
         logger.info('Checking for available VSCode LM models...');
-        const timeoutPromise = new Promise<never>((_, reject) => 
+        const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), 5000)
         );
-        
+
         const modelsPromise = vscode.lm.selectChatModels();
         const models = await Promise.race([modelsPromise, timeoutPromise]);
 
@@ -349,10 +349,10 @@ async function configureOllama(logger: Logger): Promise<Record<string, string> |
         logger.info(`Connecting to Ollama at ${endpoint}...`);
         const { Ollama } = await import('ollama');
         const client = new Ollama({ host: endpoint });
-        
+
         const response = await Promise.race([
             client.list(),
-            new Promise<never>((_, reject) => 
+            new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('Connection timeout')), 5000)
             )
         ]);
@@ -419,7 +419,7 @@ async function testConnection(
 
     try {
         logger.info(`Testing ${provider} connection...`);
-        
+
         // Show progress
         return await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
@@ -480,4 +480,3 @@ async function saveConfiguration(
         await workspaceConfig.update('ollamaEndpoint', config.endpoint, vscode.ConfigurationTarget.Global);
     }
 }
-

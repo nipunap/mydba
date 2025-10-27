@@ -619,6 +619,147 @@ export function templateQuery(sql: string): string {
 
 ---
 
+## CI/CD and Release Process
+
+### Continuous Integration
+
+Our CI pipeline runs automatically on every push and pull request:
+
+#### CI Workflow (`.github/workflows/ci.yml`)
+
+**Triggers:**
+- Push to `main` or `develop` branches
+- Pull requests to `main` or `develop`
+- Manual trigger via `workflow_dispatch`
+
+**What it does:**
+1. **Build and Test** (Multi-OS Matrix):
+   - Tests on Ubuntu, Windows, and macOS
+   - Tests with Node.js 18.x and 20.x
+   - Runs linter, compiles TypeScript, runs unit and integration tests
+   - Validates package.json and checks for required files
+   - Uploads compilation artifacts
+
+2. **Package Extension**:
+   - Creates VSIX package (skipped on `main` branch)
+   - Uploads VSIX artifact for testing
+
+3. **Lint Report**:
+   - Generates ESLint report
+   - Comments on PRs with linting issues
+
+4. **Status Check**:
+   - Aggregates all job results
+   - Blocks PR merge if any checks fail
+
+#### CodeQL Security Scanning (`.github/workflows/codeql.yml`)
+
+**Triggers:**
+- Push to `main` or `develop`
+- Pull requests to `main` or `develop`
+- Weekly schedule (Monday 00:00 UTC)
+
+**What it does:**
+- Scans codebase for security vulnerabilities
+- Analyzes JavaScript/TypeScript with GitHub's security queries
+- Reports results to GitHub Security tab
+
+### Release Process
+
+Releases are **fully automated** when you bump the version in `package.json`:
+
+#### How to Release
+
+1. **Update Version**:
+   ```bash
+   npm version patch   # 1.0.0 → 1.0.1 (bug fixes)
+   npm version minor   # 1.0.0 → 1.1.0 (new features)
+   npm version major   # 1.0.0 → 2.0.0 (breaking changes)
+   ```
+
+2. **Update CHANGELOG.md**:
+   Add a section for the new version:
+   ```markdown
+   ## [1.1.0] - 2025-01-15
+
+   ### Added
+   - New feature X
+   - New feature Y
+
+   ### Fixed
+   - Bug fix Z
+   ```
+
+3. **Commit and Push**:
+   ```bash
+   git add package.json CHANGELOG.md
+   git commit -m "chore: bump version to 1.1.0"
+   git push origin main
+   ```
+
+4. **Automated Publishing** (`.github/workflows/publish-release.yml`):
+   - Waits for CI checks to pass
+   - Validates semantic versioning (must be > previous version)
+   - Runs security scan and dependency review
+   - Compiles and packages extension
+   - Extracts version-specific changelog
+   - Creates GitHub Release with git tag
+   - Publishes to VSCode Marketplace (if `AZURE_TOKEN` is configured)
+   - Creates GitHub issue if publishing fails
+
+#### GitHub Secrets Setup
+
+For automated marketplace publishing, configure the following secret:
+
+**`AZURE_TOKEN`**: VSCode Marketplace Personal Access Token
+
+**How to create the token:**
+
+1. Go to [Azure DevOps](https://dev.azure.com/)
+2. Click on your profile → Security → Personal Access Tokens
+3. Create new token with:
+   - **Name**: `MyDBA VSCode Marketplace`
+   - **Organization**: All accessible organizations
+   - **Scopes**: `Marketplace` → `Manage`
+4. Copy the token (you won't see it again!)
+5. Add to GitHub:
+   - Go to your repository → Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - **Name**: `AZURE_TOKEN`
+   - **Value**: Paste your token
+   - Click "Add secret"
+
+**Note**: Without `AZURE_TOKEN`, the workflow will skip marketplace publishing but still create the GitHub Release.
+
+### Debugging Failed Workflows
+
+If a CI workflow fails:
+
+1. **Check the Workflow Run**:
+   - Go to Actions tab in GitHub
+   - Click on the failed workflow
+   - Expand the failed job to see logs
+
+2. **Common Issues**:
+   - **Compilation errors**: Check TypeScript errors in "Compile TypeScript" step
+   - **Test failures**: Check "Run Unit Tests" or "Run Integration Tests" steps
+   - **Linting errors**: Check "Run linter" step
+   - **Package validation**: Check "Validate package.json" step
+
+3. **Re-run Failed Jobs**:
+   - Click "Re-run failed jobs" button in the workflow run
+   - Or trigger manually: Actions → CI → Run workflow
+
+4. **Local Testing**:
+   Always test locally before pushing:
+   ```bash
+   npm run compile   # Check for compilation errors
+   npm run lint      # Check for linting errors
+   npm test          # Run all tests
+   ```
+
+---
+
 ## Community
 
 ### Getting Help

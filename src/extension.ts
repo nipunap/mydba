@@ -56,7 +56,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         // Create AI provider status bar item
         const aiStatusBar = vscode.window.createStatusBarItem(
-            vscode.StatusBarAlignment.Right, 
+            vscode.StatusBarAlignment.Right,
             100
         );
         aiStatusBar.command = 'mydba.configureAIProvider';
@@ -69,7 +69,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 const config = vscode.workspace.getConfiguration('mydba.ai');
                 const provider = config.get<string>('provider', 'auto');
                 const enabled = config.get<boolean>('enabled', true);
-                
+
                 if (!enabled || provider === 'none') {
                     aiStatusBar.text = '$(circle-slash) AI: Off';
                     aiStatusBar.backgroundColor = undefined;
