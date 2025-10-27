@@ -285,7 +285,7 @@ export class ExplainViewerPanel {
         for (const tableName of tableNames) {
             try {
                 // Fetch table schema - qualify with database if available
-                const schemaQuery = database 
+                const schemaQuery = database
                     ? `DESCRIBE \`${database}\`.\`${tableName}\``
                     : `DESCRIBE \`${tableName}\``;
                 const schemaResult = await adapter.query<any>(schemaQuery);

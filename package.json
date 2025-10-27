@@ -4,7 +4,7 @@
   "description": "AI-powered database management and optimization for MySQL, MariaDB, PostgreSQL, Redis, and Valkey",
   "version": "0.1.0",
   "publisher": "mydba",
-  "icon": "resources/mydba.png",
+  "icon": "resources/mydba-icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -383,6 +383,26 @@
           ],
           "default": "1hour",
           "description": "Custom time range for metrics dashboard"
+        },
+        "mydba.alerts.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable metric alerts and notifications"
+        },
+        "mydba.alerts.connectionsThreshold": {
+          "type": "number",
+          "default": 80,
+          "description": "Alert when connection usage exceeds this percentage"
+        },
+        "mydba.alerts.bufferPoolThreshold": {
+          "type": "number",
+          "default": 90,
+          "description": "Alert when buffer pool hit rate falls below this percentage"
+        },
+        "mydba.alerts.slowQueriesThreshold": {
+          "type": "number",
+          "default": 10,
+          "description": "Alert when slow queries per minute exceeds this value"
         }
       }
     },
