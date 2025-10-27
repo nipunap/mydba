@@ -12,7 +12,7 @@ suite('Panel Lifecycle Tests', () => {
     // 1. Panels require ConnectionManager with active connections
     // 2. Commands need valid connectionIds passed as parameters
     // 3. VSCode webview panels need proper context to initialize
-    // 
+    //
     // To run these tests properly, we would need:
     // - Mock ConnectionManager with test connections
     // - Test fixtures for connection configs

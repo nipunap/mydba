@@ -366,8 +366,7 @@ export class MySQLAdapter {
                     t.PROCESSLIST_STATE as threadState,
                     tc.TRX_ID as transactionId,
                     tc.TRX_STATE as transactionState,
-                    tc.TRX_STARTED as transactionStarted,
-                    tc.AUTOCOMMIT as autocommit
+                    tc.TRX_STARTED as transactionStarted
                 FROM information_schema.PROCESSLIST p
                 LEFT JOIN performance_schema.threads t
                     ON t.PROCESSLIST_ID = p.ID
@@ -402,7 +401,7 @@ export class MySQLAdapter {
                     transactionId: row.transactionId || undefined,
                     transactionState: row.transactionState || undefined,
                     transactionStarted: row.transactionStarted ? new Date(row.transactionStarted) : undefined,
-                    autocommit: row.autocommit === 'YES',
+                    autocommit: undefined, // Note: autocommit is a session variable, not available in INNODB_TRX
                     queryFingerprint: queryText ? anonymizer.fingerprint(queryText) : undefined
                 };
             });
