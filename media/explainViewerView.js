@@ -29,6 +29,26 @@
     let currentRawJson = null;
     let searchTimeout = null;
 
+    // Sanitization functions to prevent XSS
+    function sanitizeAccessType(str) {
+        if (typeof str !== 'string') return 'unknown';
+        const allowedTypes = ['ALL', 'index', 'range', 'ref', 'eq_ref', 'const', 'system', 'NULL', 'fulltext', 'ref_or_null', 'index_merge', 'unique_subquery', 'index_subquery'];
+        return allowedTypes.includes(str) ? str : 'unknown';
+    }
+
+    function sanitizeMetricLevel(str) {
+        if (typeof str !== 'string') return 'unknown';
+        const allowedValues = ['low', 'medium', 'high', 'easy', 'hard'];
+        const value = str.toLowerCase();
+        return allowedValues.includes(value) ? value : 'unknown';
+    }
+
+    function sanitizeColor(str) {
+        if (typeof str !== 'string') return 'good';
+        const allowedColors = ['good', 'warning', 'critical'];
+        return allowedColors.includes(str) ? str : 'good';
+    }
+
     // Event listeners - with proper null checks
     toggleViewBtn?.addEventListener('click', toggleView);
     expandAllBtn?.addEventListener('click', expandAll);
@@ -232,7 +252,9 @@
         details.push(`<div class="detail-grid">`);
 
         if (nodeData.accessType) {
-            details.push(`<div class="detail-item"><span class="detail-label">Access Type:</span> <span class="access-type-badge ${nodeData.accessType}">${nodeData.accessType}</span></div>`);
+            const safeAccessType = sanitizeAccessType(nodeData.accessType);
+            const labelAccessType = escapeHtml(nodeData.accessType);
+            details.push(`<div class="detail-item"><span class="detail-label">Access Type:</span> <span class="access-type-badge ${safeAccessType}">${labelAccessType}</span></div>`);
         }
 
         if (nodeData.key) {
@@ -555,18 +577,21 @@
             html += '<div class="ai-metadata">';
             if (data.metadata.totalCost > 0) {
                 const costClass = data.metadata.totalCost > 10000 ? 'critical' : (data.metadata.totalCost > 1000 ? 'warning' : 'good');
-                html += `<span class="metric-badge ${costClass}">Cost: ${data.metadata.totalCost.toFixed(2)}</span>`;
+                const safeCostClass = sanitizeColor(costClass);
+                html += `<span class="metric-badge ${safeCostClass}">Cost: ${data.metadata.totalCost.toFixed(2)}</span>`;
             }
             if (data.metadata.estimatedRows > 0) {
                 const rowsClass = data.metadata.estimatedRows > 10000 ? 'warning' : 'good';
-                html += `<span class="metric-badge ${rowsClass}">Rows: ${data.metadata.estimatedRows.toLocaleString()}</span>`;
+                const safeRowsClass = sanitizeColor(rowsClass);
+                html += `<span class="metric-badge ${safeRowsClass}">Rows: ${data.metadata.estimatedRows.toLocaleString()}</span>`;
             }
             if (data.metadata.tablesCount > 0) {
                 html += `<span class="metric-badge">Tables: ${data.metadata.tablesCount}</span>`;
             }
             if (data.estimatedComplexity) {
                 const complexityClass = data.estimatedComplexity > 7 ? 'critical' : (data.estimatedComplexity > 4 ? 'warning' : 'good');
-                html += `<span class="metric-badge ${complexityClass}">Complexity: ${data.estimatedComplexity}/10</span>`;
+                const safeComplexityClass = sanitizeColor(complexityClass);
+                html += `<span class="metric-badge ${safeComplexityClass}">Complexity: ${data.estimatedComplexity}/10</span>`;
             }
             html += '</div>';
         }
@@ -608,14 +633,16 @@
             data.optimizationSuggestions.forEach((suggestion, index) => {
                 const impactColor = suggestion.impact === 'high' ? 'critical' : suggestion.impact === 'medium' ? 'warning' : 'good';
                 const difficultyColor = suggestion.difficulty === 'hard' ? 'critical' : suggestion.difficulty === 'medium' ? 'warning' : 'good';
+                const safeImpactColor = sanitizeColor(impactColor);
+                const safeDifficultyColor = sanitizeColor(difficultyColor);
 
                 html += `<div class="optimization-item">`;
                 html += `<div class="optimization-header">`;
                 html += `<span class="optimization-number">${index + 1}</span>`;
                 html += `<strong>${escapeHtml(suggestion.title)}</strong>`;
                 html += `<div class="optimization-badges">`;
-                html += `<span class="badge badge-impact ${impactColor}">Impact: ${escapeHtml(suggestion.impact)}</span>`;
-                html += `<span class="badge badge-difficulty ${difficultyColor}">Difficulty: ${escapeHtml(suggestion.difficulty)}</span>`;
+                html += `<span class="badge badge-impact ${safeImpactColor}">Impact: ${escapeHtml(suggestion.impact)}</span>`;
+                html += `<span class="badge badge-difficulty ${safeDifficultyColor}">Difficulty: ${escapeHtml(suggestion.difficulty)}</span>`;
                 html += `</div>`;
                 html += `</div>`;
                 html += `<div class="optimization-description">${escapeHtml(suggestion.description)}</div>`;
