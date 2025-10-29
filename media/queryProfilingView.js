@@ -101,6 +101,20 @@
     return allowedValues.includes(value) ? value : 'unknown';
   }
 
+  function sanitizeSeverity(str) {
+    if (typeof str !== 'string') return 'low';
+    const allowedValues = ['critical', 'warning', 'info', 'low'];
+    const value = str.toLowerCase();
+    return allowedValues.includes(value) ? value : 'low';
+  }
+
+  function sanitizePriority(str) {
+    if (typeof str !== 'string') return 'medium';
+    const allowedValues = ['low', 'medium', 'high', 'critical'];
+    const value = str.toLowerCase();
+    return allowedValues.includes(value) ? value : 'medium';
+  }
+
   function renderAIInsights(insights) {
     if (!insights) return '<p>No insights available.</p>';
 
@@ -131,13 +145,14 @@
     if (insights.antiPatterns && insights.antiPatterns.length > 0) {
       html += '<div class="ai-antipatterns"><h4>⚠️ Issues Found</h4>';
       insights.antiPatterns.forEach(ap => {
-        const severityClass = ap.severity?.toLowerCase() || 'low';
+        const severityClass = sanitizeSeverity(ap.severity);
+        const severityLabel = escapeHtml(ap.severity || 'Low');
         html += `
           <div class="antipattern-item">
             <div class="antipattern-header">
               <span class="severity-icon severity-${severityClass}">●</span>
               <strong>${escapeHtml(ap.pattern)}</strong>
-              <span class="severity-badge-small severity-${severityClass}">${ap.severity || 'Low'}</span>
+              <span class="severity-badge-small severity-${severityClass}">${severityLabel}</span>
             </div>
             <p class="antipattern-message">${escapeHtml(ap.message)}</p>
             ${ap.suggestion ? `<p class="antipattern-suggestion">💡 ${escapeHtml(ap.suggestion)}</p>` : ''}
@@ -150,14 +165,16 @@
     if (insights.optimizations && insights.optimizations.length > 0) {
       html += '<div class="ai-optimizations"><h4>✨ Optimization Suggestions</h4>';
       insights.optimizations.forEach((opt, idx) => {
+        const safePriority = opt.priority ? sanitizePriority(opt.priority) : null;
+        const priorityLabel = opt.priority ? escapeHtml(opt.priority) : null;
         html += `
           <div class="optimization-item">
             <div class="optimization-header">
               <span class="optimization-number">${idx + 1}</span>
               <strong>${escapeHtml(opt.suggestion)}</strong>
               <div class="optimization-badges">
-                ${opt.priority ? `<span class="badge priority-${opt.priority.toLowerCase()}">${opt.priority}</span>` : ''}
-                ${opt.estimatedImprovement ? `<span class="badge improvement">~${opt.estimatedImprovement}</span>` : ''}
+                ${safePriority ? `<span class="badge priority-${safePriority}">${priorityLabel}</span>` : ''}
+                ${opt.estimatedImprovement ? `<span class="badge improvement">~${escapeHtml(opt.estimatedImprovement)}</span>` : ''}
               </div>
             </div>
             <p class="optimization-description">${escapeHtml(opt.reasoning)}</p>`;
