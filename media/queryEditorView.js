@@ -346,11 +346,17 @@
         html += '</div>';
 
         // Add collapsible raw JSON
-        html += '<details class="raw-json"><summary>View Raw JSON</summary>';
-        html += '<pre>' + JSON.stringify(explainData, null, 2) + '</pre>';
-        html += '</details>';
+        html += '<details class="raw-json"><summary>View Raw JSON</summary></details>';
 
         explainContent.innerHTML = html;
+
+        // Safely insert JSON as text inside the <pre> within details
+        const detailsEl = explainContent.querySelector('.raw-json');
+        if (detailsEl) {
+            const preEl = document.createElement('pre');
+            preEl.textContent = JSON.stringify(explainData, null, 2);
+            detailsEl.appendChild(preEl);
+        }
 
         // Highlight performance issues
         highlightExplainIssues();
