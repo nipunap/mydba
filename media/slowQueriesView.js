@@ -90,7 +90,7 @@
                     <div class="query-title">
                         <span class="schema">${escapeHtml(r.schema || '-')}</span>
                         ${r.impactScore !== undefined ? `<span class="impact-badge ${impactBadgeClass}">Impact: ${Math.round(r.impactScore)}</span>` : ''}
-                        <span class="meta">avg: ${r.avgMs.toFixed(2)} ms · total: ${r.totalMs.toFixed(2)} ms · count: ${r.count}</span>
+                        <span class="meta">avg: ${escapeHtml(r.avgMs.toFixed(2))} ms · total: ${escapeHtml(r.totalMs.toFixed(2))} ms · count: ${escapeHtml(String(r.count))}</span>
                     </div>
                 </div>
                 <div class="query-text"><pre>${escapeHtml(r.digestText)}</pre></div>
