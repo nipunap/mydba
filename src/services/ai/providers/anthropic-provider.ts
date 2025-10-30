@@ -39,7 +39,7 @@ export class AnthropicProvider implements AIProvider {
                 }]
             });
             return true;
-        } catch (error) {
+        } catch {
             this.logger.debug('Anthropic availability check failed:', error as Error);
             return false;
         }
@@ -71,7 +71,7 @@ export class AnthropicProvider implements AIProvider {
             }
 
             return this.parseResponse(content.text);
-        } catch (error) {
+        } catch {
             this.logger.error('Anthropic analysis failed:', error as Error);
             throw new Error(`Anthropic analysis failed: ${(error as Error).message}`);
         }
@@ -203,7 +203,7 @@ Only return the JSON object, no additional text.`;
 
             // Fallback: treat as plain text
             return this.parseUnstructuredResponse(content);
-        } catch (error) {
+        } catch {
             this.logger.warn('Failed to parse Anthropic JSON response:', error as Error);
             return this.parseUnstructuredResponse(content);
         }

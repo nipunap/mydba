@@ -1,4 +1,3 @@
-import * as vscode from 'vscode';
 import * as mysql from 'mysql2/promise';
 import { Logger } from '../utils/logger';
 import { DataSanitizer } from '../utils/data-sanitizer';
@@ -102,7 +101,7 @@ export class MySQLAdapter {
 
             // Test the connection and get version
             const [rows] = await this.pool.query('SELECT VERSION() as version');
-            const versionRow = rows as any[];
+            const versionRow = rows as Array<{ version: string }>;
             this.versionString = versionRow[0]?.version || 'Unknown';
 
             // Detect if it's MariaDB
@@ -173,8 +172,8 @@ export class MySQLAdapter {
         this.ensureConnected();
 
         try {
-            const [rows] = await this.pool!.query<any[]>('SHOW DATABASES');
-            return rows.map((row: any) => ({ name: row.Database }));
+            const [rows] = await this.pool.query<Array<{ Database: string }>>('SHOW DATABASES');
+            return rows.map((row) => ({ name: row.Database }));
 
         } catch (error) {
             this.logger.error('Failed to get databases:', error as Error);
@@ -188,14 +187,22 @@ export class MySQLAdapter {
         // Validate database name
         const validation = InputValidator.validateDatabaseName(database);
         if (!validation.valid) {
-            throw new ValidationError(validation.error!, 'database');
+            throw new ValidationError(validation.error ?? 'Invalid database name', 'database');
         }
 
         try {
             const sql = `SHOW TABLE STATUS FROM \`${database}\``;
-            const [rows] = await this.pool!.query<any[]>(sql);
+            interface TableRow {
+                Name: string;
+                Engine?: string;
+                Rows?: number;
+                Data_length?: number;
+                Index_length?: number;
+                Collation?: string;
+            }
+            const [rows] = await this.pool.query<TableRow[]>(sql);
 
-            return rows.map((row: any) => ({
+            return rows.map((row) => ({
                 name: row.Name,
                 engine: row.Engine,
                 rows: row.Rows || 0,
@@ -216,12 +223,12 @@ export class MySQLAdapter {
         // Validate inputs
         const dbValidation = InputValidator.validateDatabaseName(database);
         if (!dbValidation.valid) {
-            throw new ValidationError(dbValidation.error!, 'database');
+            throw new ValidationError(dbValidation.error ?? 'Invalid database name', 'database');
         }
 
         const tableValidation = InputValidator.validateDatabaseName(table); // Same rules as database
         if (!tableValidation.valid) {
-            throw new ValidationError(tableValidation.error!, 'table');
+            throw new ValidationError(tableValidation.error ?? 'Invalid table name', 'table');
         }
 
         try {
@@ -273,7 +280,7 @@ export class MySQLAdapter {
             if (!validation.valid) {
                 this.logger.error(`Validation failed for SQL: ${sql.substring(0, 200)}`);
                 this.logger.error(`Validation error: ${validation.error}`);
-                throw new ValidationError(validation.error!, 'sql');
+                throw new ValidationError(validation.error ?? 'Validation failed', 'sql');
             }
 
             // Check for destructive queries
@@ -290,19 +297,28 @@ export class MySQLAdapter {
             const safeForConsole = sanitizedSQL.replace(/%/g, '%%');
             this.logger.info(`Executing query: ${DataSanitizer.truncate(safeForConsole, 200)}`);
 
-            const [rows, fields] = await this.pool!.query(sql, params);
+            const [rows, fields] = await this.pool.query(sql, params);
 
             // Convert mysql2 field info to our format
-            const fieldInfo: FieldInfo[] = Array.isArray(fields) ? fields.map((f: any) => ({
+            interface Mysql2Field {
+                name: string;
+                type: number;
+            }
+            const fieldInfo: FieldInfo[] = Array.isArray(fields) ? fields.map((f: Mysql2Field) => ({
                 name: f.name,
                 type: f.type
             })) : [];
 
+            interface QueryResultPacket {
+                affectedRows?: number;
+                insertId?: number;
+            }
+
             return {
                 rows: rows as T[],
                 fields: fieldInfo,
-                affected: Array.isArray(rows) ? 0 : (rows as any).affectedRows || 0,
-                insertId: Array.isArray(rows) ? 0 : (rows as any).insertId || 0
+                affected: Array.isArray(rows) ? 0 : (rows as QueryResultPacket).affectedRows || 0,
+                insertId: Array.isArray(rows) ? 0 : (rows as QueryResultPacket).insertId || 0
             };
 
         } catch (error) {
@@ -321,7 +337,7 @@ export class MySQLAdapter {
 
         let connection: mysql.PoolConnection | null = null;
         try {
-            connection = await this.pool!.getConnection();
+            connection = await this.pool.getConnection();
             this.logger.debug('Acquired dedicated connection from pool');
             const result = await fn(connection);
             return result;
@@ -365,7 +381,10 @@ export class MySQLAdapter {
 
         try {
             // First, check if Performance Schema is enabled
-            const [psConfig] = await this.pool!.query<any[]>(
+            interface PerformanceSchemaConfig {
+                enabled: number;
+            }
+            const [psConfig] = await this.pool.query<PerformanceSchemaConfig[]>(
                 "SELECT @@global.performance_schema AS enabled"
             );
             const psEnabled = psConfig && psConfig[0]?.enabled === 1;
@@ -402,14 +421,29 @@ export class MySQLAdapter {
             `;
 
             this.logger.debug('Executing enhanced processlist query with transaction detection');
-            const [rows] = await this.pool!.query<any[]>(query);
-            this.logger.debug(`Retrieved ${(rows as any[]).length} processes`);
+            interface ProcessRow {
+                id: number;
+                user: string;
+                host: string;
+                db: string | null;
+                command: string;
+                time: number;
+                state: string | null;
+                info: string | null;
+                threadId: number | null;
+                threadState: string | null;
+                transactionId: string | null;
+                transactionState: string | null;
+                transactionStarted: Date | null;
+            }
+            const [rows] = await this.pool.query<ProcessRow[]>(query);
+            this.logger.debug(`Retrieved ${rows.length} processes`);
 
             // Import QueryAnonymizer for fingerprinting
             const { QueryAnonymizer } = await import('../utils/query-anonymizer');
             const anonymizer = new QueryAnonymizer();
 
-            return (rows as any[]).map((row: any) => {
+            return rows.map((row) => {
                 const inTransaction = !!row.transactionId;
                 const queryText = row.info || '';
 
@@ -441,10 +475,21 @@ export class MySQLAdapter {
     private async getBasicProcessList(): Promise<Process[]> {
         try {
             this.logger.debug('Executing SHOW FULL PROCESSLIST');
-            const [rows] = await this.pool!.query<any[]>('SHOW FULL PROCESSLIST');
-            this.logger.debug(`Retrieved ${(rows as any[]).length} processes`);
+            interface BasicProcessRow {
+                Id: number;
+                User: string;
+                Host: string;
+                db?: string | null;
+                DB?: string | null;
+                Command: string;
+                Time: number;
+                State: string | null;
+                Info: string | null;
+            }
+            const [rows] = await this.pool.query<BasicProcessRow[]>('SHOW FULL PROCESSLIST');
+            this.logger.debug(`Retrieved ${rows.length} processes`);
 
-            return (rows as any[]).map((row: any) => ({
+            return rows.map((row) => ({
                 id: row.Id,
                 user: row.User,
                 host: row.Host,
@@ -465,9 +510,13 @@ export class MySQLAdapter {
         this.ensureConnected();
 
         try {
-            const [rows] = await this.pool!.query<any[]>('SHOW GLOBAL VARIABLES');
+            interface VariableRow {
+                Variable_name: string;
+                Value: string;
+            }
+            const [rows] = await this.pool.query<VariableRow[]>('SHOW GLOBAL VARIABLES');
 
-            return rows.map((row: any) => ({
+            return rows.map((row) => ({
                 name: row.Variable_name,
                 value: row.Value,
                 scope: 'GLOBAL'
@@ -483,9 +532,13 @@ export class MySQLAdapter {
         this.ensureConnected();
 
         try {
-            const [rows] = await this.pool!.query<any[]>('SHOW SESSION VARIABLES');
+            interface VariableRow {
+                Variable_name: string;
+                Value: string;
+            }
+            const [rows] = await this.pool.query<VariableRow[]>('SHOW SESSION VARIABLES');
 
-            return rows.map((row: any) => ({
+            return rows.map((row) => ({
                 name: row.Variable_name,
                 value: row.Value,
                 scope: 'SESSION'
@@ -501,11 +554,15 @@ export class MySQLAdapter {
         this.ensureConnected();
 
         try {
-            const [rows] = await this.pool!.query<any[]>('SHOW GLOBAL STATUS');
+            interface StatusRow {
+                Variable_name: string;
+                Value: string;
+            }
+            const [rows] = await this.pool.query<StatusRow[]>('SHOW GLOBAL STATUS');
 
             // Parse status variables into metrics
             const statusMap = new Map<string, string>();
-            rows.forEach((row: any) => {
+            rows.forEach((row) => {
                 statusMap.set(row.Variable_name, row.Value);
             });
 

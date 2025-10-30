@@ -47,7 +47,7 @@ export class QueryAnalyzer {
                 complexity,
                 queryType: this.getQueryType(astArray[0]),
             };
-        } catch (error) {
+        } catch {
             // If parsing fails, return basic analysis
             return {
                 antiPatterns: [{
@@ -65,11 +65,11 @@ export class QueryAnalyzer {
     /**
      * Detect SELECT * usage
      */
-    private detectSelectStar(ast: any): AntiPattern[] {
+    private detectSelectStar(ast: unknown): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.columns) {
-            const hasSelectStar = ast.columns.some((col: any) =>
+            const hasSelectStar = ast.columns.some((col: unknown) =>
                 col.expr && col.expr.type === 'column_ref' && col.expr.column === '*'
             );
 
@@ -89,7 +89,7 @@ export class QueryAnalyzer {
     /**
      * Detect missing WHERE clause in UPDATE/DELETE
      */
-    private detectMissingWhere(ast: any): AntiPattern[] {
+    private detectMissingWhere(ast: unknown): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if ((ast.type === 'update' || ast.type === 'delete') && !ast.where) {
@@ -107,7 +107,7 @@ export class QueryAnalyzer {
     /**
      * Detect Cartesian joins (missing join conditions)
      */
-    private detectCartesianJoin(ast: any): AntiPattern[] {
+    private detectCartesianJoin(ast: unknown): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.from) {
@@ -115,7 +115,7 @@ export class QueryAnalyzer {
 
             if (tables.length > 1) {
                 // Check if there are join conditions or WHERE conditions
-                const hasJoinConditions = tables.some((table: any) => table.on);
+                const hasJoinConditions = tables.some((table: unknown) => table.on);
                 const hasWhereConditions = ast.where && this.hasTableComparison(ast.where);
 
                 if (!hasJoinConditions && !hasWhereConditions) {
@@ -135,7 +135,7 @@ export class QueryAnalyzer {
     /**
      * Detect functions on indexed columns (breaks index usage)
      */
-    private detectFunctionsOnIndexedColumns(ast: any): AntiPattern[] {
+    private detectFunctionsOnIndexedColumns(ast: unknown): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.where) {
@@ -157,7 +157,7 @@ export class QueryAnalyzer {
     /**
      * Detect implicit type conversions
      */
-    private detectImplicitTypeConversions(ast: any): AntiPattern[] {
+    private detectImplicitTypeConversions(ast: unknown): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.where) {
@@ -179,11 +179,11 @@ export class QueryAnalyzer {
     /**
      * Detect subqueries in SELECT list
      */
-    private detectSubqueryInSelect(ast: any): AntiPattern[] {
+    private detectSubqueryInSelect(ast: unknown): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.columns) {
-            const hasSubquery = ast.columns.some((col: any) =>
+            const hasSubquery = ast.columns.some((col: unknown) =>
                 col.expr && col.expr.type === 'select'
             );
 
@@ -203,7 +203,7 @@ export class QueryAnalyzer {
     /**
      * Calculate query complexity score
      */
-    private calculateComplexity(ast: any): number {
+    private calculateComplexity(ast: unknown): number {
         let complexity = 1;
 
         if (ast.type === 'select') {
@@ -238,7 +238,7 @@ export class QueryAnalyzer {
     /**
      * Get query type
      */
-    private getQueryType(ast: any): string {
+    private getQueryType(ast: unknown): string {
         if (!ast) return 'unknown';
         return ast.type || 'unknown';
     }
@@ -246,7 +246,7 @@ export class QueryAnalyzer {
     /**
      * Extract tables from FROM clause
      */
-    private extractTables(from: any): any[] {
+    private extractTables(from: unknown): unknown[] {
         if (!from) return [];
         if (Array.isArray(from)) return from;
         return [from];
@@ -255,7 +255,7 @@ export class QueryAnalyzer {
     /**
      * Check if WHERE has table comparisons
      */
-    private hasTableComparison(where: any): boolean {
+    private hasTableComparison(_where: unknown): boolean {
         if (!where) return false;
 
         if (where.type === 'binary_expr') {
@@ -278,7 +278,7 @@ export class QueryAnalyzer {
     /**
      * Find functions used in WHERE conditions
      */
-    private findFunctionsInConditions(where: any): string[] {
+    private findFunctionsInConditions(_where: unknown): string[] {
         const functions: string[] = [];
 
         if (!where) return functions;
@@ -300,7 +300,7 @@ export class QueryAnalyzer {
     /**
      * Find implicit type conversions
      */
-    private findImplicitConversions(where: any): any[] {
+    private findImplicitConversions(_where: unknown): unknown[] {
         // Simplified implementation - would need type information
         // from schema to do proper detection
         return [];
@@ -309,7 +309,7 @@ export class QueryAnalyzer {
     /**
      * Count subqueries in query
      */
-    private countSubqueries(ast: any, count = 0): number {
+    private countSubqueries(ast: unknown, count = 0): number {
         if (!ast || typeof ast !== 'object') return count;
 
         if (ast.type === 'select' && count > 0) {
@@ -319,7 +319,7 @@ export class QueryAnalyzer {
 
         // Recursively count in nested structures
         for (const key in ast) {
-            if (ast.hasOwnProperty(key)) {
+            if (astObject.prototype.hasOwnProperty.call(key)) {
                 const value = ast[key];
                 if (typeof value === 'object') {
                     count = this.countSubqueries(value, count);

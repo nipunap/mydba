@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
-import { QueriesWithoutIndexesService, QueryWithoutIndexInfo, PerformanceSchemaConfigurationError } from '../services/queries-without-indexes-service';
+import { QueriesWithoutIndexesService, QueryWithoutIndexInfo as _QueryWithoutIndexInfo, PerformanceSchemaConfigurationError } from '../services/queries-without-indexes-service';
 
 export class QueriesWithoutIndexesPanel {
     private static panelRegistry: Map<string, QueriesWithoutIndexesPanel> = new Map();
@@ -76,7 +78,7 @@ export class QueriesWithoutIndexesPanel {
 
     private setupMessageHandling(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: any) => {
+            async (message: unknown) => {
                 switch (message.type) {
                     case 'refresh':
                         await this.loadQueries();
@@ -119,7 +121,7 @@ export class QueriesWithoutIndexesPanel {
                 timestamp: new Date().toISOString()
             });
 
-        } catch (error) {
+        } catch {
             // Handle Performance Schema configuration error
             if (error instanceof PerformanceSchemaConfigurationError) {
                 await this.handleConfigurationError(error);
@@ -211,7 +213,7 @@ export class QueriesWithoutIndexesPanel {
             // Reload queries
             await this.loadQueries();
 
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to apply configuration:', error as Error);
             vscode.window.showErrorMessage(`Failed to apply configuration: ${(error as Error).message}`);
         }
@@ -246,7 +248,7 @@ export class QueriesWithoutIndexesPanel {
             const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
             cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
 
-            const explainResult = await adapter.query<any>(`EXPLAIN FORMAT=JSON ${cleanQuery}`);
+            const explainResult = await adapter.query<unknown>(`EXPLAIN FORMAT=JSON ${cleanQuery}`);
 
             // Import ExplainViewerPanel and AIService
             const { ExplainViewerPanel } = await import('./explain-viewer-panel');
@@ -267,7 +269,7 @@ export class QueriesWithoutIndexesPanel {
                 aiService
             );
 
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to explain query:', error as Error);
             vscode.window.showErrorMessage(`Failed to explain query: ${(error as Error).message}`);
         }
@@ -291,7 +293,7 @@ export class QueriesWithoutIndexesPanel {
                 queryText,
                 aiService
             );
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to profile query:', error as Error);
             vscode.window.showErrorMessage(`Failed to profile query: ${(error as Error).message}`);
         }

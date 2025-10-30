@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { IDatabaseAdapter } from '../adapters/database-adapter';
 import { Logger } from '../utils/logger';
 
@@ -82,7 +84,7 @@ export class QueriesWithoutIndexesService {
                 LIMIT 100
             `;
 
-            const result = await adapter.query<any>(query);
+            const result = await adapter.query<unknown>(query);
             const rows = Array.isArray(result) ? result : ((result as any).rows || []);
 
             this.logger.info(`Found ${rows.length} queries without optimal indexes`);
@@ -95,7 +97,7 @@ export class QueriesWithoutIndexesService {
             }
 
             return queriesInfo;
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to detect queries without indexes:', error as Error);
             throw error;
         }
@@ -103,7 +105,7 @@ export class QueriesWithoutIndexesService {
 
     private async ensurePerformanceSchemaEnabled(adapter: IDatabaseAdapter): Promise<void> {
         // Check if performance_schema is enabled
-        const result = await adapter.query<any>(`SHOW VARIABLES LIKE 'performance_schema'`);
+        const result = await adapter.query<unknown>(`SHOW VARIABLES LIKE 'performance_schema'`);
         const rows = Array.isArray(result) ? result : ((result as any).rows || []);
 
         if (rows.length === 0 || rows[0].Value !== 'ON') {
@@ -111,7 +113,7 @@ export class QueriesWithoutIndexesService {
         }
 
         // Check if statement instrumentation is already enabled
-        const instrumentsCheck = await adapter.query<any>(`
+        const instrumentsCheck = await adapter.query<unknown>(`
             SELECT COUNT(*) as disabled_count
             FROM performance_schema.setup_instruments
             WHERE NAME LIKE 'statement/%' AND (ENABLED = 'NO' OR TIMED = 'NO')
@@ -120,7 +122,7 @@ export class QueriesWithoutIndexesService {
         const needsInstruments = instrumentRows.length > 0 && instrumentRows[0].disabled_count > 0;
 
         // Check if statement consumers are enabled
-        const consumersCheck = await adapter.query<any>(`
+        const consumersCheck = await adapter.query<unknown>(`
             SELECT COUNT(*) as disabled_count
             FROM performance_schema.setup_consumers
             WHERE NAME LIKE '%statements%' AND ENABLED = 'NO'
@@ -167,7 +169,7 @@ export class QueriesWithoutIndexesService {
         this.logger.info('Performance Schema configuration applied successfully');
     }
 
-    private async analyzeQuery(adapter: IDatabaseAdapter, row: any): Promise<QueryWithoutIndexInfo> {
+    private async analyzeQuery(adapter: IDatabaseAdapter, row: unknown): Promise<QueryWithoutIndexInfo> {
         const countStar = parseInt(row.count_star || row.COUNT_STAR || 0);
         const sumRowsExamined = parseInt(row.sum_rows_examined || row.SUM_ROWS_EXAMINED || 0);
         const sumRowsSent = parseInt(row.sum_rows_sent || row.SUM_ROWS_SENT || 0);
@@ -214,7 +216,7 @@ export class QueriesWithoutIndexesService {
         };
     }
 
-    private async suggestIndexes(adapter: IDatabaseAdapter, queryText: string, schemaName: string): Promise<string[]> {
+    private async suggestIndexes(adapter: IDatabaseAdapter, queryText: string, _schemaName: string): Promise<string[]> {
         const suggestions: string[] = [];
 
         try {
@@ -282,7 +284,7 @@ export class QueriesWithoutIndexesService {
                 suggestions.push('Run EXPLAIN to identify which columns need indexing');
             }
 
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to suggest indexes:', error as Error);
             suggestions.push('Unable to auto-suggest indexes - use EXPLAIN for details');
         }
@@ -294,7 +296,7 @@ export class QueriesWithoutIndexesService {
     /**
      * Get index usage statistics for a schema
      */
-    async getIndexUsageStats(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
+    async getIndexUsageStats(adapter: IDatabaseAdapter, _schemaName: string): Promise<any[]> {
         const query = `
             SELECT
                 t.TABLE_SCHEMA as schema_name,
@@ -322,14 +324,14 @@ export class QueriesWithoutIndexesService {
             ORDER BY t.TABLE_NAME, t.INDEX_NAME, t.SEQ_IN_INDEX
         `;
 
-        const result = await adapter.query<any>(query, [schemaName, schemaName]);
+        const result = await adapter.query<unknown>(query, [schemaName, schemaName]);
         return Array.isArray(result) ? result : ((result as any).rows || []);
     }
 
     /**
      * Find duplicate indexes
      */
-    async findDuplicateIndexes(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
+    async findDuplicateIndexes(adapter: IDatabaseAdapter, _schemaName: string): Promise<any[]> {
         // Security: Validate schema name to prevent SQL injection
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(schemaName)) {
             throw new Error('Invalid schema name: only alphanumeric characters and underscores allowed');
@@ -356,14 +358,14 @@ export class QueriesWithoutIndexesService {
             ORDER BY TABLE_NAME, columns
         `;
 
-        const result = await adapter.query<any>(query, [schemaName, schemaName]);
+        const result = await adapter.query<unknown>(query, [schemaName, schemaName]);
         return Array.isArray(result) ? result : ((result as any).rows || []);
     }
 
     /**
      * Find unused indexes (indexes with no usage in Performance Schema)
      */
-    async findUnusedIndexes(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
+    async findUnusedIndexes(adapter: IDatabaseAdapter, _schemaName: string): Promise<any[]> {
         // Security: Validate schema name to prevent SQL injection
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(schemaName)) {
             throw new Error('Invalid schema name: only alphanumeric characters and underscores allowed');
@@ -393,7 +395,7 @@ export class QueriesWithoutIndexesService {
             ORDER BY s.TABLE_NAME, s.INDEX_NAME
         `;
 
-        const result = await adapter.query<any>(query, [schemaName]);
+        const result = await adapter.query<unknown>(query, [schemaName]);
         return Array.isArray(result) ? result : ((result as any).rows || []);
     }
 }

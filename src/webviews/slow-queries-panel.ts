@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
@@ -68,7 +70,7 @@ export class SlowQueriesPanel {
 
     private setupMessageHandling(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: any) => {
+            async (message: unknown) => {
                 switch (message.type) {
                     case 'refresh':
                         await this.loadSlowQueries();
@@ -115,7 +117,7 @@ export class SlowQueriesPanel {
 
             // Execute EXPLAIN query with FORMAT=JSON
             const explainQuery = `EXPLAIN FORMAT=JSON ${cleanQuery}`;
-            const result = await adapter.query<any>(explainQuery);
+            const result = await adapter.query<unknown>(explainQuery);
 
             // Extract the EXPLAIN data from the result
             const explainData = result.rows?.[0] || {};
@@ -129,7 +131,7 @@ export class SlowQueriesPanel {
             await aiService.initialize();
 
             ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiService);
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to EXPLAIN query:', error as Error);
             vscode.window.showErrorMessage(`Failed to EXPLAIN query: ${(error as Error).message}`);
         }
@@ -155,7 +157,7 @@ export class SlowQueriesPanel {
             const aiService = new AIService(this.logger, this.context);
             await aiService.initialize();
             QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiService);
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to open Profiling:', error as Error);
             vscode.window.showErrorMessage(`Failed to open Profiling: ${(error as Error).message}`);
         }
@@ -176,7 +178,7 @@ export class SlowQueriesPanel {
                 timestamp: new Date().toISOString(),
                 sortBy: this.currentSortBy
             });
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to load slow queries:', error as Error);
             this.panel.webview.postMessage({ type: 'error', message: (error as Error).message });
         } finally {

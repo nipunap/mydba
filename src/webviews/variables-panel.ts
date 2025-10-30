@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
-import { Variable } from '../types';
+// import { Variable } from '../types';
 
 export class VariablesPanel {
     private static currentPanel: VariablesPanel | undefined;
@@ -102,7 +102,7 @@ export class VariablesPanel {
                 variables: variables,
                 scope: this.currentScope
             });
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to load variables:', error as Error);
             this.panel.webview.postMessage({
                 type: 'error',

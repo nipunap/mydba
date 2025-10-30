@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 
-export interface EventType<T> {
+export interface EventType<_T> {
     readonly name: string;
 }
 
@@ -10,7 +10,7 @@ export interface EventHandler<T> {
 }
 
 export class EventBus {
-    private handlers = new Map<string, EventHandler<any>[]>();
+    private handlers = new Map<string, EventHandler<unknown>[]>();
 
     constructor(private logger: Logger) {}
 
@@ -21,8 +21,10 @@ export class EventBus {
             this.handlers.set(eventName, []);
         }
 
-        const handlers = this.handlers.get(eventName)!;
-        handlers.push(handler);
+        const handlers = this.handlers.get(eventName);
+        if (handlers) {
+            handlers.push(handler);
+        }
 
         this.logger.debug(`Registered handler for event: ${eventName}`);
 
@@ -46,7 +48,7 @@ export class EventBus {
         const promises = handlers.map(async (handler) => {
             try {
                 await handler(data);
-            } catch (error) {
+            } catch {
                 this.logger.error(`Error in event handler for ${eventName}:`, error as Error);
             }
         });

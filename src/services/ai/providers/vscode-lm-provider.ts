@@ -26,7 +26,7 @@ export class VSCodeLMProvider implements AIProvider {
             // Check if any models are available
             const models = await vscode.lm.selectChatModels();
             return models.length > 0;
-        } catch (error) {
+        } catch {
             this.logger.debug('VSCode LM availability check failed:', error as Error);
             return false;
         }
@@ -71,7 +71,7 @@ export class VSCodeLMProvider implements AIProvider {
             }
 
             return this.parseResponse(responseText);
-        } catch (error) {
+        } catch {
             this.logger.error('VSCode LM analysis failed:', error as Error);
             throw new Error(`AI analysis failed: ${(error as Error).message}`);
         }
@@ -176,7 +176,7 @@ Format your response as JSON with this structure:
 
             // Fallback: parse as plain text
             return this.parseUnstructuredResponse(responseText);
-        } catch (error) {
+        } catch {
             this.logger.warn('Failed to parse AI response, using fallback:', error as Error);
             return this.parseUnstructuredResponse(responseText);
         }

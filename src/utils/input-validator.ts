@@ -64,7 +64,7 @@ export class InputValidator {
         }
 
         // Check for invalid characters
-        const invalidChars = /[<>\"\']/;
+        const invalidChars = /[<>"']/;
         if (invalidChars.test(username)) {
             return { valid: false, error: 'Username contains invalid characters' };
         }

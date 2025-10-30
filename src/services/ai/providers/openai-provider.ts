@@ -33,7 +33,7 @@ export class OpenAIProvider implements AIProvider {
             // Try to list models to verify API key
             await this.client.models.list();
             return true;
-        } catch (error) {
+        } catch {
             this.logger.debug('OpenAI availability check failed:', error as Error);
             return false;
         }
@@ -70,7 +70,7 @@ export class OpenAIProvider implements AIProvider {
             }
 
             return this.parseResponse(content);
-        } catch (error) {
+        } catch {
             this.logger.error('OpenAI analysis failed:', error as Error);
             throw new Error(`OpenAI analysis failed: ${(error as Error).message}`);
         }
@@ -101,7 +101,7 @@ ${context.anonymizedQuery || context.query}
             prompt += `
 **Schema Context:**
 Database: ${context.schema.database || 'N/A'}
-Tables: ${tables.map((t: any) => `${t.name} (${t.columns?.map((c: any) => c.name).join(', ') || ''})`).join(', ')}
+Tables: ${tables.map((t: unknown) => `${t.name} (${t.columns?.map((c: unknown) => c.name).join(', ') || ''})`).join(', ')}
 `;
 
             // Add performance/profiling analysis if available
@@ -184,7 +184,7 @@ Provide your response as a JSON object with this exact structure:
                 estimatedComplexity: result.estimatedComplexity,
                 citations: result.citations || []
             };
-        } catch (error) {
+        } catch {
             this.logger.warn('Failed to parse OpenAI JSON response:', error as Error);
             // Fallback
             return {

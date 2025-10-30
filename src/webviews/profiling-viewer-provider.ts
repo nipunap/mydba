@@ -444,7 +444,7 @@ export class ProfilingViewerProvider extends BaseWebviewProvider {
 
     private convertToProfilingStages(profileResult: ProfileResult): { stages: ProfilingStage[], totalDuration: number } {
         const totalDuration = profileResult.totalDuration;
-        const stages: ProfilingStage[] = profileResult.stages.map((stage, index) => ({
+        const stages: ProfilingStage[] = profileResult.stages.map((stage, _index) => ({
             name: stage.Stage,
             duration: stage.Duration,
             percentage: (stage.Duration / totalDuration) * 100,

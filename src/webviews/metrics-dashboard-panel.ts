@@ -113,7 +113,7 @@ export class MetricsDashboardPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: any) => {
+            async (message: unknown) => {
                 switch (message.type) {
                     case 'refresh':
                         await this.loadMetrics();
@@ -147,16 +147,16 @@ export class MetricsDashboardPanel {
             }
 
             // Get global status
-            const statusResult = await adapter.query<any>('SHOW GLOBAL STATUS');
+            const statusResult = await adapter.query<unknown>('SHOW GLOBAL STATUS');
             const statusMap = new Map<string, string>();
-            statusResult.rows?.forEach((row: any) => {
+            statusResult.rows?.forEach((row: unknown) => {
                 statusMap.set(row.Variable_name, row.Value);
             });
 
             // Get global variables
-            const variablesResult = await adapter.query<any>('SHOW GLOBAL VARIABLES');
+            const variablesResult = await adapter.query<unknown>('SHOW GLOBAL VARIABLES');
             const variablesMap = new Map<string, string>();
-            variablesResult.rows?.forEach((row: any) => {
+            variablesResult.rows?.forEach((row: unknown) => {
                 variablesMap.set(row.Variable_name, row.Value);
             });
 
@@ -186,7 +186,7 @@ export class MetricsDashboardPanel {
                 timestamp: new Date().toISOString()
             });
 
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to load metrics:', error as Error);
             this.panel.webview.postMessage({
                 type: 'metricsError',
@@ -241,7 +241,7 @@ export class MetricsDashboardPanel {
         };
 
         // Table Cache
-        const tableOpenCache = getNumber(variables, 'table_open_cache');
+        const _tableOpenCache = getNumber(variables, 'table_open_cache');
         const openTables = getNumber(status, 'Open_tables');
         const openedTables = getNumber(status, 'Opened_tables');
         const tableCacheHitRate = openedTables > 0

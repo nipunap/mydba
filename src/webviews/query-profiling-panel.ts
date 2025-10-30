@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
@@ -57,7 +59,7 @@ export class QueryProfilingPanel {
     }
 
     private setupMessageHandling(): void {
-        this.panel.webview.onDidReceiveMessage(async (message: any) => {
+        this.panel.webview.onDidReceiveMessage(async (message: unknown) => {
             if (message.type === 'reprofile') {
                 this.query = message.query || this.query;
                 await this.profile();
@@ -74,13 +76,13 @@ export class QueryProfilingPanel {
 
             // Get AI insights asynchronously
             this.getAIInsights(result);
-        } catch (error) {
+        } catch {
             this.logger.error('Profiling failed:', error as Error);
             this.panel.webview.postMessage({ type: 'error', message: (error as Error).message });
         }
     }
 
-    private async getAIInsights(profile: any): Promise<void> {
+    private async getAIInsights(profile: unknown): Promise<void> {
         if (!this.aiService) {
             this.logger.warn('AI service not available');
             return;
@@ -110,7 +112,7 @@ export class QueryProfilingPanel {
                     rowsSent: profile.summary.totalRowsSent,
                     efficiency: profile.summary.efficiency,
                     lockTime: profile.summary.totalLockTime,
-                    stages: profile.stages?.map((s: any) => ({
+                    stages: profile.stages?.map((s: unknown) => ({
                         name: s.eventName,
                         duration: s.duration
                     }))
@@ -137,7 +139,7 @@ export class QueryProfilingPanel {
                 type: 'aiInsights',
                 insights: analysis
             });
-        } catch (error) {
+        } catch {
             this.logger.error('AI analysis failed:', error as Error);
             this.panel.webview.postMessage({
                 type: 'aiInsightsError',
@@ -176,7 +178,7 @@ export class QueryProfilingPanel {
         return tables;
     }
 
-    private async buildSchemaContext(adapter: any, tables: string[]): Promise<any> {
+    private async buildSchemaContext(adapter: unknown, tables: string[]): Promise<unknown> {
         const schemaContext: any = {
             tables: {}
         };
@@ -208,7 +210,7 @@ export class QueryProfilingPanel {
                 const stats = Array.isArray(statsResult) ? statsResult[0] : ((statsResult as any).rows?.[0]);
 
                 schemaContext.tables[tableName] = {
-                    columns: columns.map((col: any) => ({
+                    columns: columns.map((col: unknown) => ({
                         name: col.Field || col.field,
                         type: col.Type || col.type,
                         nullable: (col.Null || col.null) === 'YES',
@@ -226,7 +228,7 @@ export class QueryProfilingPanel {
                 };
 
                 this.logger.info(`Fetched schema for table: ${tableName}`);
-            } catch (error) {
+            } catch {
                 this.logger.warn(`Failed to fetch schema for table ${tableName}:`, error as Error);
             }
         }
@@ -234,10 +236,10 @@ export class QueryProfilingPanel {
         return schemaContext;
     }
 
-    private formatIndexes(indexRows: any[]): any[] {
+    private formatIndexes(indexRows: unknown[]): unknown[] {
         const indexMap = new Map<string, any>();
 
-        indexRows.forEach((row: any) => {
+        indexRows.forEach((row: unknown) => {
             const indexName = row.Key_name || row.key_name;
             const columnName = row.Column_name || row.column_name;
             const seqInIndex = row.Seq_in_index || row.seq_in_index;
@@ -260,13 +262,13 @@ export class QueryProfilingPanel {
 
         // Sort columns by position within each index
         indexMap.forEach(index => {
-            index.columns.sort((a: any, b: any) => a.position - b.position);
+            index.columns.sort((a: unknown, b: unknown) => a.position - b.position);
         });
 
         return Array.from(indexMap.values());
     }
 
-    private buildProfilingContext(profile: any): string {
+    private buildProfilingContext(profile: unknown): string {
         const lines: string[] = [];
 
         lines.push('## Query Performance Profile');
@@ -293,9 +295,9 @@ export class QueryProfilingPanel {
 
             // Find slowest stages
             const sortedStages = [...profile.stages].sort((a, b) => b.duration - a.duration);
-            const totalDuration = profile.stages.reduce((sum: number, s: any) => sum + s.duration, 0);
+            const totalDuration = profile.stages.reduce((sum: number, s: unknown) => sum + s.duration, 0);
 
-            sortedStages.slice(0, 5).forEach((stage: any, idx: number) => {
+            sortedStages.slice(0, 5).forEach((stage: unknown, idx: number) => {
                 const percentage = ((stage.duration / totalDuration) * 100).toFixed(1);
                 const icon = idx === 0 ? '🔴' : idx === 1 ? '🟡' : '⚪';
                 lines.push(`${icon} ${stage.eventName}: ${stage.duration.toFixed(2)} µs (${percentage}% of total)`);

@@ -20,9 +20,9 @@ export class DataSanitizer {
             environment: config.environment,
             // Sensitive fields omitted or masked
             password: config.password ? '***' : undefined,
-            ssl: config.ssl ? { enabled: true } as any : undefined,
-            ssh: config.ssh ? { enabled: true } as any : undefined,
-            awsIamAuth: config.awsIamAuth ? { enabled: true } as any : undefined
+            ssl: config.ssl ? { enabled: true } as any : undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+            ssh: config.ssh ? { enabled: true } as any : undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+            awsIamAuth: config.awsIamAuth ? { enabled: true } as any : undefined // eslint-disable-line @typescript-eslint/no-explicit-any
         };
     }
 
@@ -176,12 +176,12 @@ export class DataSanitizer {
 
         return message
             // Remove file paths
-            .replace(/\/[\w\/.-]+/g, '[path]')
+            .replace(/\/[\w/.-]+/g, '[path]')
             .replace(/[A-Z]:\\[\w\\.-]+/g, '[path]')
 
             // Remove connection strings
-            .replace(/mysql:\/\/[^@]+@[^\/]+/g, 'mysql://***:***@***/***')
-            .replace(/postgresql:\/\/[^@]+@[^\/]+/g, 'postgresql://***:***@***/***')
+            .replace(/mysql:\/\/[^@]+@[^/]+/g, 'mysql://***:***@***/***')
+            .replace(/postgresql:\/\/[^@]+@[^/]+/g, 'postgresql://***:***@***/***')
 
             // Remove passwords
             .replace(/password[=:][\w]+/gi, 'password=***')
@@ -199,7 +199,7 @@ export class DataSanitizer {
         }
 
         return results.map(row => {
-            const sanitized = { ...row } as any;
+            const sanitized = { ...row } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
             // Auto-detect and mask sensitive columns
             const detectedSensitiveKeys = Object.keys(sanitized).filter(key =>
@@ -222,6 +222,7 @@ export class DataSanitizer {
      * Removes ANSI color codes from strings
      */
     static stripAnsiCodes(str: string): string {
+        // eslint-disable-next-line no-control-regex
         return str.replace(/\x1b\[[0-9;]*m/g, '');
     }
 

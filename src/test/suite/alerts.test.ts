@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Alert System Integration Tests
  * Tests metrics alerting, debouncing, and notification display

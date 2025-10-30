@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Database Interaction Integration Tests
  * Tests MySQL adapter with real database connections
@@ -13,7 +15,7 @@ import {
     waitForPerformanceSchema,
     executeSlowQuery,
     executeUnindexedQuery,
-    cleanupTestData
+    cleanupTestData as _cleanupTestData
 } from '../helpers/database-helper';
 
 suite('Database Operations Tests', () => {
@@ -26,7 +28,7 @@ suite('Database Operations Tests', () => {
                 waitForInit: true,
                 maxRetries: 10
             });
-        } catch (error) {
+        } catch {
             console.error('Failed to create test connection:', error);
             this.skip();
         }
@@ -176,7 +178,7 @@ suite('Database Operations Tests', () => {
                 maxRetries: 1
             });
             assert.fail('Connection should have failed');
-        } catch (error) {
+        } catch {
             // Expected to fail
             assert.ok(error instanceof Error, 'Should throw an Error');
             assert.ok(
@@ -205,7 +207,7 @@ suite('Database Operations Tests', () => {
         try {
             await testAdapter.query('SELECT 1', []);
             assert.fail('Query should fail after disconnect');
-        } catch (error) {
+        } catch {
             assert.ok(error instanceof Error, 'Should throw an Error');
         }
     });

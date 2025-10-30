@@ -31,7 +31,7 @@ export interface DatabaseFeatures {
 export interface ExecuteResult {
     affected: number;
     insertId?: number;
-    result?: any;
+    result?: unknown;
 }
 
 export interface ExplainResult {
@@ -51,7 +51,7 @@ export interface ExplainResult {
 }
 
 export interface ProfileResult {
-    statement: any;
+    statement: string;
     stages: Array<{
         Stage: string;
         Duration: number;
@@ -61,7 +61,7 @@ export interface ProfileResult {
 }
 
 export interface OptimizerTrace {
-    trace: any;
+    trace: unknown;
     source: string;
 }
 
@@ -130,7 +130,7 @@ export interface Column {
     name: string;
     type: string;
     nullable: boolean;
-    defaultValue?: any;
+    defaultValue?: unknown;
     key?: string;
     extra?: string;
     comment?: string;
@@ -169,8 +169,8 @@ export interface IDatabaseAdapter {
     testConnection(): Promise<ConnectionTestResult>;
     isConnected(): boolean;
 
-    query<T = any>(sql: string, params?: any[]): Promise<T[]>;
-    execute(sql: string, params?: any[]): Promise<ExecuteResult>;
+    query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
+    execute(sql: string, params?: unknown[]): Promise<ExecuteResult>;
     beginTransaction(): Promise<Transaction>;
 
     getDatabases(): Promise<Database[]>;

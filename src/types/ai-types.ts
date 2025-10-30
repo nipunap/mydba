@@ -38,7 +38,7 @@ export interface ColumnInfo {
     type: string;
     nullable: boolean;
     key?: string;
-    default?: any;
+    default?: unknown;
     extra?: string;
 }
 

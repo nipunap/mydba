@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 
-export interface ServiceToken<T> {
+export interface ServiceToken<_T> {
     readonly name: string;
 }
 
@@ -10,9 +10,9 @@ export interface ServiceFactory<T> {
 }
 
 export class ServiceContainer {
-    private services = new Map<string, any>();
-    private factories = new Map<string, ServiceFactory<any>>();
-    private singletons = new Map<string, any>();
+    private services = new Map<string, unknown>();
+    private factories = new Map<string, ServiceFactory<unknown>>();
+    private singletons = new Map<string, unknown>();
 
     constructor(
         private context: vscode.ExtensionContext,

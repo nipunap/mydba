@@ -1,7 +1,8 @@
 import { MySQLAdapter } from './mysql-adapter';
 import { Logger } from '../utils/logger';
+import { ConnectionConfig } from '../types';
 
-type AdapterFactory = (config: any, logger: Logger) => MySQLAdapter;
+type AdapterFactory = (config: ConnectionConfig, logger: Logger) => MySQLAdapter;
 
 export class AdapterRegistry {
     private factories = new Map<string, AdapterFactory>();
@@ -26,7 +27,7 @@ export class AdapterRegistry {
         this.logger.debug(`Registered adapter factory: ${type}`);
     }
 
-    create(type: string, config: any): MySQLAdapter {
+    create(type: string, config: ConnectionConfig): MySQLAdapter {
         const factory = this.factories.get(type);
         if (!factory) {
             throw new Error(`Adapter not found for database type: ${type}`);

@@ -11,7 +11,7 @@ export class MetricsCollector {
         private logger: Logger
     ) {}
 
-    async collect(connectionId: string): Promise<any> {
+    async collect(connectionId: string): Promise<unknown> {
         this.logger.debug(`Collecting metrics for connection: ${connectionId}`);
 
         const adapter = this.connectionManager.getAdapter(connectionId);
@@ -21,7 +21,7 @@ export class MetricsCollector {
 
         try {
             return await adapter.getMetrics();
-        } catch (error) {
+        } catch {
             this.logger.error(`Failed to collect metrics for ${connectionId}:`, error as Error);
             return null;
         }
@@ -41,7 +41,7 @@ export class MetricsCollector {
                     // TODO: Emit metrics event
                     this.logger.debug(`Collected metrics for ${connectionId}`);
                 }
-            } catch (error) {
+            } catch {
                 this.logger.error(`Error collecting metrics for ${connectionId}:`, error as Error);
             }
         }, interval);
@@ -58,13 +58,13 @@ export class MetricsCollector {
         }
     }
 
-    getHistory(connectionId: string, range: any): Promise<any[]> {
+    getHistory(connectionId: string, _range: unknown): Promise<any[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
         // TODO: Implement metrics history
         this.logger.debug(`Getting metrics history for ${connectionId}`);
         return Promise.resolve([]);
     }
 
-    aggregate(metrics: any[], method: string): any {
+    aggregate(metrics: unknown[], method: string): any { // eslint-disable-line @typescript-eslint/no-explicit-any
         // TODO: Implement metrics aggregation
         this.logger.debug(`Aggregating ${metrics.length} metrics using ${method}`);
         return {};

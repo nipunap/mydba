@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
-import { Process } from '../types';
+// import { Process } from '../types';
 
 export class ProcessListPanel {
     private static currentPanel: ProcessListPanel | undefined;
@@ -133,7 +133,7 @@ export class ProcessListPanel {
                 processes: processes,
                 timestamp: new Date().toISOString()
             });
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to load process list:', error as Error);
             this.panel.webview.postMessage({
                 type: 'error',
@@ -171,7 +171,7 @@ export class ProcessListPanel {
             await adapter.query('KILL ?', [processId]);
             vscode.window.showInformationMessage(`Process ${processId} killed`);
             await this.loadProcessList();
-        } catch (error) {
+        } catch {
             this.logger.error(`Failed to kill process ${processId}:`, error as Error);
             vscode.window.showErrorMessage(`Failed to kill process: ${(error as Error).message}`);
         }

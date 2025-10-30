@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Core type definitions for MyDBA extension
  */
@@ -123,7 +125,7 @@ export interface QueryResult<T = unknown> {
     fields?: FieldInfo[];
     affected?: number;
     insertId?: number;
-    result?: any; // For non-SELECT queries
+    result?: unknown; // For non-SELECT queries
 }
 
 export interface ExplainResult {
@@ -157,7 +159,7 @@ export interface ProfileResult {
 export interface OptimizerTrace {
     source: string;
     trace: {
-        steps: any[];
+        steps: unknown[];
     };
 }
 

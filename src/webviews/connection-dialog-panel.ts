@@ -72,7 +72,7 @@ export class ConnectionDialogPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: any) => {
+            async (message: unknown) => {
                 switch (message.type) {
                     case 'testConnection':
                         await this.testConnection(message.config);
@@ -107,13 +107,13 @@ export class ConnectionDialogPanel {
                     password: '' // Don't send password to frontend for security
                 }
             });
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to load connection data:', error as Error);
             vscode.window.showErrorMessage(`Failed to load connection: ${(error as Error).message}`);
         }
     }
 
-    private async testConnection(config: any): Promise<void> {
+    private async testConnection(config: unknown): Promise<void> {
         this.logger.info(`Testing connection: ${config.name}`);
 
         try {
@@ -159,7 +159,7 @@ export class ConnectionDialogPanel {
                 });
             }
 
-        } catch (error) {
+        } catch {
             this.logger.error('Connection test failed:', error as Error);
             this.panel.webview.postMessage({
                 type: 'testResult',
@@ -169,7 +169,7 @@ export class ConnectionDialogPanel {
         }
     }
 
-    private async saveConnection(config: any): Promise<void> {
+    private async saveConnection(config: unknown): Promise<void> {
         this.logger.info(`Saving connection: ${config.name}`);
 
         try {
@@ -201,7 +201,7 @@ export class ConnectionDialogPanel {
 
             this.panel.dispose();
 
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to save connection:', error as Error);
             this.panel.webview.postMessage({
                 type: 'saveError',

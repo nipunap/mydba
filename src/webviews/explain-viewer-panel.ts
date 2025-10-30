@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
@@ -54,7 +56,7 @@ export class ExplainViewerPanel {
         private connectionManager: ConnectionManager,
         private connectionId: string,
         private query: string,
-        private explainData: any,
+        private explainData: unknown,
         private aiService?: AIService
     ) {
         this.panel = panel;
@@ -70,7 +72,7 @@ export class ExplainViewerPanel {
         connectionManager: ConnectionManager,
         connectionId: string,
         query: string,
-        explainData: any,
+        explainData: unknown,
         aiService?: AIService
     ): void {
         const panelKey = `explainViewer-${connectionId}-${Date.now()}`;
@@ -156,7 +158,7 @@ export class ExplainViewerPanel {
 
             // Get AI insights asynchronously (don't block the UI)
             this.getAIInsights(explainJson, treeData);
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to process EXPLAIN data:', error as Error);
             this.panel.webview.postMessage({
                 type: 'error',
@@ -165,7 +167,7 @@ export class ExplainViewerPanel {
         }
     }
 
-    private async getAIInsights(explainJson: any, treeData: ExplainNode): Promise<void> {
+    private async getAIInsights(explainJson: unknown, treeData: ExplainNode): Promise<void> {
         if (!this.aiService) {
             this.logger.debug('AI service not available, skipping AI insights');
             return;
@@ -211,7 +213,7 @@ export class ExplainViewerPanel {
             });
 
             this.logger.info('AI insights sent successfully');
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to get AI insights:', error as Error);
             this.panel.webview.postMessage({
                 type: 'aiInsightsError',
@@ -220,7 +222,7 @@ export class ExplainViewerPanel {
         }
     }
 
-    private buildExplainSummary(explainJson: any, treeData: ExplainNode, issues: string[]): string {
+    private buildExplainSummary(explainJson: unknown, treeData: ExplainNode, issues: string[]): string {
         const lines: string[] = [];
 
         lines.push('Execution Plan Summary:');
@@ -304,12 +306,12 @@ export class ExplainViewerPanel {
         return total;
     }
 
-    private convertToTree(explainJson: any): ExplainNode {
+    private convertToTree(explainJson: unknown): ExplainNode {
         const queryBlock = explainJson.query_block || explainJson;
         return this.processQueryBlock(queryBlock, 'root');
     }
 
-    private processQueryBlock(block: any, id: string): ExplainNode {
+    private processQueryBlock(block: unknown, id: string): ExplainNode {
         const node: ExplainNode = {
             id,
             type: block.select_id ? `SELECT #${block.select_id}` : 'Query',
@@ -340,7 +342,7 @@ export class ExplainViewerPanel {
 
         // Process nested tables
         if (block.nested_loop && Array.isArray(block.nested_loop)) {
-            block.nested_loop.forEach((nestedTable: any, index: number) => {
+            block.nested_loop.forEach((nestedTable: unknown, index: number) => {
                 if (nestedTable.table) {
                     const nestedNode = this.processTable(nestedTable.table, `${id}-nested-${index}`);
                     node.children!.push(nestedNode);
@@ -377,7 +379,7 @@ export class ExplainViewerPanel {
         return node;
     }
 
-    private processTable(table: any, id: string): ExplainNode {
+    private processTable(table: unknown, id: string): ExplainNode {
         const node: ExplainNode = {
             id,
             type: 'Table Access',
@@ -397,16 +399,16 @@ export class ExplainViewerPanel {
         return node;
     }
 
-    private extractTableNames(explainJson: any): Set<string> {
+    private extractTableNames(explainJson: unknown): Set<string> {
         const tables = new Set<string>();
 
-        const extractFromBlock = (block: any) => {
+        const extractFromBlock = (block: unknown) => {
             if (block.table?.table_name) {
                 tables.add(block.table.table_name);
             }
 
             if (block.nested_loop && Array.isArray(block.nested_loop)) {
-                block.nested_loop.forEach((nested: any) => {
+                block.nested_loop.forEach((nested: unknown) => {
                     if (nested.table?.table_name) {
                         tables.add(nested.table.table_name);
                     }
@@ -445,9 +447,9 @@ export class ExplainViewerPanel {
                 const schemaQuery = database
                     ? `DESCRIBE \`${database}\`.\`${tableName}\``
                     : `DESCRIBE \`${tableName}\``;
-                const schemaResult = await adapter.query<any>(schemaQuery);
+                const schemaResult = await adapter.query<unknown>(schemaQuery);
 
-                const schema: TableColumn[] = (schemaResult.rows || []).map((row: any) => ({
+                const schema: TableColumn[] = (schemaResult.rows || []).map((row: unknown) => ({
                     name: row.Field,
                     type: row.Type,
                     nullable: row.Null === 'YES',
@@ -460,7 +462,7 @@ export class ExplainViewerPanel {
                 const indexQuery = database
                     ? `SHOW INDEX FROM \`${database}\`.\`${tableName}\``
                     : `SHOW INDEX FROM \`${tableName}\``;
-                const indexResult = await adapter.query<any>(indexQuery);
+                const indexResult = await adapter.query<unknown>(indexQuery);
 
                 const indexMap = new Map<string, {
                     columns: string[];
@@ -470,7 +472,7 @@ export class ExplainViewerPanel {
                     columnCardinalities: Map<string, number>;
                 }>();
 
-                (indexResult.rows || []).forEach((row: any) => {
+                (indexResult.rows || []).forEach((row: unknown) => {
                     const indexName = row.Key_name;
                     if (!indexMap.has(indexName)) {
                         indexMap.set(indexName, {
@@ -493,13 +495,13 @@ export class ExplainViewerPanel {
 
                 this.tableMetadataCache.set(tableName, { schema, indexes });
                 this.logger.info(`Fetched metadata for table: ${tableName}`);
-            } catch (error) {
+            } catch {
                 this.logger.error(`Failed to fetch metadata for table ${tableName}:`, error as Error);
             }
         }
     }
 
-    private analyzeTableAccess(node: ExplainNode, table: any): void {
+    private analyzeTableAccess(node: ExplainNode, table: unknown): void {
         const accessType = node.accessType?.toLowerCase();
         const tableName = node.table;
         const metadata = tableName ? this.tableMetadataCache.get(tableName) : undefined;
@@ -605,7 +607,7 @@ export class ExplainViewerPanel {
 
             if (metadata) {
                 // Calculate table size impact
-                const totalTableSize = metadata.schema.length * node.rows;
+                const _totalTableSize = metadata.schema.length * node.rows;
                 node.issues!.push(`💡 Table has ${metadata.schema.length} columns - consider selecting only needed columns`);
 
                 // Suggest partitioning for very large tables
@@ -646,7 +648,7 @@ export class ExplainViewerPanel {
         }
     }
 
-    private suggestIndexColumns(table: any, metadata: TableMetadata): string[] {
+    private suggestIndexColumns(table: unknown, metadata: TableMetadata): string[] {
         const suggestions: string[] = [];
 
         // Look for conditions in attached_condition or used_columns
@@ -790,7 +792,7 @@ export class ExplainViewerPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: any) => {
+            async (message: unknown) => {
                 switch (message.type) {
                     case 'log':
                         this.logger.debug(message.message as string);

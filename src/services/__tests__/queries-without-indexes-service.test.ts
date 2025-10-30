@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { QueriesWithoutIndexesService } from '../queries-without-indexes-service';
 import { IDatabaseAdapter } from '../../adapters/database-adapter';
 import { Logger } from '../../utils/logger';

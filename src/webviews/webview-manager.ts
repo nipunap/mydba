@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
@@ -38,13 +40,13 @@ export class WebviewManager {
         this.logger.info('Webview providers initialized');
     }
 
-    updateExplain(explainResult: any): void {
+    updateExplain(explainResult: unknown): void {
         if (this.explainProvider) {
             this.explainProvider.updateExplain(explainResult);
         }
     }
 
-    updateProfile(profileResult: any): void {
+    updateProfile(profileResult: unknown): void {
         if (this.profilingProvider) {
             this.profilingProvider.updateProfile(profileResult);
         }

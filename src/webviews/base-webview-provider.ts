@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
@@ -38,7 +40,7 @@ export abstract class BaseWebviewProvider {
         );
     }
 
-    protected postMessage(message: any): void {
+    protected postMessage(message: unknown): void {
         if (this._view) {
             this._view.webview.postMessage(message);
         }

@@ -455,7 +455,7 @@ async function testConnection(
 async function saveConfiguration(
     provider: string,
     config: Record<string, string>,
-    context: vscode.ExtensionContext
+    _context: vscode.ExtensionContext
 ): Promise<void> {
     const workspaceConfig = vscode.workspace.getConfiguration('mydba.ai');
 

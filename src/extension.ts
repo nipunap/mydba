@@ -171,7 +171,7 @@ async function loadSavedState(context: vscode.ExtensionContext, logger: Logger):
     }
 }
 
-async function showWelcomeMessage(context: vscode.ExtensionContext, logger: Logger): Promise<void> {
+async function showWelcomeMessage(context: vscode.ExtensionContext, _logger: Logger): Promise<void> {
     const hasShownWelcome = context.globalState.get('mydba.hasShownWelcome', false);
 
     if (!hasShownWelcome) {

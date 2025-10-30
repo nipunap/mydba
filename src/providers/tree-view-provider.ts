@@ -178,7 +178,7 @@ export class TreeViewProvider implements vscode.TreeDataProvider<TreeItem> {
             });
 
             // Add database nodes
-            databases.forEach((db: any) => {
+            databases.forEach((db: { name: string }) => {
                 items.push({
                     id: `database-${connection.id}-${db.name}`,
                     label: db.name,
@@ -234,7 +234,7 @@ export class TreeViewProvider implements vscode.TreeDataProvider<TreeItem> {
         try {
             const tables = await adapter.getTables(databaseName);
 
-            return tables.map((table: any) => ({
+            return tables.map((table: { name: string; rows?: number }) => ({
                 id: `table-${connectionId}-${databaseName}-${table.name}`,
                 label: `${table.name} (${table.rows || 0} rows)`,
                 iconPath: new vscode.ThemeIcon('table'),

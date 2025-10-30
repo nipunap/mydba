@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * MariaDB Integration Tests
  * Tests MySQL adapter with MariaDB Docker container
@@ -13,7 +15,7 @@ import {
     waitForPerformanceSchema,
     executeSlowQuery,
     executeUnindexedQuery,
-    cleanupTestData
+    cleanupTestData as _cleanupTestData
 } from '../helpers/database-helper';
 
 suite('MariaDB Integration Tests', () => {
@@ -28,7 +30,7 @@ suite('MariaDB Integration Tests', () => {
                 user: 'test_user',
                 password: 'test_password'
             });
-        } catch (error) {
+        } catch {
             console.error('Failed to create MariaDB test connection:', error);
             console.error('Make sure MariaDB container is running on port 3307');
             this.skip();
@@ -391,7 +393,7 @@ suite('MariaDB Integration Tests', () => {
                 password: 'test_password'
             });
             assert.fail('Connection should have failed');
-        } catch (error) {
+        } catch {
             // Expected to fail
             assert.ok(error instanceof Error, 'Should throw an Error');
             assert.ok(
@@ -423,7 +425,7 @@ suite('MariaDB Integration Tests', () => {
         try {
             await testAdapter.query('SELECT 1');
             assert.fail('Query should fail after disconnect');
-        } catch (error) {
+        } catch {
             assert.ok(error instanceof Error, 'Should throw an Error');
         }
     });

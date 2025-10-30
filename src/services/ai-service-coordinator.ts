@@ -7,7 +7,7 @@ export class AIServiceCoordinator {
         private config: ConfigurationService
     ) {}
 
-    async analyzeQuery(request: any): Promise<any> {
+    async analyzeQuery(_request: unknown): Promise<unknown> {
         this.logger.info('Analyzing query with AI...');
 
         if (!this.isEnabled()) {
@@ -23,7 +23,7 @@ export class AIServiceCoordinator {
         };
     }
 
-    async interpretExplain(explainResult: any, context: any): Promise<any> {
+    async interpretExplain(_explainResult: unknown, _context: unknown): Promise<unknown> {
         this.logger.info('Interpreting EXPLAIN plan with AI...');
 
         if (!this.isEnabled()) {
@@ -34,7 +34,7 @@ export class AIServiceCoordinator {
         return { summary: 'Query analysis not implemented yet' };
     }
 
-    async interpretProfiling(profilingResult: any, context: any): Promise<any> {
+    async interpretProfiling(_profilingResult: unknown, _context: unknown): Promise<unknown> {
         this.logger.info('Interpreting profiling data with AI...');
 
         if (!this.isEnabled()) {
@@ -45,7 +45,7 @@ export class AIServiceCoordinator {
         return { insights: [] };
     }
 
-    async askAI(prompt: string, context: any): Promise<any> {
+    async askAI(_prompt: string, _context: unknown): Promise<unknown> {
         this.logger.info('Sending request to AI...');
 
         if (!this.isEnabled()) {
@@ -60,7 +60,7 @@ export class AIServiceCoordinator {
         return this.config.get('mydba.ai.enabled', true);
     }
 
-    getSettings(): any {
+    getSettings(): Record<string, boolean> {
         return {
             enabled: this.config.get('mydba.ai.enabled', true),
             anonymizeData: this.config.get('mydba.ai.anonymizeData', true),

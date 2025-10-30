@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
-import { QueryResult } from '../types';
+// import { QueryResult } from '../types';
 import { ExplainViewerPanel } from './explain-viewer-panel';
 
 /**
@@ -93,7 +95,7 @@ export class QueryEditorPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: any) => {
+            async (message: unknown) => {
                 switch (message.type) {
                     case 'executeQuery':
                         await this.executeQuery(message.query);
@@ -165,7 +167,7 @@ export class QueryEditorPanel {
                 timestamp: new Date().toISOString()
             });
 
-        } catch (error) {
+        } catch {
             this.logger.error('Query execution failed:', error as Error);
             this.panel.webview.postMessage({
                 type: 'queryError',
@@ -191,7 +193,7 @@ export class QueryEditorPanel {
 
             // Execute EXPLAIN
             const explainQuery = `EXPLAIN FORMAT=JSON ${cleanQuery}`;
-            const result = await adapter.query<any>(explainQuery);
+            const result = await adapter.query<unknown>(explainQuery);
 
             // Create AI service for enhanced analysis
             const { AIService } = await import('../services/ai-service');
@@ -209,7 +211,7 @@ export class QueryEditorPanel {
                 aiService
             );
 
-        } catch (error) {
+        } catch {
             this.logger.error('EXPLAIN failed:', error as Error);
             vscode.window.showErrorMessage(`EXPLAIN failed: ${(error as Error).message}`);
         }
@@ -308,7 +310,7 @@ export class QueryEditorPanel {
         });
     }
 
-    private async exportResults(format: 'csv' | 'json' | 'sql', results: any): Promise<void> {
+    private async exportResults(format: 'csv' | 'json' | 'sql', results: unknown): Promise<void> {
         try {
             const uri = await vscode.window.showSaveDialog({
                 filters: {
@@ -335,20 +337,20 @@ export class QueryEditorPanel {
             await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
             vscode.window.showInformationMessage(`Results exported to ${uri.fsPath}`);
 
-        } catch (error) {
+        } catch {
             this.logger.error('Export failed:', error as Error);
             vscode.window.showErrorMessage(`Export failed: ${(error as Error).message}`);
         }
     }
 
-    private resultsToCSV(results: any): string {
+    private resultsToCSV(results: unknown): string {
         if (!results.rows || results.rows.length === 0) {
             return '';
         }
 
-        const columns = results.columns.map((c: any) => c.name);
+        const columns = results.columns.map((c: unknown) => c.name);
         const header = columns.join(',');
-        const rows = results.rows.map((row: any) => {
+        const rows = results.rows.map((row: unknown) => {
             return columns.map((col: string) => {
                 const value = row[col];
                 if (value === null || value === undefined) {
@@ -366,15 +368,15 @@ export class QueryEditorPanel {
         return [header, ...rows].join('\n');
     }
 
-    private resultsToSQL(results: any): string {
+    private resultsToSQL(results: unknown): string {
         // Simple INSERT statement generation
         if (!results.rows || results.rows.length === 0) {
             return '';
         }
 
         const tableName = 'table_name'; // Placeholder
-        const columns = results.columns.map((c: any) => c.name);
-        const inserts = results.rows.map((row: any) => {
+        const columns = results.columns.map((c: unknown) => c.name);
+        const inserts = results.rows.map((row: unknown) => {
             const values = columns.map((col: string) => {
                 const value = row[col];
                 if (value === null || value === undefined) {

@@ -56,7 +56,7 @@ export class AIService {
             } else {
                 this.logger.warn('No AI provider configured');
             }
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to initialize AI Service:', error as Error);
             // Don't throw - allow extension to work without AI
         }
@@ -133,7 +133,7 @@ export class AIService {
                 estimatedComplexity: aiResult.estimatedComplexity || staticAnalysis.complexity,
                 citations: aiResult.citations
             };
-        } catch (error) {
+        } catch {
             this.logger.error('AI analysis failed, returning static analysis:', error as Error);
 
             // Show error to user

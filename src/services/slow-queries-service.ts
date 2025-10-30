@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { IDatabaseAdapter } from '../adapters/database-adapter';
 import { Logger } from '../utils/logger';
 
@@ -44,10 +46,10 @@ export class SlowQueriesService {
         `;
 
         this.logger.info(`Detecting slow queries (sort by: ${sortBy})...`);
-        const result = await adapter.query<any>(sql);
-        const rows: any[] = Array.isArray(result) ? result : (result as any).rows || [];
+        const result = await adapter.query<unknown>(sql);
+        const rows: unknown[] = Array.isArray(result) ? result : (result as any).rows || [];
 
-        const queries = rows.map((r: any) => {
+        const queries = rows.map((r: unknown) => {
             const avgMs = this.psToMs(r.avg_timer_wait || r.AVG_TIMER_WAIT || 0);
             const totalMs = this.psToMs(r.sum_timer_wait || r.SUM_TIMER_WAIT || 0);
             const count = Number(r.count_star || r.COUNT_STAR || 0);

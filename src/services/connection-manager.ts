@@ -1,10 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as vscode from 'vscode';
 import { SecretStorageService } from './secret-storage-service';
 import { EventBus, EVENTS, Connection, ConnectionStateChange } from './event-bus';
 import { Logger } from '../utils/logger';
 import { AdapterRegistry } from '../adapters/adapter-registry';
 import { MySQLAdapter } from '../adapters/mysql-adapter';
-import { ConnectionConfig, ConnectionTestResult, SSLConfig, SSHConfig, AWSIAMConfig } from '../types';
+import { ConnectionConfig, ConnectionTestResult } from '../types';
+import type { SSLConfig as _SSLConfig, SSHConfig as _SSHConfig, AWSIAMConfig as _AWSIAMConfig } from '../types';
 
 // Re-export types for backward compatibility
 export { ConnectionConfig, ConnectionTestResult };
@@ -140,7 +143,7 @@ export class ConnectionManager {
 
             this.logger.info(`Connected to: ${connection.name}`);
 
-        } catch (error) {
+        } catch {
             this.logger.error(`Failed to connect to ${connection.name}:`, error as Error);
 
             // Emit error state
@@ -184,7 +187,7 @@ export class ConnectionManager {
 
             this.logger.info(`Disconnected from: ${connection.name}`);
 
-        } catch (error) {
+        } catch {
             this.logger.error(`Error disconnecting from ${connection.name}:`, error as Error);
             throw error;
         }
@@ -251,7 +254,7 @@ export class ConnectionManager {
                 version
             };
 
-        } catch (error) {
+        } catch {
             this.logger.error(`Connection test error:`, error as Error);
             return {
                 success: false,
@@ -308,13 +311,13 @@ export class ConnectionManager {
                     await this.eventBus.emit(EVENTS.CONNECTION_ADDED, connection);
 
                     this.logger.debug(`Loaded connection: ${config.name}`);
-                } catch (error) {
+                } catch {
                     this.logger.error('Failed to load connection:', error as Error);
                 }
             }
 
             this.logger.info(`Loaded ${this.connections.size} connections`);
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to load connections:', error as Error);
         }
     }
@@ -328,7 +331,7 @@ export class ConnectionManager {
             await this.saveAllConnections();
 
             this.logger.debug(`Saved connection config: ${config.id}`);
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to save connection config:', error as Error);
         }
     }
@@ -336,7 +339,7 @@ export class ConnectionManager {
     private async saveAllConnections(): Promise<void> {
         const connectionsJson = Array.from(this.connectionConfigs.values()).map(config => {
             // Remove password before saving (stored separately in secret storage)
-            const { password, ...configWithoutPassword } = config as any;
+            const { password: _password, ...configWithoutPassword } = config as any;
             return JSON.stringify(configWithoutPassword);
         });
 

@@ -26,7 +26,7 @@ export class QueryAnonymizer {
 
             // Convert back to SQL
             return this.parser.sqlify(ast, { database: 'MySQL' });
-        } catch (error) {
+        } catch {
             // If parsing fails, use regex fallback
             return this.anonymizeWithRegex(query);
         }
@@ -35,7 +35,7 @@ export class QueryAnonymizer {
     /**
      * Anonymize AST by replacing literal values
      */
-    private anonymizeAST(node: any): void {
+    private anonymizeAST(node: unknown): void {
         if (!node || typeof node !== 'object') {
             return;
         }
@@ -63,7 +63,7 @@ export class QueryAnonymizer {
 
         // Recursively process nested objects
         for (const key in node) {
-            if (node.hasOwnProperty(key) && key !== 'type') {
+            if (nodeObject.prototype.hasOwnProperty.call(key) && key !== 'type') {
                 this.anonymizeAST(node[key]);
             }
         }

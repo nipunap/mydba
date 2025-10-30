@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ConnectionManager, ConnectionConfig } from '../services/connection-manager';
+import { ConnectionManager } from '../services/connection-manager';
 import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 import { WebviewManager } from '../webviews/webview-manager';
 import { Logger } from '../utils/logger';
@@ -12,7 +12,7 @@ export class CommandRegistry {
         private logger: Logger
     ) {}
 
-    registerCommands(context: vscode.ExtensionContext, treeViewProvider?: any): void {
+    registerCommands(context: vscode.ExtensionContext, _treeViewProvider?: unknown): void {
         this.logger.info('Registering MyDBA commands...');
 
         // Connection commands
@@ -44,7 +44,7 @@ export class CommandRegistry {
             vscode.commands.registerCommand('mydba.showQueryEditor', (connectionId: string) => this.showQueryEditor(connectionId)),
             vscode.commands.registerCommand('mydba.showQueriesWithoutIndexes', (connectionId: string) => this.showQueriesWithoutIndexes(connectionId)),
             vscode.commands.registerCommand('mydba.showSlowQueries', (connectionId: string) => this.showSlowQueries(connectionId)),
-            vscode.commands.registerCommand('mydba.previewTableData', (treeItem: any) => {
+            vscode.commands.registerCommand('mydba.previewTableData', (treeItem: { metadata?: { connectionId?: string; database?: string; table?: string } }) => {
                 // Extract metadata from tree item
                 const { connectionId, database, table } = treeItem.metadata || {};
                 if (connectionId && database && table) {
@@ -73,12 +73,12 @@ export class CommandRegistry {
         }
     }
 
-    private async connect(treeItemOrId: any): Promise<void> {
+    private async connect(treeItemOrId: string | { id?: string }): Promise<void> {
         try {
             // Extract connection ID from tree item or use directly if string
             const connectionId = typeof treeItemOrId === 'string'
                 ? treeItemOrId
-                : treeItemOrId?.id?.replace('connection-', '') || treeItemOrId;
+                : treeItemOrId?.id?.replace('connection-', '') || String(treeItemOrId);
 
             this.logger.info(`Connecting to connection ID: ${connectionId}...`);
             await this.connectionManager.connect(connectionId);
@@ -89,12 +89,12 @@ export class CommandRegistry {
         }
     }
 
-    private async disconnect(treeItemOrId: any): Promise<void> {
+    private async disconnect(treeItemOrId: string | { id?: string }): Promise<void> {
         try {
             // Extract connection ID from tree item or use directly if string
             const connectionId = typeof treeItemOrId === 'string'
                 ? treeItemOrId
-                : treeItemOrId?.id?.replace('connection-', '') || treeItemOrId;
+                : treeItemOrId?.id?.replace('connection-', '') || String(treeItemOrId);
 
             this.logger.info(`Disconnecting from connection ID: ${connectionId}...`);
             await this.connectionManager.disconnect(connectionId);
@@ -105,11 +105,11 @@ export class CommandRegistry {
         }
     }
 
-    private async deleteConnection(treeItemOrId: any): Promise<void> {
+    private async deleteConnection(treeItemOrId: string | { id?: string }): Promise<void> {
         // Extract connection ID from tree item or use directly if string
         const connectionId = typeof treeItemOrId === 'string'
             ? treeItemOrId
-            : treeItemOrId?.id?.replace('connection-', '') || treeItemOrId;
+            : treeItemOrId?.id?.replace('connection-', '') || String(treeItemOrId);
 
         const connection = this.connectionManager.getConnection(connectionId);
         if (!connection) {
@@ -155,7 +155,7 @@ export class CommandRegistry {
 
         try {
             this.logger.info('Analyzing query with AI...');
-            const analysis = await this.aiServiceCoordinator.analyzeQuery({
+            await this.aiServiceCoordinator.analyzeQuery({
                 query: text,
                 connectionId: 'current', // TODO: Get active connection
                 context: {},
@@ -354,8 +354,10 @@ export class CommandRegistry {
         try {
             this.logger.info('Generating sample unindexed workload...');
             // Heuristic: use first connected connection
-            const connections = (this.connectionManager as any).listConnections?.() || [];
-            const active = connections.find((c: any) => c.isConnected) || connections[0];
+            interface ConnectionInfo { id: string; isConnected?: boolean }
+            const connectionManager = this.connectionManager as { listConnections?: () => ConnectionInfo[] };
+            const connections = connectionManager.listConnections?.() || [];
+            const active = connections.find((c) => c.isConnected) || connections[0];
             if (!active) {
                 vscode.window.showWarningMessage('No connection available');
                 return;

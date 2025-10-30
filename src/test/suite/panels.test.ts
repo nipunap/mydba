@@ -4,7 +4,7 @@
  */
 
 import * as assert from 'assert';
-import * as vscode from 'vscode';
+// import * as vscode from 'vscode';
 
 suite('Panel Lifecycle Tests', () => {
     // NOTE: Panel tests require active database connections with valid connectionIds

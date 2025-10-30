@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { IDatabaseAdapter } from '../adapters/database-adapter';
 import { Logger } from '../utils/logger';
 
@@ -47,7 +49,7 @@ export class QueryProfilingService {
             let lastEventId: number = 0;
             let totalDuration: number = 0;
 
-            await mysqlAdapter.withConnection(async (conn: any) => {
+            await mysqlAdapter.withConnection(async (conn: unknown) => {
                 // Get PROCESSLIST_ID (what CONNECTION_ID() returns)
                 const [connIdRows] = await conn.query('SELECT CONNECTION_ID() as connection_id');
                 const connectionId = connIdRows[0]?.connection_id || connIdRows[0]?.CONNECTION_ID;
@@ -105,7 +107,7 @@ export class QueryProfilingService {
             this.logger.info(`Normalized target query: ${normalizedTargetQuery.substring(0, 80)}`);
 
             // Try to get statements from multiple sources (using regular adapter, different connection)
-            let stmtRows: any[] = [];
+            let stmtRows: unknown[] = [];
             let sourceUsed = '';
 
             // First try: events_statements_history_long with EVENT_ID filter
@@ -126,7 +128,7 @@ export class QueryProfilingService {
                 LIMIT 30
             `;
 
-            let stmtResult = await adapter.query<any>(stmtQuery, [threadId, lastEventId]);
+            let stmtResult = await adapter.query<unknown>(stmtQuery, [threadId, lastEventId]);
             stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
             sourceUsed = 'events_statements_history_long (with EVENT_ID filter)';
 
@@ -151,7 +153,7 @@ export class QueryProfilingService {
                     LIMIT 30
                 `;
 
-                stmtResult = await adapter.query<any>(stmtQuery, [threadId]);
+                stmtResult = await adapter.query<unknown>(stmtQuery, [threadId]);
                 stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
                 sourceUsed = 'events_statements_history_long (no EVENT_ID filter)';
                 this.logger.info(`Found ${stmtRows.length} statements in ${sourceUsed}`);
@@ -176,7 +178,7 @@ export class QueryProfilingService {
                     LIMIT 10
                 `;
 
-                stmtResult = await adapter.query<any>(stmtQuery, [threadId]);
+                stmtResult = await adapter.query<unknown>(stmtQuery, [threadId]);
                 stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
                 sourceUsed = 'events_statements_history';
                 this.logger.info(`Found ${stmtRows.length} statements in ${sourceUsed}`);
@@ -199,7 +201,7 @@ export class QueryProfilingService {
                     WHERE THREAD_ID = ?
                 `;
 
-                stmtResult = await adapter.query<any>(stmtQuery, [threadId]);
+                stmtResult = await adapter.query<unknown>(stmtQuery, [threadId]);
                 stmtRows = Array.isArray(stmtResult) ? stmtResult : ((stmtResult as any).rows || []);
                 sourceUsed = 'events_statements_current';
                 this.logger.info(`Found ${stmtRows.length} statements in ${sourceUsed}`);
@@ -207,14 +209,14 @@ export class QueryProfilingService {
 
             // Log all found statements for debugging
             if (stmtRows.length > 0) {
-                stmtRows.forEach((row: any, index: number) => {
+                stmtRows.forEach((row: unknown, index: number) => {
                     const sqlText = (row.SQL_TEXT || row.sql_text || '').substring(0, 80);
                     this.logger.info(`  [${index}] EVENT_ID ${row.EVENT_ID || row.event_id}: ${sqlText}`);
                 });
             }
 
             // Filter in memory with aggressive normalization
-            let stmt = stmtRows.find((row: any) => {
+            let stmt = stmtRows.find((row: unknown) => {
                 const sqlText = row.SQL_TEXT || row.sql_text || '';
                 const normalizedSql = normalizeQueryForMatching(sqlText);
 
@@ -233,7 +235,7 @@ export class QueryProfilingService {
             if (!stmt && stmtRows.length > 0) {
                 this.logger.warn('Exact query match not found, filtering out setup queries...');
                 // Filter out performance_schema setup queries
-                const nonSetupQueries = stmtRows.filter((row: any) => {
+                const nonSetupQueries = stmtRows.filter((row: unknown) => {
                     const sqlText = (row.SQL_TEXT || row.sql_text || '').toLowerCase();
                     const isSetup = sqlText.includes('performance_schema') ||
                                    sqlText.includes('connection_id()') ||
@@ -278,11 +280,11 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
                 ORDER BY EVENT_ID
             `;
 
-            const stagesResult = await adapter.query<any>(stagesQuery, [eventId]);
+            const stagesResult = await adapter.query<unknown>(stagesQuery, [eventId]);
             const stageRows = Array.isArray(stagesResult) ? stagesResult : ((stagesResult as any).rows || []);
 
             // Build profile
-            const stages: ProfileStage[] = stageRows.map((stage: any) => ({
+            const stages: ProfileStage[] = stageRows.map((stage: unknown) => ({
                 eventName: this.cleanEventName(stage.event_name || stage.EVENT_NAME),
                 duration: parseFloat(stage.duration_us || stage.DURATION_US || 0),
             }));
@@ -309,7 +311,7 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
 
             return profile;
 
-        } catch (error) {
+        } catch {
             this.logger.error('Failed to profile query:', error as Error);
             throw error;
         }
@@ -317,7 +319,7 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
 
     private async ensurePerformanceSchemaEnabled(adapter: IDatabaseAdapter): Promise<void> {
         // Check if performance_schema is enabled
-        const result = await adapter.query<any>(`SHOW VARIABLES LIKE 'performance_schema'`);
+        const result = await adapter.query<unknown>(`SHOW VARIABLES LIKE 'performance_schema'`);
         const rows = Array.isArray(result) ? result : ((result as any).rows || []);
 
         if (rows.length === 0 || (rows[0].Value !== 'ON' && rows[0].value !== 'ON')) {
@@ -378,7 +380,7 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
             LIMIT 50
         `;
 
-        const result = await adapter.query<any>(query, [minDurationMs]);
+        const result = await adapter.query<unknown>(query, [minDurationMs]);
         return Array.isArray(result) ? result : ((result as any).rows || []);
     }
 
@@ -407,7 +409,7 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
                 AND SCHEMA_NAME NOT IN ('performance_schema', 'information_schema', 'mysql', 'sys')
         `;
 
-        const params: any[] = [];
+        const params: unknown[] = [];
         if (schemaName) {
             query += ' AND SCHEMA_NAME = ?';
             params.push(schemaName);
@@ -415,7 +417,7 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
 
         query += ' ORDER BY SUM_TIMER_WAIT DESC LIMIT 100';
 
-        const result = await adapter.query<any>(query, params);
+        const result = await adapter.query<unknown>(query, params);
         return Array.isArray(result) ? result : ((result as any).rows || []);
     }
 }
