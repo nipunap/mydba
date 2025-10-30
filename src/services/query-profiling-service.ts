@@ -311,7 +311,7 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
 
             return profile;
 
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to profile query:', error as Error);
             throw error;
         }

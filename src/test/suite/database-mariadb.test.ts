@@ -30,7 +30,7 @@ suite('MariaDB Integration Tests', () => {
                 user: 'test_user',
                 password: 'test_password'
             });
-        } catch {
+        } catch (error) {
             console.error('Failed to create MariaDB test connection:', error);
             console.error('Make sure MariaDB container is running on port 3307');
             this.skip();
@@ -393,7 +393,7 @@ suite('MariaDB Integration Tests', () => {
                 password: 'test_password'
             });
             assert.fail('Connection should have failed');
-        } catch {
+        } catch (error) {
             // Expected to fail
             assert.ok(error instanceof Error, 'Should throw an Error');
             assert.ok(
@@ -425,7 +425,7 @@ suite('MariaDB Integration Tests', () => {
         try {
             await testAdapter.query('SELECT 1');
             assert.fail('Query should fail after disconnect');
-        } catch {
+        } catch (error) {
             assert.ok(error instanceof Error, 'Should throw an Error');
         }
     });

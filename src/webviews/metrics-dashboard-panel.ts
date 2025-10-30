@@ -186,7 +186,7 @@ export class MetricsDashboardPanel {
                 timestamp: new Date().toISOString()
             });
 
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to load metrics:', error as Error);
             this.panel.webview.postMessage({
                 type: 'metricsError',

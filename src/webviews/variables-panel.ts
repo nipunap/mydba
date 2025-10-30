@@ -102,7 +102,7 @@ export class VariablesPanel {
                 variables: variables,
                 scope: this.currentScope
             });
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to load variables:', error as Error);
             this.panel.webview.postMessage({
                 type: 'error',

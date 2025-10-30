@@ -121,7 +121,7 @@ export class QueriesWithoutIndexesPanel {
                 timestamp: new Date().toISOString()
             });
 
-        } catch {
+        } catch (error) {
             // Handle Performance Schema configuration error
             if (error instanceof PerformanceSchemaConfigurationError) {
                 await this.handleConfigurationError(error);
@@ -213,7 +213,7 @@ export class QueriesWithoutIndexesPanel {
             // Reload queries
             await this.loadQueries();
 
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to apply configuration:', error as Error);
             vscode.window.showErrorMessage(`Failed to apply configuration: ${(error as Error).message}`);
         }
@@ -269,7 +269,7 @@ export class QueriesWithoutIndexesPanel {
                 aiService
             );
 
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to explain query:', error as Error);
             vscode.window.showErrorMessage(`Failed to explain query: ${(error as Error).message}`);
         }
@@ -293,7 +293,7 @@ export class QueriesWithoutIndexesPanel {
                 queryText,
                 aiService
             );
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to profile query:', error as Error);
             vscode.window.showErrorMessage(`Failed to profile query: ${(error as Error).message}`);
         }

@@ -167,7 +167,7 @@ export class QueryEditorPanel {
                 timestamp: new Date().toISOString()
             });
 
-        } catch {
+        } catch (error) {
             this.logger.error('Query execution failed:', error as Error);
             this.panel.webview.postMessage({
                 type: 'queryError',
@@ -211,7 +211,7 @@ export class QueryEditorPanel {
                 aiService
             );
 
-        } catch {
+        } catch (error) {
             this.logger.error('EXPLAIN failed:', error as Error);
             vscode.window.showErrorMessage(`EXPLAIN failed: ${(error as Error).message}`);
         }
@@ -337,7 +337,7 @@ export class QueryEditorPanel {
             await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
             vscode.window.showInformationMessage(`Results exported to ${uri.fsPath}`);
 
-        } catch {
+        } catch (error) {
             this.logger.error('Export failed:', error as Error);
             vscode.window.showErrorMessage(`Export failed: ${(error as Error).message}`);
         }

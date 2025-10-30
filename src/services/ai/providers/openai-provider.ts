@@ -33,7 +33,7 @@ export class OpenAIProvider implements AIProvider {
             // Try to list models to verify API key
             await this.client.models.list();
             return true;
-        } catch {
+        } catch (error) {
             this.logger.debug('OpenAI availability check failed:', error as Error);
             return false;
         }
@@ -70,7 +70,7 @@ export class OpenAIProvider implements AIProvider {
             }
 
             return this.parseResponse(content);
-        } catch {
+        } catch (error) {
             this.logger.error('OpenAI analysis failed:', error as Error);
             throw new Error(`OpenAI analysis failed: ${(error as Error).message}`);
         }
@@ -184,7 +184,7 @@ Provide your response as a JSON object with this exact structure:
                 estimatedComplexity: result.estimatedComplexity,
                 citations: result.citations || []
             };
-        } catch {
+        } catch (error) {
             this.logger.warn('Failed to parse OpenAI JSON response:', error as Error);
             // Fallback
             return {

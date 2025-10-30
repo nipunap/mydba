@@ -28,7 +28,7 @@ suite('Database Operations Tests', () => {
                 waitForInit: true,
                 maxRetries: 10
             });
-        } catch {
+        } catch (error) {
             console.error('Failed to create test connection:', error);
             this.skip();
         }
@@ -178,7 +178,7 @@ suite('Database Operations Tests', () => {
                 maxRetries: 1
             });
             assert.fail('Connection should have failed');
-        } catch {
+        } catch (error) {
             // Expected to fail
             assert.ok(error instanceof Error, 'Should throw an Error');
             assert.ok(
@@ -207,7 +207,7 @@ suite('Database Operations Tests', () => {
         try {
             await testAdapter.query('SELECT 1', []);
             assert.fail('Query should fail after disconnect');
-        } catch {
+        } catch (error) {
             assert.ok(error instanceof Error, 'Should throw an Error');
         }
     });

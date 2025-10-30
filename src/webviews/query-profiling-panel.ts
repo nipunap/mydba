@@ -76,7 +76,7 @@ export class QueryProfilingPanel {
 
             // Get AI insights asynchronously
             this.getAIInsights(result);
-        } catch {
+        } catch (error) {
             this.logger.error('Profiling failed:', error as Error);
             this.panel.webview.postMessage({ type: 'error', message: (error as Error).message });
         }
@@ -139,7 +139,7 @@ export class QueryProfilingPanel {
                 type: 'aiInsights',
                 insights: analysis
             });
-        } catch {
+        } catch (error) {
             this.logger.error('AI analysis failed:', error as Error);
             this.panel.webview.postMessage({
                 type: 'aiInsightsError',
@@ -228,7 +228,7 @@ export class QueryProfilingPanel {
                 };
 
                 this.logger.info(`Fetched schema for table: ${tableName}`);
-            } catch {
+            } catch (error) {
                 this.logger.warn(`Failed to fetch schema for table ${tableName}:`, error as Error);
             }
         }

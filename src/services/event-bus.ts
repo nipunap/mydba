@@ -48,7 +48,7 @@ export class EventBus {
         const promises = handlers.map(async (handler) => {
             try {
                 await handler(data);
-            } catch {
+            } catch (error) {
                 this.logger.error(`Error in event handler for ${eventName}:`, error as Error);
             }
         });

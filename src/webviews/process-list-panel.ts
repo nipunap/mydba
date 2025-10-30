@@ -133,7 +133,7 @@ export class ProcessListPanel {
                 processes: processes,
                 timestamp: new Date().toISOString()
             });
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to load process list:', error as Error);
             this.panel.webview.postMessage({
                 type: 'error',
@@ -171,7 +171,7 @@ export class ProcessListPanel {
             await adapter.query('KILL ?', [processId]);
             vscode.window.showInformationMessage(`Process ${processId} killed`);
             await this.loadProcessList();
-        } catch {
+        } catch (error) {
             this.logger.error(`Failed to kill process ${processId}:`, error as Error);
             vscode.window.showErrorMessage(`Failed to kill process: ${(error as Error).message}`);
         }

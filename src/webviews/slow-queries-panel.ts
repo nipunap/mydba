@@ -131,7 +131,7 @@ export class SlowQueriesPanel {
             await aiService.initialize();
 
             ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiService);
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to EXPLAIN query:', error as Error);
             vscode.window.showErrorMessage(`Failed to EXPLAIN query: ${(error as Error).message}`);
         }
@@ -157,7 +157,7 @@ export class SlowQueriesPanel {
             const aiService = new AIService(this.logger, this.context);
             await aiService.initialize();
             QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiService);
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to open Profiling:', error as Error);
             vscode.window.showErrorMessage(`Failed to open Profiling: ${(error as Error).message}`);
         }
@@ -178,7 +178,7 @@ export class SlowQueriesPanel {
                 timestamp: new Date().toISOString(),
                 sortBy: this.currentSortBy
             });
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to load slow queries:', error as Error);
             this.panel.webview.postMessage({ type: 'error', message: (error as Error).message });
         } finally {

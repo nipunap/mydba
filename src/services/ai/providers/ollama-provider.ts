@@ -42,7 +42,7 @@ export class OllamaProvider implements AIProvider {
             }
 
             return true;
-        } catch {
+        } catch (error) {
             this.logger.debug('Ollama availability check failed:', error as Error);
             return false;
         }
@@ -78,7 +78,7 @@ export class OllamaProvider implements AIProvider {
 
             const content = response.message.content;
             return this.parseResponse(content);
-        } catch {
+        } catch (error) {
             this.logger.error('Ollama analysis failed:', error as Error);
 
             // Provide helpful error message
@@ -192,7 +192,7 @@ Return ONLY the JSON, no explanatory text.`;
 
             // Fallback for non-JSON responses
             return this.parseUnstructuredResponse(content);
-        } catch {
+        } catch (error) {
             this.logger.warn('Failed to parse Ollama JSON response, using fallback:', error as Error);
             return this.parseUnstructuredResponse(content);
         }
@@ -226,7 +226,7 @@ Return ONLY the JSON, no explanatory text.`;
         try {
             const response = await this.client.list();
             return response.models.map(m => m.name);
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to list Ollama models:', error as Error);
             return [];
         }

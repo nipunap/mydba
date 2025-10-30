@@ -17,7 +17,7 @@ export class SecretStorageService {
         try {
             await this.context.secrets.store(key, value);
             this.logger.debug(`Stored secret: ${key}`);
-        } catch {
+        } catch (error) {
             this.logger.error(`Failed to store secret ${key}:`, error as Error);
             throw error;
         }
@@ -28,7 +28,7 @@ export class SecretStorageService {
             const value = await this.context.secrets.get(key);
             this.logger.debug(`Retrieved secret: ${key}`);
             return value;
-        } catch {
+        } catch (error) {
             this.logger.error(`Failed to get secret ${key}:`, error as Error);
             throw error;
         }
@@ -38,7 +38,7 @@ export class SecretStorageService {
         try {
             await this.context.secrets.delete(key);
             this.logger.debug(`Deleted secret: ${key}`);
-        } catch {
+        } catch (error) {
             this.logger.error(`Failed to delete secret ${key}:`, error as Error);
             throw error;
         }

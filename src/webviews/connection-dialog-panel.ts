@@ -107,7 +107,7 @@ export class ConnectionDialogPanel {
                     password: '' // Don't send password to frontend for security
                 }
             });
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to load connection data:', error as Error);
             vscode.window.showErrorMessage(`Failed to load connection: ${(error as Error).message}`);
         }
@@ -159,7 +159,7 @@ export class ConnectionDialogPanel {
                 });
             }
 
-        } catch {
+        } catch (error) {
             this.logger.error('Connection test failed:', error as Error);
             this.panel.webview.postMessage({
                 type: 'testResult',
@@ -201,7 +201,7 @@ export class ConnectionDialogPanel {
 
             this.panel.dispose();
 
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to save connection:', error as Error);
             this.panel.webview.postMessage({
                 type: 'saveError',

@@ -466,7 +466,7 @@
     "ts-jest": "^29.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.46.2",
-    "vsce": "^2.15.0"
+    "vsce": "^1.97.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

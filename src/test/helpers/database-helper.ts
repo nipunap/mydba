@@ -51,7 +51,7 @@ export async function createTestConnection(
             }
 
             return adapter;
-        } catch {
+        } catch (error) {
             lastError = error as Error;
             logger.warn(`Connection attempt ${i + 1}/${maxRetries} failed: ${(error as Error).message}`);
 
@@ -80,7 +80,7 @@ async function waitForTestData(adapter: MySQLAdapter, maxWait: number = 30000): 
             if (result.rows && result.rows.length > 0 && result.rows[0].count > 0) {
                 return; // Data is ready
             }
-        } catch {
+        } catch (error) {
             // Table might not exist yet, keep waiting
         }
 
@@ -107,7 +107,7 @@ export async function cleanupTestData(adapter: MySQLAdapter): Promise<void> {
 
         // Re-enable foreign key checks
         await adapter.query('SET FOREIGN_KEY_CHECKS = 1');
-    } catch {
+    } catch (error) {
         console.error('Failed to cleanup test data:', error);
         // Don't throw - cleanup is best effort
     }
@@ -132,7 +132,7 @@ export async function waitForPerformanceSchema(
             if (result.rows && result.rows.length > 0 && result.rows[0].count >= minStatements) {
                 return;
             }
-        } catch {
+        } catch (error) {
             // Performance Schema might not be ready yet
         }
 
@@ -152,7 +152,7 @@ export async function isPerformanceSchemaEnabled(adapter: MySQLAdapter): Promise
         );
 
         return !!(result.rows && Array.isArray(result.rows) && result.rows.length > 0 && result.rows[0].Value === 'ON');
-    } catch {
+    } catch (error) {
         return false;
     }
 }
@@ -171,7 +171,7 @@ export async function startLongTransaction(
     setTimeout(async () => {
         try {
             await adapter.query('COMMIT');
-        } catch {
+        } catch (error) {
             // Ignore errors if connection was closed
         }
     }, durationMs);
@@ -218,7 +218,7 @@ function sleep(ms: number): Promise<void> {
 export async function disconnectAdapter(adapter: MySQLAdapter): Promise<void> {
     try {
         await adapter.disconnect();
-    } catch {
+    } catch (error) {
         // Ignore disconnect errors
     }
 }
@@ -242,7 +242,7 @@ export async function createMariaDBTestConnection(
 export async function resetPerformanceSchema(adapter: MySQLAdapter): Promise<void> {
     try {
         await adapter.query('CALL sys.ps_truncate_all_tables(FALSE)');
-    } catch {
+    } catch (error) {
         // sys schema might not be available, try alternative
         try {
             await adapter.query('TRUNCATE TABLE performance_schema.events_statements_history');

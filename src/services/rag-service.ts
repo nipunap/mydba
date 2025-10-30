@@ -42,7 +42,7 @@ export class RAGService {
             // Combine all docs
             this.allDocs = [...this.mysqlDocs, ...this.mariadbDocs];
             this.logger.info(`RAG Service initialized with ${this.allDocs.length} total documents`);
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to initialize RAG Service:', error as Error);
             throw error;
         }

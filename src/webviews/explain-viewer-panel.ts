@@ -158,7 +158,7 @@ export class ExplainViewerPanel {
 
             // Get AI insights asynchronously (don't block the UI)
             this.getAIInsights(explainJson, treeData);
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to process EXPLAIN data:', error as Error);
             this.panel.webview.postMessage({
                 type: 'error',
@@ -213,7 +213,7 @@ export class ExplainViewerPanel {
             });
 
             this.logger.info('AI insights sent successfully');
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to get AI insights:', error as Error);
             this.panel.webview.postMessage({
                 type: 'aiInsightsError',
@@ -495,7 +495,7 @@ export class ExplainViewerPanel {
 
                 this.tableMetadataCache.set(tableName, { schema, indexes });
                 this.logger.info(`Fetched metadata for table: ${tableName}`);
-            } catch {
+            } catch (error) {
                 this.logger.error(`Failed to fetch metadata for table ${tableName}:`, error as Error);
             }
         }

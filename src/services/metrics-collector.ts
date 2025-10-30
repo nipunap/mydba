@@ -21,7 +21,7 @@ export class MetricsCollector {
 
         try {
             return await adapter.getMetrics();
-        } catch {
+        } catch (error) {
             this.logger.error(`Failed to collect metrics for ${connectionId}:`, error as Error);
             return null;
         }
@@ -41,7 +41,7 @@ export class MetricsCollector {
                     // TODO: Emit metrics event
                     this.logger.debug(`Collected metrics for ${connectionId}`);
                 }
-            } catch {
+            } catch (error) {
                 this.logger.error(`Error collecting metrics for ${connectionId}:`, error as Error);
             }
         }, interval);

@@ -97,7 +97,7 @@ export class QueriesWithoutIndexesService {
             }
 
             return queriesInfo;
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to detect queries without indexes:', error as Error);
             throw error;
         }
@@ -284,7 +284,7 @@ export class QueriesWithoutIndexesService {
                 suggestions.push('Run EXPLAIN to identify which columns need indexing');
             }
 
-        } catch {
+        } catch (error) {
             this.logger.error('Failed to suggest indexes:', error as Error);
             suggestions.push('Unable to auto-suggest indexes - use EXPLAIN for details');
         }

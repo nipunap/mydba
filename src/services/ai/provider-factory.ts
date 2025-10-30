@@ -122,7 +122,7 @@ export class AIProviderFactory {
             }
 
             return new VSCodeLMProvider(this.logger);
-        } catch {
+        } catch (error) {
             this.logger.warn('Failed to create VSCode LM provider:', error as Error);
             return null;
         }

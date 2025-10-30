@@ -172,8 +172,8 @@ export class MySQLAdapter {
         this.ensureConnected();
 
         try {
-            const [rows] = await this.pool.query<Array<{ Database: string }>>('SHOW DATABASES');
-            return rows.map((row) => ({ name: row.Database }));
+            const [rows] = await this.pool.query('SHOW DATABASES');
+            return (rows as Array<{ Database: string }>).map((row) => ({ name: row.Database }));
 
         } catch (error) {
             this.logger.error('Failed to get databases:', error as Error);
@@ -200,7 +200,7 @@ export class MySQLAdapter {
                 Index_length?: number;
                 Collation?: string;
             }
-            const [rows] = await this.pool.query<TableRow[]>(sql);
+            const [rows] = await this.pool.query(sql);
 
             return rows.map((row) => ({
                 name: row.Name,
@@ -384,7 +384,7 @@ export class MySQLAdapter {
             interface PerformanceSchemaConfig {
                 enabled: number;
             }
-            const [psConfig] = await this.pool.query<PerformanceSchemaConfig[]>(
+            const [psConfig] = await this.pool.query(
                 "SELECT @@global.performance_schema AS enabled"
             );
             const psEnabled = psConfig && psConfig[0]?.enabled === 1;
@@ -436,7 +436,7 @@ export class MySQLAdapter {
                 transactionState: string | null;
                 transactionStarted: Date | null;
             }
-            const [rows] = await this.pool.query<ProcessRow[]>(query);
+            const [rows] = await this.pool.query(query);
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             // Import QueryAnonymizer for fingerprinting
@@ -486,7 +486,7 @@ export class MySQLAdapter {
                 State: string | null;
                 Info: string | null;
             }
-            const [rows] = await this.pool.query<BasicProcessRow[]>('SHOW FULL PROCESSLIST');
+            const [rows] = await this.pool.query('SHOW FULL PROCESSLIST');
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             return rows.map((row) => ({
@@ -514,7 +514,7 @@ export class MySQLAdapter {
                 Variable_name: string;
                 Value: string;
             }
-            const [rows] = await this.pool.query<VariableRow[]>('SHOW GLOBAL VARIABLES');
+            const [rows] = await this.pool.query('SHOW GLOBAL VARIABLES');
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -536,7 +536,7 @@ export class MySQLAdapter {
                 Variable_name: string;
                 Value: string;
             }
-            const [rows] = await this.pool.query<VariableRow[]>('SHOW SESSION VARIABLES');
+            const [rows] = await this.pool.query('SHOW SESSION VARIABLES');
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -558,7 +558,7 @@ export class MySQLAdapter {
                 Variable_name: string;
                 Value: string;
             }
-            const [rows] = await this.pool.query<StatusRow[]>('SHOW GLOBAL STATUS');
+            const [rows] = await this.pool.query('SHOW GLOBAL STATUS');
 
             // Parse status variables into metrics
             const statusMap = new Map<string, string>();
