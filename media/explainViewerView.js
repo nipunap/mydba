@@ -385,7 +385,7 @@
             html += `<td>${row.possibleKeys ? formatArray(row.possibleKeys) : '-'}</td>`;
             html += `<td>${row.key ? `<strong>${escapeHtml(row.key)}</strong>` : '-'}</td>`;
             html += `<td class="number-cell">${row.rows ? row.rows.toLocaleString() : '-'}</td>`;
-            html += `<td class="number-cell">${row.filtered !== undefined ? row.filtered + '%' : '-'}</td>`;
+            html += `<td class="number-cell">${row.filtered !== undefined ? escapeHtml(row.filtered + '%') : '-'}</td>`;
             html += `<td class="number-cell">${row.cost !== undefined && row.cost !== null && typeof row.cost === 'number' && !isNaN(row.cost) ? row.cost.toFixed(2) : '-'}</td>`;
             html += '</tr>';
 
