@@ -65,7 +65,7 @@ export class QueryAnonymizer {
 
         // Recursively process nested objects
         for (const key in node) {
-            if (nodeObject.prototype.hasOwnProperty.call(key) && key !== 'type') {
+            if (Object.prototype.hasOwnProperty.call(node, key) && key !== 'type') {
                 this.anonymizeAST(node[key]);
             }
         }

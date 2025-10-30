@@ -298,7 +298,7 @@ export class QueriesWithoutIndexesService {
     /**
      * Get index usage statistics for a schema
      */
-    async getIndexUsageStats(adapter: IDatabaseAdapter, _schemaName: string): Promise<any[]> {
+    async getIndexUsageStats(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
         const query = `
             SELECT
                 t.TABLE_SCHEMA as schema_name,
@@ -333,7 +333,7 @@ export class QueriesWithoutIndexesService {
     /**
      * Find duplicate indexes
      */
-    async findDuplicateIndexes(adapter: IDatabaseAdapter, _schemaName: string): Promise<any[]> {
+    async findDuplicateIndexes(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
         // Security: Validate schema name to prevent SQL injection
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(schemaName)) {
             throw new Error('Invalid schema name: only alphanumeric characters and underscores allowed');
@@ -367,7 +367,7 @@ export class QueriesWithoutIndexesService {
     /**
      * Find unused indexes (indexes with no usage in Performance Schema)
      */
-    async findUnusedIndexes(adapter: IDatabaseAdapter, _schemaName: string): Promise<any[]> {
+    async findUnusedIndexes(adapter: IDatabaseAdapter, schemaName: string): Promise<any[]> {
         // Security: Validate schema name to prevent SQL injection
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(schemaName)) {
             throw new Error('Invalid schema name: only alphanumeric characters and underscores allowed');

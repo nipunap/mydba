@@ -269,7 +269,7 @@ export class QueryAnalyzer {
      * Check if WHERE has table comparisons
      */
 // @ts-expect-error - runtime validated message type
-    private hasTableComparison(_where: unknown): boolean {
+    private hasTableComparison(where: unknown): boolean {
         if (!where) return false;
 
         if (where.type === 'binary_expr') {
@@ -293,7 +293,7 @@ export class QueryAnalyzer {
      * Find functions used in WHERE conditions
      */
 // @ts-expect-error - runtime validated message type
-    private findFunctionsInConditions(_where: unknown): string[] {
+    private findFunctionsInConditions(where: unknown): string[] {
         const functions: string[] = [];
 
         if (!where) return functions;
@@ -316,7 +316,7 @@ export class QueryAnalyzer {
      * Find implicit type conversions
      */
 // @ts-expect-error - runtime validated message type
-    private findImplicitConversions(_where: unknown): unknown[] {
+    private findImplicitConversions(where: unknown): unknown[] {
         // Simplified implementation - would need type information
         // from schema to do proper detection
         return [];
@@ -336,7 +336,7 @@ export class QueryAnalyzer {
 
         // Recursively count in nested structures
         for (const key in ast) {
-            if (astObject.prototype.hasOwnProperty.call(key)) {
+            if (Object.prototype.hasOwnProperty.call(ast, key)) {
                 const value = ast[key];
                 if (typeof value === 'object') {
                     count = this.countSubqueries(value, count);
