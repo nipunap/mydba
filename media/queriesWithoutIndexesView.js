@@ -84,13 +84,22 @@
         }
     }
 
+    function sanitizeSeverity(severity) {
+        const allowed = ['info', 'warning', 'critical'];
+        if (allowed.includes(severity)) {
+            return severity;
+        }
+        return 'unknown';
+    }
+
     function renderQueries(queries) {
         let html = '';
 
         queries.forEach((query, index) => {
-            const severityClass = `severity-${query.severity}`;
-            const severityIcon = getSeverityIcon(query.severity);
-            const severityLabel = query.severity.toUpperCase();
+            const safeSeverity = sanitizeSeverity(query.severity);
+            const severityClass = `severity-${safeSeverity}`;
+            const severityIcon = getSeverityIcon(safeSeverity);
+            const severityLabel = safeSeverity.toUpperCase();
 
             html += `
                 <div class="query-card ${severityClass}">
