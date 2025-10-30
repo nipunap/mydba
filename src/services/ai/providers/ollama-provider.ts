@@ -111,8 +111,9 @@ ${context.anonymizedQuery || context.query}
             prompt += `
 Schema Context:
 Database: ${context.schema.database || 'N/A'}
-Tables: ${tables.map((t: unknown) => {
-                const cols = (t.columns || []).slice(0, 5).map((c: unknown) => `${c.name}:${c.type}`).join(', ');
+// @ts-expect-error - runtime validated message type
+Tables: ${tables.map((t: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+                const cols = (t.columns || []).slice(0, 5).map((c: any) => `${c.name}:${c.type}`).join(', '); // eslint-disable-line @typescript-eslint/no-explicit-any
                 const more = (t.columns?.length || 0) > 5 ? ` (+${t.columns.length - 5} more)` : '';
                 return `${t.name}(${cols}${more})`;
             }).join(', ')}

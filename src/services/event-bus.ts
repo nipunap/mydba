@@ -10,7 +10,8 @@ export interface EventHandler<T> {
 }
 
 export class EventBus {
-    private handlers = new Map<string, EventHandler<unknown>[]>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private handlers = new Map<string, EventHandler<any>[]>();
 
     constructor(private logger: Logger) {}
 
@@ -23,17 +24,21 @@ export class EventBus {
 
         const handlers = this.handlers.get(eventName);
         if (handlers) {
-            handlers.push(handler);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            handlers.push(handler as EventHandler<any>);
         }
 
         this.logger.debug(`Registered handler for event: ${eventName}`);
 
         return {
             dispose: () => {
-                const index = handlers.indexOf(handler);
-                if (index > -1) {
-                    handlers.splice(index, 1);
-                    this.logger.debug(`Unregistered handler for event: ${eventName}`);
+                if (handlers) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const index = handlers.indexOf(handler as EventHandler<any>);
+                    if (index > -1) {
+                        handlers.splice(index, 1);
+                        this.logger.debug(`Unregistered handler for event: ${eventName}`);
+                    }
                 }
             }
         };

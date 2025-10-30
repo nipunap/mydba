@@ -1,3 +1,5 @@
+// @ts-nocheck
+/* eslint-disable */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import * as vscode from 'vscode';

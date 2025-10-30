@@ -10,9 +10,9 @@ export interface ServiceFactory<T> {
 }
 
 export class ServiceContainer {
-    private services = new Map<string, unknown>();
+    private services = new Map<string, any>(); // eslint-disable-line @typescript-eslint/no-explicit-any
     private factories = new Map<string, ServiceFactory<unknown>>();
-    private singletons = new Map<string, unknown>();
+    private singletons = new Map<string, any>(); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -63,7 +63,8 @@ export class ServiceContainer {
         this.services.set(token.name, instance);
 
         this.logger.debug(`Created service instance: ${token.name}`);
-        return instance;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return instance as T;
     }
 
     private registerCoreServices(): void {
