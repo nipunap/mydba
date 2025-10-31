@@ -1,89 +1,82 @@
 ## Description
 
-<!-- Provide a brief description of your changes -->
+<!-- Provide a clear and concise description of your changes -->
+
+## PR Title Format ⚠️
+
+**Important:** Your PR title must follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+- `feat: add new feature` - New feature (minor version bump)
+- `fix: resolve bug` - Bug fix (patch version bump)
+- `docs: update documentation` - Documentation only (no version bump)
+- `style: format code` - Code style changes (no version bump)
+- `refactor: restructure code` - Code refactoring (no version bump)
+- `perf: improve performance` - Performance improvements (patch version bump)
+- `test: add tests` - Test additions or changes (no version bump)
+- `chore: update build` - Build/tooling changes (no version bump)
+- `feat!: breaking change` - Breaking change (major version bump)
+
+**Breaking changes** can be indicated by:
+- Adding `!` after the type: `feat!: remove legacy API`
+- Including `BREAKING CHANGE:` in the PR body
 
 ## Type of Change
 
-<!-- Mark the relevant option with an "x" -->
+<!-- Check all that apply -->
 
-- [ ] Bug fix (non-breaking change that fixes an issue)
-- [ ] New feature (non-breaking change that adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
-- [ ] Performance improvement
-- [ ] Refactoring (no functional changes)
-- [ ] Dependency update
-
-## Motivation
-
-<!-- Why is this change needed? What problem does it solve? -->
-
-## Changes
-
-<!-- List the main changes made in this PR -->
-
--
--
--
+- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
+- [ ] ✨ New feature (non-breaking change which adds functionality)
+- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] 📝 Documentation update
+- [ ] 🎨 Code style/refactoring
+- [ ] ⚡ Performance improvement
+- [ ] ✅ Test update
+- [ ] 🔧 Build/tooling update
 
 ## Testing
 
-<!-- Describe the tests you ran and their results -->
+<!-- Describe the tests you ran and how to reproduce them -->
 
-- [ ] Unit tests added/updated
-- [ ] Integration tests pass (`npm run test:integration`)
-- [ ] Manually tested locally
-- [ ] Tested on MySQL 8.0 and/or MariaDB 10.11
-- [ ] Performance tested (if applicable)
-
-## License Compliance
-
-<!-- Checked automatically by CI, but please verify if adding new dependencies -->
-
-- [ ] No new dependencies added
-- [ ] New dependencies verified with `npm run license:verify`
-- [ ] All dependencies use approved licenses (MIT, Apache-2.0, BSD, ISC, etc.)
-
-## Checklist
-
-<!-- Verify these items before submitting the PR -->
-
-- [ ] Code compiles without errors (`npm run compile`)
-- [ ] All tests pass (`npm test`)
+- [ ] Unit tests pass (`npm run test:unit`)
+- [ ] Integration tests pass (`npm test`)
 - [ ] Linting passes (`npm run lint`)
-- [ ] License compliance verified (`npm run license:verify`)
-- [ ] Documentation updated (if applicable)
-- [ ] CHANGELOG.md updated (if applicable)
-- [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
-- [ ] Branch is up-to-date with target branch
+- [ ] Manual testing completed
 
-## Screenshots (if applicable)
-
-<!-- Add screenshots for UI changes -->
+**Test Configuration:**
+- OS:
+- Node version:
+- VS Code version:
 
 ## Breaking Changes
 
-<!-- List any breaking changes and migration steps -->
+<!-- If this PR introduces breaking changes, describe them here -->
+<!-- Include migration instructions for users -->
 
-## Additional Notes
+**BREAKING CHANGE:** (if applicable)
+<!-- Describe what breaks and how users should migrate -->
 
-<!-- Add any additional context or notes for reviewers -->
+## Checklist
+
+- [ ] My code follows the style guidelines of this project
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have made corresponding changes to the documentation
+- [ ] My changes generate no new warnings or errors
+- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] New and existing unit tests pass locally with my changes
+- [ ] Any dependent changes have been merged and published
 
 ## Related Issues
 
-<!-- Link related issues using "Closes #123" or "Fixes #456" -->
+<!-- Link any related issues here -->
 
 Closes #
+Related to #
+
+## Additional Context
+
+<!-- Add any other context, screenshots, or information about the PR here -->
 
 ---
 
-## Reviewer Checklist
-
-<!-- For reviewers to check before approving -->
-
-- [ ] Code quality meets standards
-- [ ] Tests are adequate and passing
-- [ ] License compliance check passed
-- [ ] No security vulnerabilities introduced
-- [ ] Documentation is clear and complete
-- [ ] Breaking changes are documented
+**Note:** After merging, the version will be automatically bumped and the changelog will be updated based on your PR title.

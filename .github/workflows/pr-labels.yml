@@ -112,33 +112,5 @@ jobs:
               }
             }
 
-      - name: Check for breaking changes
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-            });
-
-            const body = pr.body || '';
-            const title = pr.title || '';
-
-            const hasBreakingChange =
-              title.includes('!:') ||
-              title.toUpperCase().includes('BREAKING') ||
-              body.toUpperCase().includes('BREAKING CHANGE');
-
-            if (hasBreakingChange) {
-              try {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  labels: ['breaking-change']
-                });
-              } catch (error) {
-                console.log('Breaking change label may not exist, skipping...');
-              }
-            }
+      # Note: Breaking change detection and version labeling is now handled
+      # by the pr-version-check.yml workflow for PRs targeting main branch

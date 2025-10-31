@@ -264,6 +264,141 @@ git push origin feature/your-feature-name
 
 ---
 
+## Automated Version Bump and Changelog
+
+**Important**: MyDBA uses an automated version bump and changelog generation system for PRs targeting the `main` branch.
+
+### PR Title Requirements
+
+Your **PR title** must follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>(<scope>): <description>
+```
+
+**Valid types:**
+- `feat:` - New feature (triggers **minor** version bump: 1.0.0 → 1.1.0)
+- `fix:` - Bug fix (triggers **patch** version bump: 1.0.0 → 1.0.1)
+- `perf:` - Performance improvement (triggers **patch** version bump)
+- `docs:` - Documentation only (no version bump)
+- `style:` - Code style changes (no version bump)
+- `refactor:` - Code refactoring (no version bump)
+- `test:` - Test additions or changes (no version bump)
+- `chore:` - Build, CI, or tooling changes (no version bump)
+- `ci:` - CI/CD changes (no version bump)
+- `build:` - Build system changes (no version bump)
+
+**Breaking changes:**
+Add `!` after the type to indicate a breaking change (triggers **major** version bump):
+```
+feat!: remove legacy API support
+```
+
+Or include `BREAKING CHANGE:` in the PR body:
+```
+fix: update authentication flow
+
+BREAKING CHANGE: The old auth method is no longer supported.
+Users must migrate to the new OAuth2 flow.
+```
+
+### Examples
+
+**Good PR titles:**
+```
+feat: add query caching support
+fix(mysql): resolve connection timeout issue
+docs: update database setup guide
+feat!: redesign connection management API
+refactor(ai): improve query templating logic
+```
+
+**Bad PR titles:**
+```
+Update README          ❌ Missing type
+added new feature      ❌ Wrong format
+Fix bug                ❌ Missing description
+FEAT: Add cache        ❌ Type should be lowercase
+```
+
+### What Happens Automatically
+
+#### On PR Creation/Update (PRs to `main` only):
+
+1. **Validation**: PR title format is validated
+2. **Version Label**: `version:major`, `version:minor`, `version:patch`, or `version:none` label is added
+3. **Breaking Change Check**: `breaking-change` label is added if detected
+4. **Preview Comment**: A bot posts a comment showing:
+   - Current version
+   - New version (after merge)
+   - Changelog entry preview
+
+**Example preview comment:**
+```markdown
+## 🤖 Version Bump Preview
+
+**Current version:** 1.0.1
+**New version:** 1.1.0 (minor)
+
+**Changelog entry:**
+## [1.1.0] - 2025-10-31
+
+### Added
+- Add query caching support (#123)
+
+This will be automatically applied when merged to main.
+```
+
+#### After Merge to `main`:
+
+1. **Version Bump**: `package.json` version is automatically updated
+2. **Changelog Update**: `CHANGELOG.md` is updated with your PR
+3. **Git Tag**: A version tag (e.g., `v1.1.0`) is created
+4. **Summary Comment**: A success comment is posted on your PR
+
+### Breaking Change Approval
+
+If your PR introduces a breaking change:
+
+1. The `breaking-change` and `needs-approval` labels are added
+2. A warning comment is posted explaining the requirement
+3. A maintainer must add the `approved-breaking-change` label
+4. The PR cannot be merged until approved
+
+**Breaking changes should:**
+- Be clearly documented in the PR description
+- Include migration instructions for users
+- Be discussed with maintainers before submission
+
+### Validation Failures
+
+If your PR title doesn't follow the format:
+
+1. The PR check will fail (red X)
+2. A comment will explain the issue and show examples
+3. Update your PR title to fix it (the check will re-run automatically)
+
+### Testing Locally
+
+You can validate your PR title locally before pushing:
+
+```bash
+# Validate a PR title
+node scripts/validate-pr-title.js "feat: add new feature"
+
+# Preview changelog entry
+npm run version:preview
+
+# Check what version bump would occur
+node scripts/validate-pr-title.js "feat: add cache" ""
+```
+
+### Manual Version Bumps
+
+For PRs not targeting `main` (e.g., to `develop`), version bumps are not automated. Maintainers will handle versioning when releasing from `develop` to `main`.
+
+---
+
 ## Coding Standards
 
 ### TypeScript Style

@@ -1,0 +1,250 @@
+name: Auto Version Bump
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    name: Bump Version and Update Changelog
+    runs-on: ubuntu-latest
+    # Skip if commit is from github-actions bot
+    if: github.actor != 'github-actions[bot]'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Find merged PR
+        id: find-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commit = context.payload.head_commit;
+            if (!commit) {
+              console.log('No commit found, skipping');
+              core.setOutput('skip', 'true');
+              return;
+            }
+
+            const commitMessage = commit.message;
+            console.log('Commit message:', commitMessage);
+
+            // Skip if commit message contains [skip ci]
+            if (commitMessage.includes('[skip ci]')) {
+              console.log('Commit contains [skip ci], skipping');
+              core.setOutput('skip', 'true');
+              return;
+            }
+
+            // Try to find PR number from commit message
+            let prNumber = null;
+
+            // Check for "Merge pull request #123"
+            let match = commitMessage.match(/Merge pull request #(\d+)/);
+            if (match) {
+              prNumber = parseInt(match[1], 10);
+            }
+
+            // Check for "(#123)" at end of message (squash merge)
+            if (!prNumber) {
+              match = commitMessage.match(/\(#(\d+)\)\s*$/m);
+              if (match) {
+                prNumber = parseInt(match[1], 10);
+              }
+            }
+
+            if (!prNumber) {
+              console.log('No PR number found in commit, skipping');
+              core.setOutput('skip', 'true');
+              return;
+            }
+
+            console.log('Found PR number:', prNumber);
+
+            // Get PR details
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            // Get PR labels
+            const labels = pr.labels.map(label => label.name);
+            console.log('PR labels:', labels);
+
+            // Find version label
+            const versionLabel = labels.find(label => label.startsWith('version:'));
+            if (!versionLabel) {
+              console.log('No version label found, skipping');
+              core.setOutput('skip', 'true');
+              return;
+            }
+
+            const bumpType = versionLabel.replace('version:', '');
+            console.log('Bump type:', bumpType);
+
+            core.setOutput('skip', 'false');
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('pr_title', pr.title);
+            core.setOutput('pr_body', pr.body || '');
+            core.setOutput('bump_type', bumpType);
+            core.setOutput('has_breaking', labels.includes('breaking-change'));
+
+      - name: Install dependencies
+        if: steps.find-pr.outputs.skip == 'false'
+        run: npm ci
+
+      - name: Calculate new version
+        if: steps.find-pr.outputs.skip == 'false'
+        id: calc-version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          BUMP_TYPE="${{ steps.find-pr.outputs.bump_type }}"
+
+          echo "Current version: $CURRENT_VERSION"
+          echo "Bump type: $BUMP_TYPE"
+
+          if [ "$BUMP_TYPE" = "none" ]; then
+            echo "No version bump needed"
+            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          else
+            # Use npm version to calculate new version
+            NEW_VERSION=$(npm version $BUMP_TYPE --no-git-tag-version | sed 's/v//')
+            echo "New version: $NEW_VERSION"
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+
+            # Reset package.json for now (we'll update it later)
+            git checkout package.json
+          fi
+
+      - name: Update package.json
+        if: steps.find-pr.outputs.skip == 'false' && steps.calc-version.outputs.version_changed == 'true'
+        run: |
+          NEW_VERSION="${{ steps.calc-version.outputs.new_version }}"
+          BUMP_TYPE="${{ steps.find-pr.outputs.bump_type }}"
+
+          # Update version in package.json
+          npm version $BUMP_TYPE --no-git-tag-version
+
+          echo "✅ Updated package.json to version $NEW_VERSION"
+
+      - name: Generate and insert changelog entry
+        if: steps.find-pr.outputs.skip == 'false'
+        run: |
+          PR_TITLE="${{ steps.find-pr.outputs.pr_title }}"
+          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
+          PR_BODY="${{ steps.find-pr.outputs.pr_body }}"
+          NEW_VERSION="${{ steps.calc-version.outputs.new_version }}"
+          REPO_URL="https://github.com/${{ github.repository }}"
+
+          export PR_TITLE
+          export PR_NUMBER
+          export PR_BODY
+          export NEW_VERSION
+          export REPO_URL
+
+          # Generate and insert changelog entry
+          node scripts/generate-changelog.js insert "$PR_TITLE" "$PR_NUMBER" "$NEW_VERSION"
+
+          echo "✅ Updated CHANGELOG.md"
+
+      - name: Commit and push changes
+        if: steps.find-pr.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.calc-version.outputs.new_version }}"
+          VERSION_CHANGED="${{ steps.calc-version.outputs.version_changed }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          if [ "$VERSION_CHANGED" = "true" ]; then
+            git add package.json CHANGELOG.md
+            git commit -m "chore: release version $NEW_VERSION [skip ci]"
+          else
+            git add CHANGELOG.md
+            git commit -m "docs: update changelog [skip ci]"
+          fi
+
+          git push origin main
+
+          echo "✅ Pushed changes to main"
+
+      - name: Create git tag
+        if: steps.find-pr.outputs.skip == 'false' && steps.calc-version.outputs.version_changed == 'true'
+        run: |
+          NEW_VERSION="${{ steps.calc-version.outputs.new_version }}"
+
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+
+          echo "✅ Created and pushed tag v$NEW_VERSION"
+
+      - name: Post summary comment on PR
+        if: steps.find-pr.outputs.skip == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.find-pr.outputs.pr_number }};
+            const newVersion = '${{ steps.calc-version.outputs.new_version }}';
+            const versionChanged = '${{ steps.calc-version.outputs.version_changed }}' === 'true';
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+
+            let message = `## ✅ Auto Version Bump Complete\n\n`;
+
+            if (versionChanged) {
+              message += `**Version:** ${newVersion}\n`;
+              message += `**Tag:** [v${newVersion}](${repoUrl}/releases/tag/v${newVersion})\n`;
+            } else {
+              message += `**Version:** ${newVersion} (no bump)\n`;
+              message += `**Note:** This change was added to the changelog but did not trigger a version bump.\n`;
+            }
+
+            message += `**Changelog:** [View CHANGELOG.md](${repoUrl}/blob/main/CHANGELOG.md)\n\n`;
+            message += `_Automated by GitHub Actions_`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: message,
+            });
+
+      - name: Summary
+        if: steps.find-pr.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.calc-version.outputs.new_version }}"
+          VERSION_CHANGED="${{ steps.calc-version.outputs.version_changed }}"
+          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
+
+          echo "### ✅ Version Bump Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** #$PR_NUMBER" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version changed:** $VERSION_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changelog:** Updated" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$VERSION_CHANGED" = "true" ]; then
+            echo "- **Tag:** v$NEW_VERSION created" >> $GITHUB_STEP_SUMMARY
+          fi
