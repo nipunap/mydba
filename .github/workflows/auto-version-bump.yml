@@ -176,7 +176,7 @@ jobs:
 
           if [ "$VERSION_CHANGED" = "true" ]; then
             git add package.json CHANGELOG.md
-            git commit -m "chore: release version $NEW_VERSION [skip ci]"
+            git commit -m "chore: release version $NEW_VERSION"
           else
             git add CHANGELOG.md
             git commit -m "docs: update changelog [skip ci]"
