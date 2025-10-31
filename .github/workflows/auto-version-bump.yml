@@ -146,22 +146,16 @@ jobs:
 
       - name: Generate and insert changelog entry
         if: steps.find-pr.outputs.skip == 'false'
+        env:
+          PR_TITLE: ${{ steps.find-pr.outputs.pr_title }}
+          PR_NUMBER: ${{ steps.find-pr.outputs.pr_number }}
+          PR_BODY: ${{ steps.find-pr.outputs.pr_body }}
+          NEW_VERSION: ${{ steps.calc-version.outputs.new_version }}
+          REPO_URL: https://github.com/${{ github.repository }}
         run: |
-          PR_TITLE="${{ steps.find-pr.outputs.pr_title }}"
-          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
-          PR_BODY="${{ steps.find-pr.outputs.pr_body }}"
-          NEW_VERSION="${{ steps.calc-version.outputs.new_version }}"
-          REPO_URL="https://github.com/${{ github.repository }}"
-
-          export PR_TITLE
-          export PR_NUMBER
-          export PR_BODY
-          export NEW_VERSION
-          export REPO_URL
-
-          # Generate and insert changelog entry
+          # Generate and insert changelog entry (env vars passed automatically)
           node scripts/generate-changelog.js insert "$PR_TITLE" "$PR_NUMBER" "$NEW_VERSION"
-
+          
           echo "✅ Updated CHANGELOG.md"
 
       - name: Commit and push changes
