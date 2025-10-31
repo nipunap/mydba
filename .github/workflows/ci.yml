@@ -250,6 +250,12 @@ jobs:
           --health-retries=10
 
     steps:
+      - name: Cleanup workspace
+        run: |
+          sudo rm -rf "${{ github.workspace }}"/*
+          sudo rm -rf "${{ github.workspace }}"/.[!.]*
+        continue-on-error: true
+        
       - name: Checkout code
         uses: actions/checkout@v4
 
