@@ -307,6 +307,20 @@ jobs:
           mysql -h 127.0.0.1 -P 3307 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
           echo "MariaDB test data initialized"
 
+      - name: Grant Performance Schema and system database permissions
+        run: |
+          # Grant permissions for MySQL
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "GRANT SELECT, UPDATE ON performance_schema.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "FLUSH PRIVILEGES;"
+          echo "MySQL permissions granted"
+          
+          # Grant permissions for MariaDB
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT, UPDATE ON performance_schema.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "FLUSH PRIVILEGES;"
+          echo "MariaDB permissions granted"
+
       - name: Run Integration Tests with XVFB
         uses: coactions/setup-xvfb@v1
         with:
