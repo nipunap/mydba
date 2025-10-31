@@ -1,6 +1,5 @@
-// @ts-nocheck
-/* eslint-disable */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
@@ -116,7 +115,7 @@ export class ExplainViewerPanel {
     private async processAndSendExplainData(): Promise<void> {
         try {
             // Parse the EXPLAIN JSON
-            let explainJson = this.explainData;
+            let explainJson: any = this.explainData;
 
             // Handle case where EXPLAIN is wrapped in an object
             if (explainJson.EXPLAIN) {
@@ -129,7 +128,7 @@ export class ExplainViewerPanel {
                     type: 'error',
                     message: 'Invalid EXPLAIN data received. The query may not have been executed properly.'
                 });
-                this.logger.error('Invalid EXPLAIN data:', explainJson);
+                this.logger.error('Invalid EXPLAIN data:', explainJson as Error);
                 return;
             }
 
@@ -308,12 +307,12 @@ export class ExplainViewerPanel {
         return total;
     }
 
-    private convertToTree(explainJson: unknown): ExplainNode {
+    private convertToTree(explainJson: any): ExplainNode {
         const queryBlock = explainJson.query_block || explainJson;
         return this.processQueryBlock(queryBlock, 'root');
     }
 
-    private processQueryBlock(block: unknown, id: string): ExplainNode {
+    private processQueryBlock(block: any, id: string): ExplainNode {
         const node: ExplainNode = {
             id,
             type: block.select_id ? `SELECT #${block.select_id}` : 'Query',
@@ -344,7 +343,7 @@ export class ExplainViewerPanel {
 
         // Process nested tables
         if (block.nested_loop && Array.isArray(block.nested_loop)) {
-            block.nested_loop.forEach((nestedTable: unknown, index: number) => {
+            block.nested_loop.forEach((nestedTable: any, index: number) => {
                 if (nestedTable.table) {
                     const nestedNode = this.processTable(nestedTable.table, `${id}-nested-${index}`);
                     node.children!.push(nestedNode);
@@ -381,7 +380,7 @@ export class ExplainViewerPanel {
         return node;
     }
 
-    private processTable(table: unknown, id: string): ExplainNode {
+    private processTable(table: any, id: string): ExplainNode {
         const node: ExplainNode = {
             id,
             type: 'Table Access',
@@ -401,16 +400,16 @@ export class ExplainViewerPanel {
         return node;
     }
 
-    private extractTableNames(explainJson: unknown): Set<string> {
+    private extractTableNames(explainJson: any): Set<string> {
         const tables = new Set<string>();
 
-        const extractFromBlock = (block: unknown) => {
+        const extractFromBlock = (block: any) => {
             if (block.table?.table_name) {
                 tables.add(block.table.table_name);
             }
 
             if (block.nested_loop && Array.isArray(block.nested_loop)) {
-                block.nested_loop.forEach((nested: unknown) => {
+                block.nested_loop.forEach((nested: any) => {
                     if (nested.table?.table_name) {
                         tables.add(nested.table.table_name);
                     }
@@ -451,7 +450,7 @@ export class ExplainViewerPanel {
                     : `DESCRIBE \`${tableName}\``;
                 const schemaResult = await adapter.query<unknown>(schemaQuery);
 
-                const schema: TableColumn[] = (schemaResult.rows || []).map((row: unknown) => ({
+                const schema: TableColumn[] = (schemaResult.rows || []).map((row: any) => ({
                     name: row.Field,
                     type: row.Type,
                     nullable: row.Null === 'YES',
@@ -474,7 +473,7 @@ export class ExplainViewerPanel {
                     columnCardinalities: Map<string, number>;
                 }>();
 
-                (indexResult.rows || []).forEach((row: unknown) => {
+                (indexResult.rows || []).forEach((row: any) => {
                     const indexName = row.Key_name;
                     if (!indexMap.has(indexName)) {
                         indexMap.set(indexName, {
@@ -650,7 +649,7 @@ export class ExplainViewerPanel {
         }
     }
 
-    private suggestIndexColumns(table: unknown, metadata: TableMetadata): string[] {
+    private suggestIndexColumns(table: any, metadata: TableMetadata): string[] {
         const suggestions: string[] = [];
 
         // Look for conditions in attached_condition or used_columns
@@ -719,15 +718,22 @@ export class ExplainViewerPanel {
                 <h2>Query Execution Plan</h2>
             </div>
             <div class="toolbar-actions">
-                <vscode-text-field id="search-input" placeholder="Search in plan..." style="width: 200px;">
-                    <span slot="start" class="codicon codicon-search"></span>
-                </vscode-text-field>
-                <vscode-button id="toggle-view" appearance="secondary">
+                <div style="position: relative; display: inline-block;">
+                    <vscode-text-field id="search-input" placeholder="Search in plan..." style="width: 250px;" aria-label="Search execution plan">
+                        <span slot="start" class="codicon codicon-search"></span>
+                    </vscode-text-field>
+                    <vscode-button id="search-clear" appearance="icon" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);" aria-label="Clear search">
+                        <span class="codicon codicon-close"></span>
+                    </vscode-button>
+                </div>
+                <vscode-button id="toggle-view" appearance="secondary" aria-label="Toggle between tree and table view">
                     <span class="codicon codicon-layout"></span>
                     Toggle View
                 </vscode-button>
             </div>
         </div>
+
+        <div id="search-results" class="search-results" style="display: none;" role="region" aria-live="polite"></div>
 
         <div id="loading" class="loading">
             <vscode-progress-ring></vscode-progress-ring>
@@ -794,7 +800,7 @@ export class ExplainViewerPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: unknown) => {
+            async (message: any) => {
                 switch (message.type) {
                     case 'log':
                         this.logger.debug(message.message as string);
