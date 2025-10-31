@@ -286,14 +286,10 @@ jobs:
         with:
           run: npm test
 
-      - name: Run Test Coverage
+      - name: Run Test Coverage and Generate Report
         uses: coactions/setup-xvfb@v1
         with:
-          run: npm run test:coverage
-
-      - name: Generate Coverage Report
-        if: always()
-        run: npm run test:coverage:report
+          run: npm run test:coverage && npm run test:coverage:report
 
       - name: Upload Coverage Report
         if: always()
