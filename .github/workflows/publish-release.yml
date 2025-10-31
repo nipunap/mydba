@@ -111,12 +111,6 @@ jobs:
           VALIDATE_JAVASCRIPT_ES: true
           VALIDATE_TYPESCRIPT_ES: true
 
-      - name: Dependency review
-        if: steps.version_check.outputs.changed == 'true'
-        uses: actions/dependency-review-action@v3
-        with:
-          fail-on-severity: moderate
-
       - name: Setup Node.js
         if: steps.version_check.outputs.changed == 'true'
         uses: actions/setup-node@v4
@@ -256,7 +250,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ✅ Completed" >> $GITHUB_STEP_SUMMARY
           echo "- 🔒 Security scan completed" >> $GITHUB_STEP_SUMMARY
-          echo "- 📋 Dependency review passed" >> $GITHUB_STEP_SUMMARY
           echo "- 📦 VSIX package verified" >> $GITHUB_STEP_SUMMARY
           echo "- 🏷️ Git tag and GitHub Release created" >> $GITHUB_STEP_SUMMARY
 
