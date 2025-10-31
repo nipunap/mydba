@@ -802,7 +802,7 @@
         html += '<tbody>';
 
         rows.forEach((row, index) => {
-            const severityClass = row.severity || '';
+            const severityClass = sanitizeSeverity(row.severity);
             const indent = '→ '.repeat(row.level);
             const nodeId = generateNodeId(row, index);
             const highlightClass = highlightedNodeIds.has(nodeId) ? ' highlighted' : '';
@@ -1191,5 +1191,17 @@
 
         aiInsightsContent.innerHTML = html;
     }
+
+/**
+ * Sanitizes the severity class value for use in table row class attributes.
+ * Only allows expected values: '', 'low', 'medium', 'high'. Others are mapped to ''.
+ * @param {string} severity
+ * @returns {string}
+ */
+function sanitizeSeverity(severity) {
+    if (typeof severity !== 'string') return '';
+    const allowed = ['', 'low', 'medium', 'high'];
+    return allowed.includes(severity) ? severity : '';
+}
 
 })();
