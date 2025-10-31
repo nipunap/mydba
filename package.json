@@ -25,7 +25,7 @@
     "dba"
   ],
   "activationEvents": [],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -424,24 +424,30 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile",
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run build",
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run check-types && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "compile-tests": "tsc -p ./",
+    "pretest": "npm run compile-tests",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
     "test": "node ./out/test/runTest.js",
     "test:unit": "jest --testPathIgnorePatterns=/src/test/suite/",
-    "test:integration": "npm run compile && npm test",
-    "test:mariadb": "npm run compile && docker-compose -f docker-compose.test.yml up -d mariadb-10.11 && sleep 10 && npm test",
-    "test:mysql": "npm run compile && docker-compose -f docker-compose.test.yml up -d mysql-8.0 && sleep 10 && npm test",
-    "test:db": "npm run compile && docker-compose -f docker-compose.test.yml up -d && sleep 15 && npm test",
+    "test:integration": "npm run compile-tests && npm test",
+    "test:mariadb": "npm run compile-tests && docker-compose -f docker-compose.test.yml up -d mariadb-10.11 && sleep 10 && npm test",
+    "test:mysql": "npm run compile-tests && docker-compose -f docker-compose.test.yml up -d mysql-8.0 && sleep 10 && npm test",
+    "test:db": "npm run compile-tests && docker-compose -f docker-compose.test.yml up -d && sleep 15 && npm test",
     "test:coverage": "c8 npm test",
     "test:coverage:report": "c8 report --reporter=html --reporter=json-summary --reporter=text",
     "license:check": "license-checker --summary",
     "license:report": "license-checker --json --out license-report.json && license-checker --csv --out license-report.csv",
     "license:verify": "license-checker --failOn 'GPL;AGPL;LGPL;SSPL;CC-BY-NC' --summary",
-    "package": "vsce package",
+    "version:check": "node scripts/validate-pr-title.js",
+    "version:preview": "node scripts/generate-changelog.js preview",
+    "vsce:package": "vsce package",
     "install-extension": "code --install-extension mydba-*.vsix"
   },
   "devDependencies": {

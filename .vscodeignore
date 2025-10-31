@@ -1,18 +1,19 @@
 .vscode/**
 .vscode-test/**
 src/**
+out/**
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json
-**/*.map
 **/*.ts
 test/**
 jest.config.js
 jest.integration.config.js
 docker-compose.test.yml
-test/**
+esbuild.js
+eslint.config.mjs
 *.test.js
 *.test.ts
 coverage/**
@@ -40,5 +41,16 @@ LICENSE
 CONTRIBUTING.md
 SECURITY.md
 QUICKSTART.md
-# Keep icon
+BUNDLING_FIX.md
+.github/**
+.c8rc.json
+.licensecheckrc.json
+**/*.test.js
+**/*.test.ts
+# Keep resources
 !resources/mydba-icon.png
+!resources/mydba.svg
+# Keep bundled output but exclude source maps
+!dist/extension.js
+dist/**/*.map
+*.map
