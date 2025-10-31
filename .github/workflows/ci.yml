@@ -283,9 +283,15 @@ jobs:
 
       - name: Initialize test data
         run: |
+          # Initialize MySQL
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/sample-data.sql
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
-          echo "Test data initialized"
+          echo "MySQL test data initialized"
+          
+          # Initialize MariaDB
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password test_db < test/sql/sample-data.sql
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
+          echo "MariaDB test data initialized"
 
       - name: Run Integration Tests with XVFB
         uses: coactions/setup-xvfb@v1
