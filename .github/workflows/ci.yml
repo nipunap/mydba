@@ -234,20 +234,6 @@ jobs:
         volumes:
           - ${{ github.workspace }}/test/sql:/docker-entrypoint-initdb.d:ro
 
-      mariadb:
-        image: mariadb:10.11
-        env:
-          MYSQL_ROOT_PASSWORD: test_password
-          MYSQL_DATABASE: test_db
-          MYSQL_USER: test_user
-          MYSQL_PASSWORD: test_password
-        ports:
-          - 3307:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -ptest_password"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
 
     steps:
       - name: Cleanup workspace
@@ -255,7 +241,7 @@ jobs:
           sudo rm -rf "${{ github.workspace }}"/*
           sudo rm -rf "${{ github.workspace }}"/.[!.]*
         continue-on-error: true
-        
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -271,6 +257,23 @@ jobs:
       - name: Compile TypeScript
         run: npm run compile
 
+      - name: Start MariaDB with Performance Schema
+        run: |
+          docker run -d \
+            --name mariadb-test \
+            -e MYSQL_ROOT_PASSWORD=test_password \
+            -e MYSQL_DATABASE=test_db \
+            -e MYSQL_USER=test_user \
+            -e MYSQL_PASSWORD=test_password \
+            -p 3307:3306 \
+            --health-cmd="mysqladmin ping -h localhost -u root -ptest_password" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=10 \
+            mariadb:10.11 \
+            --performance-schema=ON
+          echo "MariaDB container started"
+
       - name: Wait for MySQL to be ready
         run: |
           timeout 60 bash -c 'until mysqladmin ping -h 127.0.0.1 -P 3306 -u root -ptest_password --silent; do sleep 2; done'
@@ -281,13 +284,24 @@ jobs:
           timeout 60 bash -c 'until mysqladmin ping -h 127.0.0.1 -P 3307 -u root -ptest_password --silent; do sleep 2; done'
           echo "MariaDB is ready"
 
+      - name: Enable Performance Schema in MariaDB
+        run: |
+          # Note: Performance Schema cannot be enabled at runtime in MariaDB
+          # We need to restart with the option. Let's verify if it's already enabled
+          PERF_SCHEMA=$(mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -sNe "SHOW VARIABLES LIKE 'performance_schema'" | awk '{print $2}')
+          echo "Performance Schema status: $PERF_SCHEMA"
+          if [ "$PERF_SCHEMA" != "ON" ]; then
+            echo "⚠️ Warning: Performance Schema is not enabled in MariaDB"
+            echo "This requires the container to be started with --performance-schema=ON"
+          fi
+
       - name: Initialize test data
         run: |
           # Initialize MySQL
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/sample-data.sql
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
           echo "MySQL test data initialized"
-          
+
           # Initialize MariaDB
           mysql -h 127.0.0.1 -P 3307 -u root -ptest_password test_db < test/sql/sample-data.sql
           mysql -h 127.0.0.1 -P 3307 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
