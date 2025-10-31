@@ -1086,7 +1086,7 @@
             }
 
             if (data.metadata.tablesCount > 0) {
-                html += `<span class="metric-badge">Tables: ${data.metadata.tablesCount}</span>`;
+                html += `<span class="metric-badge">Tables: ${sanitizeInt(data.metadata.tablesCount)}</span>`;
             }
 
             if (data.estimatedComplexity) {
@@ -1202,6 +1202,16 @@ function sanitizeSeverity(severity) {
     if (typeof severity !== 'string') return '';
     const allowed = ['', 'low', 'medium', 'high'];
     return allowed.includes(severity) ? severity : '';
+}
+
+/**
+ * Sanitizes a value for integer output: returns only non-negative integers, otherwise 0.
+ * @param {*} value
+ * @returns {number}
+ */
+function sanitizeInt(value) {
+    const n = Number.parseInt(value, 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 })();
