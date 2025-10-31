@@ -6,6 +6,13 @@ on:
       - main
     paths:
       - 'package.json'
+  workflow_dispatch:
+    inputs:
+      skip_version_check:
+        description: 'Skip version change check (publish current version)'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: publish-release
@@ -58,6 +65,17 @@ jobs:
         run: |
           # Get current version from package.json
           CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          # Handle manual workflow dispatch
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ inputs.skip_version_check }}" == "true" ]; then
+              echo "🔧 Manual trigger with skip_version_check enabled"
+              echo "✅ Publishing current version: $CURRENT_VERSION"
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
 
           # Get previous version from git history
           git show HEAD~1:package.json > /tmp/prev-package.json 2>/dev/null || {
