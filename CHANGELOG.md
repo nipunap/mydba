@@ -81,4 +81,3 @@ This beta release marks the completion of Phase 1 monitoring features with compr
 ## [0.1.0] - Initial Development
 
 Initial development version with basic database connection capabilities.
-

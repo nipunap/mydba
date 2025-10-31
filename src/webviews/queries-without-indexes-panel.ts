@@ -1,4 +1,3 @@
-// @ts-nocheck
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as vscode from 'vscode';
@@ -79,7 +78,7 @@ export class QueriesWithoutIndexesPanel {
 
     private setupMessageHandling(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: unknown) => {
+            async (message: any) => {
                 switch (message.type) {
                     case 'refresh':
                         await this.loadQueries();

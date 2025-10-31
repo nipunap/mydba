@@ -63,7 +63,6 @@ export class ServiceContainer {
         this.services.set(token.name, instance);
 
         this.logger.debug(`Created service instance: ${token.name}`);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return instance as T;
     }
 

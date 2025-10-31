@@ -250,7 +250,6 @@ If auto-configuration fails, MyDBA shows helpful error messages with instruction
 
 ## Support
 
-Having issues? 
+Having issues?
 - Check [GitHub Issues](https://github.com/your-org/mydba/issues)
 - Join [GitHub Discussions](https://github.com/your-org/mydba/discussions)
-

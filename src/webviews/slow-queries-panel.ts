@@ -1,4 +1,3 @@
-/* eslint-disable */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as vscode from 'vscode';
@@ -71,7 +70,6 @@ export class SlowQueriesPanel {
 
     private setupMessageHandling(): void {
         this.panel.webview.onDidReceiveMessage(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             async (message: any) => {
                 switch (message.type) {
                     case 'refresh':

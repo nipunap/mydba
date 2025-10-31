@@ -1,4 +1,3 @@
-// @ts-nocheck
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { IDatabaseAdapter } from '../adapters/database-adapter';
@@ -50,8 +49,7 @@ export class QueryProfilingService {
             let lastEventId: number = 0;
             let totalDuration: number = 0;
 
-// @ts-expect-error - runtime validated message type
-            await mysqlAdapter.withConnection(async (conn: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+            await mysqlAdapter.withConnection(async (conn: any) => {
                 // Get PROCESSLIST_ID (what CONNECTION_ID() returns)
                 const [connIdRows] = await conn.query('SELECT CONNECTION_ID() as connection_id');
                 const connectionId = connIdRows[0]?.connection_id || connIdRows[0]?.CONNECTION_ID;
@@ -109,8 +107,7 @@ export class QueryProfilingService {
             this.logger.info(`Normalized target query: ${normalizedTargetQuery.substring(0, 80)}`);
 
             // Try to get statements from multiple sources (using regular adapter, different connection)
-// @ts-expect-error - runtime validated message type
-            let stmtRows: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+            let stmtRows: any[] = [];
             let sourceUsed = '';
 
             // First try: events_statements_history_long with EVENT_ID filter
@@ -212,16 +209,14 @@ export class QueryProfilingService {
 
             // Log all found statements for debugging
             if (stmtRows.length > 0) {
-// @ts-expect-error - runtime validated message type
-                stmtRows.forEach((row: unknown, index: number) => {
-                    const sqlText = (row.SQL_TEXT || row.sql_text || '').substring(0, 80);
+                stmtRows.forEach((row: any, index: number) => {
+                    const sqlText = ((row.SQL_TEXT || row.sql_text || '') as string).substring(0, 80);
                     this.logger.info(`  [${index}] EVENT_ID ${row.EVENT_ID || row.event_id}: ${sqlText}`);
                 });
             }
 
             // Filter in memory with aggressive normalization
-// @ts-expect-error - runtime validated message type
-            let stmt = stmtRows.find((row: unknown) => {
+            let stmt = stmtRows.find((row: any) => {
                 const sqlText = row.SQL_TEXT || row.sql_text || '';
                 const normalizedSql = normalizeQueryForMatching(sqlText);
 
@@ -240,9 +235,8 @@ export class QueryProfilingService {
             if (!stmt && stmtRows.length > 0) {
                 this.logger.warn('Exact query match not found, filtering out setup queries...');
                 // Filter out performance_schema setup queries
-// @ts-expect-error - runtime validated message type
-                const nonSetupQueries = stmtRows.filter((row: unknown) => {
-                    const sqlText = (row.SQL_TEXT || row.sql_text || '').toLowerCase();
+                const nonSetupQueries = stmtRows.filter((row: any) => {
+                    const sqlText = ((row.SQL_TEXT || row.sql_text || '') as string).toLowerCase();
                     const isSetup = sqlText.includes('performance_schema') ||
                                    sqlText.includes('connection_id()') ||
                                    sqlText.includes('select 1') ||
@@ -290,10 +284,9 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
             const stageRows = Array.isArray(stagesResult) ? stagesResult : ((stagesResult as any).rows || []);
 
             // Build profile
-// @ts-expect-error - runtime validated message type
-            const stages: ProfileStage[] = stageRows.map((stage: unknown) => ({
+            const stages: ProfileStage[] = stageRows.map((stage: any) => ({
                 eventName: this.cleanEventName(stage.event_name || stage.EVENT_NAME),
-                duration: parseFloat(stage.duration_us || stage.DURATION_US || 0),
+                duration: parseFloat((stage.duration_us || stage.DURATION_US || 0) as string),
             }));
 
             const profile: QueryProfile = {
@@ -416,8 +409,7 @@ To diagnose, check: SELECT COUNT(*) FROM performance_schema.events_statements_hi
                 AND SCHEMA_NAME NOT IN ('performance_schema', 'information_schema', 'mysql', 'sys')
         `;
 
-// @ts-expect-error - runtime validated message type
-        const params: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const params: any[] = [];
         if (schemaName) {
             query += ' AND SCHEMA_NAME = ?';
             params.push(schemaName);

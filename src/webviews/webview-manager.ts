@@ -40,14 +40,12 @@ export class WebviewManager {
         this.logger.info('Webview providers initialized');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     updateExplain(explainResult: any): void {
         if (this.explainProvider) {
             this.explainProvider.updateExplain(explainResult);
         }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     updateProfile(profileResult: any): void {
         if (this.profilingProvider) {
             this.profilingProvider.updateProfile(profileResult);

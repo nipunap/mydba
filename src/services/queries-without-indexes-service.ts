@@ -1,4 +1,3 @@
-// @ts-nocheck
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { IDatabaseAdapter } from '../adapters/database-adapter';
@@ -170,8 +169,7 @@ export class QueriesWithoutIndexesService {
         this.logger.info('Performance Schema configuration applied successfully');
     }
 
-// @ts-expect-error - runtime validated message type
-    private async analyzeQuery(adapter: IDatabaseAdapter, row: unknown): Promise<QueryWithoutIndexInfo> {
+    private async analyzeQuery(adapter: IDatabaseAdapter, row: any): Promise<QueryWithoutIndexInfo> {
         const countStar = parseInt(row.count_star || row.COUNT_STAR || 0);
         const sumRowsExamined = parseInt(row.sum_rows_examined || row.SUM_ROWS_EXAMINED || 0);
         const sumRowsSent = parseInt(row.sum_rows_sent || row.SUM_ROWS_SENT || 0);
@@ -218,7 +216,7 @@ export class QueriesWithoutIndexesService {
         };
     }
 
-    private async suggestIndexes(adapter: IDatabaseAdapter, queryText: string, _schemaName: string): Promise<string[]> {
+    private async suggestIndexes(_adapter: IDatabaseAdapter, queryText: string, _schemaName: string): Promise<string[]> {
         const suggestions: string[] = [];
 
         try {

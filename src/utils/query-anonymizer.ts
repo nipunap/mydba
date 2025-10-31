@@ -1,4 +1,5 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Parser } from 'node-sql-parser';
 
 /**
@@ -36,8 +37,7 @@ export class QueryAnonymizer {
     /**
      * Anonymize AST by replacing literal values
      */
-// @ts-expect-error - runtime validated message type
-    private anonymizeAST(node: unknown): void {
+    private anonymizeAST(node: any): void {
         if (!node || typeof node !== 'object') {
             return;
         }

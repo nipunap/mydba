@@ -49,7 +49,7 @@ jobs:
           # Check for disallowed licenses
           # Fail if we find GPL, AGPL, or other copyleft licenses
           license-checker \
-            --failOn "GPL;AGPL;LGPL;SSPL;CC-BY-NC;Unlicense" \
+            --failOn "GPL;AGPL;LGPL;SSPL;CC-BY-NC" \
             --summary > license-summary.txt 2>&1 || {
               echo "❌ License compliance check failed!"
               echo "Found disallowed licenses. See summary below:"

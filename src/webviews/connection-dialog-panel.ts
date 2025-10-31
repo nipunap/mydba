@@ -1,5 +1,5 @@
-// @ts-nocheck
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
@@ -74,7 +74,7 @@ export class ConnectionDialogPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: unknown) => {
+            async (message: any) => {
                 switch (message.type) {
                     case 'testConnection':
                         await this.testConnection(message.config);
@@ -115,7 +115,7 @@ export class ConnectionDialogPanel {
         }
     }
 
-    private async testConnection(config: unknown): Promise<void> {
+    private async testConnection(config: any): Promise<void> {
         this.logger.info(`Testing connection: ${config.name}`);
 
         try {
@@ -171,7 +171,7 @@ export class ConnectionDialogPanel {
         }
     }
 
-    private async saveConnection(config: unknown): Promise<void> {
+    private async saveConnection(config: any): Promise<void> {
         this.logger.info(`Saving connection: ${config.name}`);
 
         try {

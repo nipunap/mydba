@@ -1,5 +1,5 @@
-// @ts-nocheck
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
@@ -115,7 +115,7 @@ export class MetricsDashboardPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: unknown) => {
+            async (message: any) => {
                 switch (message.type) {
                     case 'refresh':
                         await this.loadMetrics();
@@ -151,14 +151,14 @@ export class MetricsDashboardPanel {
             // Get global status
             const statusResult = await adapter.query<unknown>('SHOW GLOBAL STATUS');
             const statusMap = new Map<string, string>();
-            statusResult.rows?.forEach((row: unknown) => {
+            statusResult.rows?.forEach((row: any) => {
                 statusMap.set(row.Variable_name, row.Value);
             });
 
             // Get global variables
             const variablesResult = await adapter.query<unknown>('SHOW GLOBAL VARIABLES');
             const variablesMap = new Map<string, string>();
-            variablesResult.rows?.forEach((row: unknown) => {
+            variablesResult.rows?.forEach((row: any) => {
                 variablesMap.set(row.Variable_name, row.Value);
             });
 

@@ -1,4 +1,5 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Parser } from 'node-sql-parser';
 import { AntiPattern } from '../types/ai-types';
 
@@ -66,13 +67,11 @@ export class QueryAnalyzer {
     /**
      * Detect SELECT * usage
      */
-// @ts-expect-error - runtime validated message type
-    private detectSelectStar(ast: unknown): AntiPattern[] {
+    private detectSelectStar(ast: any): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.columns) {
-// @ts-expect-error - runtime validated message type
-            const hasSelectStar = ast.columns.some((col: unknown) =>
+            const hasSelectStar = ast.columns.some((col: any) =>
                 col.expr && col.expr.type === 'column_ref' && col.expr.column === '*'
             );
 
@@ -92,8 +91,7 @@ export class QueryAnalyzer {
     /**
      * Detect missing WHERE clause in UPDATE/DELETE
      */
-// @ts-expect-error - runtime validated message type
-    private detectMissingWhere(ast: unknown): AntiPattern[] {
+    private detectMissingWhere(ast: any): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if ((ast.type === 'update' || ast.type === 'delete') && !ast.where) {
@@ -111,8 +109,7 @@ export class QueryAnalyzer {
     /**
      * Detect Cartesian joins (missing join conditions)
      */
-// @ts-expect-error - runtime validated message type
-    private detectCartesianJoin(ast: unknown): AntiPattern[] {
+    private detectCartesianJoin(ast: any): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.from) {
@@ -120,8 +117,7 @@ export class QueryAnalyzer {
 
             if (tables.length > 1) {
                 // Check if there are join conditions or WHERE conditions
-// @ts-expect-error - runtime validated message type
-                const hasJoinConditions = tables.some((table: unknown) => table.on);
+                const hasJoinConditions = tables.some((table: any) => table.on);
                 const hasWhereConditions = ast.where && this.hasTableComparison(ast.where);
 
                 if (!hasJoinConditions && !hasWhereConditions) {
@@ -141,8 +137,7 @@ export class QueryAnalyzer {
     /**
      * Detect functions on indexed columns (breaks index usage)
      */
-// @ts-expect-error - runtime validated message type
-    private detectFunctionsOnIndexedColumns(ast: unknown): AntiPattern[] {
+    private detectFunctionsOnIndexedColumns(ast: any): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.where) {
@@ -164,8 +159,7 @@ export class QueryAnalyzer {
     /**
      * Detect implicit type conversions
      */
-// @ts-expect-error - runtime validated message type
-    private detectImplicitTypeConversions(ast: unknown): AntiPattern[] {
+    private detectImplicitTypeConversions(ast: any): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.where) {
@@ -187,13 +181,11 @@ export class QueryAnalyzer {
     /**
      * Detect subqueries in SELECT list
      */
-// @ts-expect-error - runtime validated message type
-    private detectSubqueryInSelect(ast: unknown): AntiPattern[] {
+    private detectSubqueryInSelect(ast: any): AntiPattern[] {
         const patterns: AntiPattern[] = [];
 
         if (ast.type === 'select' && ast.columns) {
-// @ts-expect-error - runtime validated message type
-            const hasSubquery = ast.columns.some((col: unknown) =>
+            const hasSubquery = ast.columns.some((col: any) =>
                 col.expr && col.expr.type === 'select'
             );
 
@@ -213,8 +205,7 @@ export class QueryAnalyzer {
     /**
      * Calculate query complexity score
      */
-// @ts-expect-error - runtime validated message type
-    private calculateComplexity(ast: unknown): number {
+    private calculateComplexity(ast: any): number {
         let complexity = 1;
 
         if (ast.type === 'select') {
@@ -249,8 +240,7 @@ export class QueryAnalyzer {
     /**
      * Get query type
      */
-// @ts-expect-error - runtime validated message type
-    private getQueryType(ast: unknown): string {
+    private getQueryType(ast: any): string {
         if (!ast) return 'unknown';
         return ast.type || 'unknown';
     }
@@ -258,8 +248,7 @@ export class QueryAnalyzer {
     /**
      * Extract tables from FROM clause
      */
-// @ts-expect-error - runtime validated message type
-    private extractTables(from: unknown): unknown[] {
+    private extractTables(from: any): any[] {
         if (!from) return [];
         if (Array.isArray(from)) return from;
         return [from];
@@ -268,8 +257,7 @@ export class QueryAnalyzer {
     /**
      * Check if WHERE has table comparisons
      */
-// @ts-expect-error - runtime validated message type
-    private hasTableComparison(where: unknown): boolean {
+    private hasTableComparison(where: any): boolean {
         if (!where) return false;
 
         if (where.type === 'binary_expr') {
@@ -292,8 +280,7 @@ export class QueryAnalyzer {
     /**
      * Find functions used in WHERE conditions
      */
-// @ts-expect-error - runtime validated message type
-    private findFunctionsInConditions(where: unknown): string[] {
+    private findFunctionsInConditions(where: any): string[] {
         const functions: string[] = [];
 
         if (!where) return functions;
@@ -315,8 +302,7 @@ export class QueryAnalyzer {
     /**
      * Find implicit type conversions
      */
-// @ts-expect-error - runtime validated message type
-    private findImplicitConversions(where: unknown): unknown[] {
+    private findImplicitConversions(_where: any): any[] {
         // Simplified implementation - would need type information
         // from schema to do proper detection
         return [];
@@ -325,8 +311,7 @@ export class QueryAnalyzer {
     /**
      * Count subqueries in query
      */
-// @ts-expect-error - runtime validated message type
-    private countSubqueries(ast: unknown, count = 0): number {
+    private countSubqueries(ast: any, count = 0): number {
         if (!ast || typeof ast !== 'object') return count;
 
         if (ast.type === 'select' && count > 0) {

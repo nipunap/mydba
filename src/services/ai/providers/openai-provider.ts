@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { AIProvider, QueryContext, AIAnalysisResult, AIProviderConfig } from '../../../types/ai-types';
 import { Logger } from '../../../utils/logger';
 import OpenAI from 'openai';
@@ -101,7 +103,7 @@ ${context.anonymizedQuery || context.query}
             prompt += `
 **Schema Context:**
 Database: ${context.schema.database || 'N/A'}
-Tables: ${tables.map((t: any) => `${t.name} (${t.columns?.map((c: any) => c.name).join(', ') || ''})`).join(', ')} // eslint-disable-line @typescript-eslint/no-explicit-any
+Tables: ${tables.map((t: any) => `${t.name || ''} (${t.columns?.map((c: any) => c.name).join(', ') || ''})`).join(', ')}
 `;
 
             // Add performance/profiling analysis if available

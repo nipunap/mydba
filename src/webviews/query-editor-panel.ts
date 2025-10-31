@@ -1,6 +1,5 @@
-// @ts-nocheck
-/* eslint-disable */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
@@ -97,7 +96,7 @@ export class QueryEditorPanel {
 
     private setupMessageHandlers(): void {
         this.panel.webview.onDidReceiveMessage(
-            async (message: unknown) => {
+            async (message: any) => {
                 switch (message.type) {
                     case 'executeQuery':
                         await this.executeQuery(message.query);
@@ -312,7 +311,7 @@ export class QueryEditorPanel {
         });
     }
 
-    private async exportResults(format: 'csv' | 'json' | 'sql', results: unknown): Promise<void> {
+    private async exportResults(format: 'csv' | 'json' | 'sql', results: any): Promise<void> {
         try {
             const uri = await vscode.window.showSaveDialog({
                 filters: {
@@ -345,14 +344,14 @@ export class QueryEditorPanel {
         }
     }
 
-    private resultsToCSV(results: unknown): string {
+    private resultsToCSV(results: any): string {
         if (!results.rows || results.rows.length === 0) {
             return '';
         }
 
-        const columns = results.columns.map((c: unknown) => c.name);
+        const columns = results.columns.map((c: any) => c.name);
         const header = columns.join(',');
-        const rows = results.rows.map((row: unknown) => {
+        const rows = results.rows.map((row: any) => {
             return columns.map((col: string) => {
                 const value = row[col];
                 if (value === null || value === undefined) {
@@ -370,15 +369,15 @@ export class QueryEditorPanel {
         return [header, ...rows].join('\n');
     }
 
-    private resultsToSQL(results: unknown): string {
+    private resultsToSQL(results: any): string {
         // Simple INSERT statement generation
         if (!results.rows || results.rows.length === 0) {
             return '';
         }
 
         const tableName = 'table_name'; // Placeholder
-        const columns = results.columns.map((c: unknown) => c.name);
-        const inserts = results.rows.map((row: unknown) => {
+        const columns = results.columns.map((c: any) => c.name);
+        const inserts = results.rows.map((row: any) => {
             const values = columns.map((col: string) => {
                 const value = row[col];
                 if (value === null || value === undefined) {

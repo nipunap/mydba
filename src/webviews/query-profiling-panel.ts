@@ -1,5 +1,3 @@
-// @ts-nocheck
-/* eslint-disable */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as vscode from 'vscode';
@@ -61,7 +59,7 @@ export class QueryProfilingPanel {
     }
 
     private setupMessageHandling(): void {
-        this.panel.webview.onDidReceiveMessage(async (message: unknown) => {
+        this.panel.webview.onDidReceiveMessage(async (message: any) => {
             if (message.type === 'reprofile') {
                 this.query = message.query || this.query;
                 await this.profile();
@@ -84,7 +82,7 @@ export class QueryProfilingPanel {
         }
     }
 
-    private async getAIInsights(profile: unknown): Promise<void> {
+    private async getAIInsights(profile: any): Promise<void> {
         if (!this.aiService) {
             this.logger.warn('AI service not available');
             return;
@@ -114,7 +112,7 @@ export class QueryProfilingPanel {
                     rowsSent: profile.summary.totalRowsSent,
                     efficiency: profile.summary.efficiency,
                     lockTime: profile.summary.totalLockTime,
-                    stages: profile.stages?.map((s: unknown) => ({
+                    stages: profile.stages?.map((s: any) => ({
                         name: s.eventName,
                         duration: s.duration
                     }))
@@ -180,7 +178,7 @@ export class QueryProfilingPanel {
         return tables;
     }
 
-    private async buildSchemaContext(adapter: unknown, tables: string[]): Promise<unknown> {
+    private async buildSchemaContext(adapter: any, tables: string[]): Promise<any> {
         const schemaContext: any = {
             tables: {}
         };
@@ -212,7 +210,7 @@ export class QueryProfilingPanel {
                 const stats = Array.isArray(statsResult) ? statsResult[0] : ((statsResult as any).rows?.[0]);
 
                 schemaContext.tables[tableName] = {
-                    columns: columns.map((col: unknown) => ({
+                    columns: columns.map((col: any) => ({
                         name: col.Field || col.field,
                         type: col.Type || col.type,
                         nullable: (col.Null || col.null) === 'YES',
@@ -238,10 +236,10 @@ export class QueryProfilingPanel {
         return schemaContext;
     }
 
-    private formatIndexes(indexRows: unknown[]): unknown[] {
+    private formatIndexes(indexRows: any[]): any[] {
         const indexMap = new Map<string, any>();
 
-        indexRows.forEach((row: unknown) => {
+        indexRows.forEach((row: any) => {
             const indexName = row.Key_name || row.key_name;
             const columnName = row.Column_name || row.column_name;
             const seqInIndex = row.Seq_in_index || row.seq_in_index;
@@ -264,14 +262,12 @@ export class QueryProfilingPanel {
 
         // Sort columns by position within each index
         indexMap.forEach(index => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             index.columns.sort((a: any, b: any) => a.position - b.position);
         });
 
         return Array.from(indexMap.values());
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private buildProfilingContext(profile: any): string {
         const lines: string[] = [];
 
@@ -299,10 +295,8 @@ export class QueryProfilingPanel {
 
             // Find slowest stages
             const sortedStages = [...profile.stages].sort((a, b) => b.duration - a.duration);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const totalDuration = profile.stages.reduce((sum: number, s: any) => sum + s.duration, 0);
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             sortedStages.slice(0, 5).forEach((stage: any, idx: number) => {
                 const percentage = ((stage.duration / totalDuration) * 100).toFixed(1);
                 const icon = idx === 0 ? '🔴' : idx === 1 ? '🟡' : '⚪';

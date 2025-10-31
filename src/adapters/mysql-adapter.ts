@@ -100,7 +100,7 @@ export class MySQLAdapter {
             });
 
             // Test the connection and get version
-            const [rows] = await this.pool!.query('SELECT VERSION() as version');
+            const [rows] = await this.pool.query('SELECT VERSION() as version');
             const versionRow = rows as Array<{ version: string }>;
             this.versionString = versionRow[0]?.version || 'Unknown';
 
@@ -172,6 +172,7 @@ export class MySQLAdapter {
         this.ensureConnected();
 
         try {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const [rows] = await this.pool!.query('SHOW DATABASES');
             return (rows as Array<{ Database: string }>).map((row) => ({ name: row.Database }));
 
@@ -200,7 +201,8 @@ export class MySQLAdapter {
                 Index_length?: number;
                 Collation?: string;
             }
-            const [rows] = await this.pool!.query(sql) as [TableRow[], any];
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const [rows] = await this.pool!.query(sql) as [TableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Name,
@@ -297,14 +299,11 @@ export class MySQLAdapter {
             const safeForConsole = sanitizedSQL.replace(/%/g, '%%');
             this.logger.info(`Executing query: ${DataSanitizer.truncate(safeForConsole, 200)}`);
 
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const [rows, fields] = await this.pool!.query(sql, params);
 
             // Convert mysql2 field info to our format
-            interface Mysql2Field {
-                name: string;
-                type: number;
-            }
-            const fieldInfo: FieldInfo[] = Array.isArray(fields) ? (fields as any[]).map((f: any) => ({
+            const fieldInfo: FieldInfo[] = Array.isArray(fields) ? (fields as mysql.FieldPacket[]).map((f) => ({
                 name: f.name,
                 type: String(f.type)
             })) : [];
@@ -337,6 +336,7 @@ export class MySQLAdapter {
 
         let connection: mysql.PoolConnection | null = null;
         try {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             connection = await this.pool!.getConnection();
             this.logger.debug('Acquired dedicated connection from pool');
             const result = await fn(connection);
@@ -384,9 +384,10 @@ export class MySQLAdapter {
             interface PerformanceSchemaConfig {
                 enabled: number;
             }
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const [psConfig] = await this.pool!.query(
                 "SELECT @@global.performance_schema AS enabled"
-            ) as [PerformanceSchemaConfig[], any];
+            ) as [PerformanceSchemaConfig[], mysql.FieldPacket[]];
             const psEnabled = psConfig && psConfig[0]?.enabled === 1;
 
             if (!psEnabled) {
@@ -436,7 +437,8 @@ export class MySQLAdapter {
                 transactionState: string | null;
                 transactionStarted: Date | null;
             }
-            const [rows] = await this.pool!.query(query) as [ProcessRow[], any];
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const [rows] = await this.pool!.query(query) as [ProcessRow[], mysql.FieldPacket[]];
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             // Import QueryAnonymizer for fingerprinting
@@ -486,7 +488,8 @@ export class MySQLAdapter {
                 State: string | null;
                 Info: string | null;
             }
-            const [rows] = await this.pool!.query('SHOW FULL PROCESSLIST') as [BasicProcessRow[], any];
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const [rows] = await this.pool!.query('SHOW FULL PROCESSLIST') as [BasicProcessRow[], mysql.FieldPacket[]];
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             return rows.map((row) => ({
@@ -514,7 +517,8 @@ export class MySQLAdapter {
                 Variable_name: string;
                 Value: string;
             }
-            const [rows] = await this.pool!.query('SHOW GLOBAL VARIABLES') as [VariableRow[], any];
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const [rows] = await this.pool!.query('SHOW GLOBAL VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -536,7 +540,8 @@ export class MySQLAdapter {
                 Variable_name: string;
                 Value: string;
             }
-            const [rows] = await this.pool!.query('SHOW SESSION VARIABLES') as [VariableRow[], any];
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const [rows] = await this.pool!.query('SHOW SESSION VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -558,7 +563,8 @@ export class MySQLAdapter {
                 Variable_name: string;
                 Value: string;
             }
-            const [rows] = await this.pool!.query('SHOW GLOBAL STATUS') as [StatusRow[], any];
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const [rows] = await this.pool!.query('SHOW GLOBAL STATUS') as [StatusRow[], mysql.FieldPacket[]];
 
             // Parse status variables into metrics
             const statusMap = new Map<string, string>();
