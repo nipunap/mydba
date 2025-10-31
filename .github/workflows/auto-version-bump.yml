@@ -21,7 +21,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT to bypass branch protection, fallback to GITHUB_TOKEN for forks
+          token: ${{ secrets.VERSION_BUMP_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -155,7 +156,7 @@ jobs:
         run: |
           # Generate and insert changelog entry (env vars passed automatically)
           node scripts/generate-changelog.js insert "$PR_TITLE" "$PR_NUMBER" "$NEW_VERSION"
-          
+
           echo "✅ Updated CHANGELOG.md"
 
       - name: Commit and push changes
