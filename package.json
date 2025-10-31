@@ -485,11 +485,11 @@
   "extensionDependencies": [],
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/mydba.git"
+    "url": "https://github.com/nipunap/mydba.git"
   },
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/your-org/mydba/issues"
+    "url": "https://github.com/nipunap/mydba/issues"
   },
-  "homepage": "https://github.com/your-org/mydba#readme"
+  "homepage": "https://github.com/nipunap/mydba#readme"
 }
