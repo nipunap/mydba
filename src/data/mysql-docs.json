@@ -1,0 +1,244 @@
+{
+  "documents": [
+    {
+      "id": "index-btree",
+      "title": "B-Tree Index Structure",
+      "keywords": ["index", "btree", "b-tree", "performance", "optimization", "create index"],
+      "content": "MySQL uses B-Tree indexes by default for most storage engines. B-Tree indexes store values in sorted order and allow for efficient lookups, range scans, and sorting operations. They work best for equality comparisons (=, IN) and range queries (>, <, BETWEEN). B-Tree indexes are less efficient for LIKE queries with leading wildcards.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/btree-index.html",
+      "version": "8.0"
+    },
+    {
+      "id": "index-selection",
+      "title": "How MySQL Uses Indexes",
+      "keywords": ["index", "query optimization", "where", "join", "order by", "group by"],
+      "content": "MySQL uses indexes for: finding rows matching WHERE clauses, eliminating rows from consideration, performing joins between tables, finding MIN() or MAX() values, sorting and grouping operations if done on a leftmost prefix of a usable index. For joins, MySQL can use indexes more efficiently if columns are declared as the same type and size.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/mysql-indexes.html",
+      "version": "8.0"
+    },
+    {
+      "id": "index-column-order",
+      "title": "Multiple-Column Index Order",
+      "keywords": ["index", "composite index", "multi-column", "leftmost prefix", "column order"],
+      "content": "For composite indexes, MySQL can use a leftmost prefix of the index. For example, INDEX(col1, col2, col3) can be used for lookups on (col1), (col1, col2), or (col1, col2, col3), but NOT for (col2) or (col2, col3) alone. Place the most selective columns first.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/multiple-column-indexes.html",
+      "version": "8.0"
+    },
+    {
+      "id": "explain-type",
+      "title": "EXPLAIN Output Type Column",
+      "keywords": ["explain", "type", "access type", "performance", "const", "ref", "range", "index", "all"],
+      "content": "The 'type' column indicates join type. From best to worst: system (one row), const (primary key/unique lookup), eq_ref (one row per join), ref (multiple matching rows), range (index range scan), index (full index scan), ALL (full table scan). Aim for const, eq_ref, or ref for best performance.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+      "version": "8.0"
+    },
+    {
+      "id": "explain-extra",
+      "title": "EXPLAIN Extra Information",
+      "keywords": ["explain", "extra", "using filesort", "using temporary", "using index", "using where"],
+      "content": "Key Extra values: 'Using index' (covering index, very good), 'Using where' (filtering after retrieval), 'Using temporary' (needs temp table, slower), 'Using filesort' (external sort needed, slower), 'Using index condition' (Index Condition Pushdown, good). Avoid 'Using temporary' and 'Using filesort' when possible.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+      "version": "8.0"
+    },
+    {
+      "id": "select-star-antipattern",
+      "title": "SELECT * Anti-Pattern",
+      "keywords": ["select", "select star", "select *", "anti-pattern", "optimization"],
+      "content": "Avoid SELECT * in production code. Explicitly list needed columns to: reduce network traffic, enable covering indexes, prevent breaking changes when schema evolves, improve query readability. SELECT * prevents MySQL from using covering indexes even when all needed columns are in an index.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/select-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "where-clause-optimization",
+      "title": "WHERE Clause Optimization",
+      "keywords": ["where", "optimization", "index", "sargable", "function", "type conversion"],
+      "content": "For optimal index usage: avoid functions on indexed columns (e.g., WHERE YEAR(date_col) = 2023), avoid implicit type conversions (WHERE int_col = '123'), use sargable predicates. Place the most restrictive conditions first. Use proper data types to avoid conversions.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/where-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "join-optimization",
+      "title": "JOIN Optimization",
+      "keywords": ["join", "inner join", "left join", "optimization", "join order"],
+      "content": "MySQL optimizer determines join order automatically but you can help: ensure joined columns are indexed, use same data types for join columns, use INNER JOIN when possible (faster than OUTER JOIN), consider STRAIGHT_JOIN to force specific join order if optimizer chooses poorly. Smaller tables should typically be joined first.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/join-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "subquery-optimization",
+      "title": "Subquery Optimization",
+      "keywords": ["subquery", "optimization", "derived table", "exists", "in", "join"],
+      "content": "Subquery optimization strategies: use EXISTS instead of IN for better performance, convert correlated subqueries to JOINs when possible, use derived tables for complex operations, leverage semi-join optimizations in MySQL 5.6+. Avoid subqueries in SELECT list as they execute once per row.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/subquery-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "index-condition-pushdown",
+      "title": "Index Condition Pushdown (ICP)",
+      "keywords": ["icp", "index condition pushdown", "optimization", "where", "index"],
+      "content": "Index Condition Pushdown allows MySQL to evaluate parts of WHERE clause at the storage engine level using index entries, reducing the number of rows retrieved. Enabled by default. Look for 'Using index condition' in EXPLAIN Extra. Works with InnoDB and MyISAM for range, ref, eq_ref, and ref_or_null access.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/index-condition-pushdown-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "covering-index",
+      "title": "Covering Indexes",
+      "keywords": ["covering index", "index", "optimization", "using index", "performance"],
+      "content": "A covering index contains all columns needed by a query, eliminating the need to access the actual table. Identified by 'Using index' in EXPLAIN Extra. Very efficient. Create by including frequently queried columns in an index. Balance between index size and query performance.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_covering_index",
+      "version": "8.0"
+    },
+    {
+      "id": "cardinality",
+      "title": "Index Cardinality",
+      "keywords": ["cardinality", "index", "selectivity", "statistics", "analyze"],
+      "content": "Cardinality indicates the number of unique values in an index. Higher cardinality (more unique values) means more selective index and better performance. MySQL uses cardinality statistics to choose optimal indexes. Run ANALYZE TABLE to update statistics. Check with SHOW INDEX FROM table_name.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_cardinality",
+      "version": "8.0"
+    },
+    {
+      "id": "buffer-pool",
+      "title": "InnoDB Buffer Pool",
+      "keywords": ["buffer pool", "innodb", "memory", "cache", "innodb_buffer_pool_size"],
+      "content": "The buffer pool caches InnoDB data and indexes in memory. Size controlled by innodb_buffer_pool_size (default 128MB). Recommended: 50-80% of dedicated server RAM. Larger buffer pool reduces disk I/O. Monitor hit rate with SHOW ENGINE INNODB STATUS. Divide into multiple instances for concurrency (innodb_buffer_pool_instances).",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-buffer-pool.html",
+      "version": "8.0"
+    },
+    {
+      "id": "query-cache-removed",
+      "title": "Query Cache Removed in MySQL 8.0",
+      "keywords": ["query cache", "cache", "removed", "deprecated", "mysql 8.0"],
+      "content": "The query cache was removed in MySQL 8.0 due to scalability issues and contention problems. Use alternative caching strategies: application-level caching (Redis, Memcached), ProxySQL query caching, or MySQL result set caching in application layer. Focus on query optimization instead.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/query-cache.html",
+      "version": "8.0"
+    },
+    {
+      "id": "performance-schema",
+      "title": "Performance Schema Overview",
+      "keywords": ["performance schema", "monitoring", "instrumentation", "metrics"],
+      "content": "Performance Schema provides low-level monitoring of MySQL execution. Collects data on: statement execution, table I/O, locks, memory usage, events. Enable with performance_schema=ON. Query tables like events_statements_summary_by_digest for slow queries, table_io_waits_summary_by_table for hot tables.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema.html",
+      "version": "8.0"
+    },
+    {
+      "id": "transactions-isolation",
+      "title": "Transaction Isolation Levels",
+      "keywords": ["transaction", "isolation", "repeatable read", "read committed", "serializable", "acid"],
+      "content": "MySQL InnoDB supports 4 isolation levels: READ UNCOMMITTED (dirty reads), READ COMMITTED (no dirty reads), REPEATABLE READ (default, prevents non-repeatable reads), SERIALIZABLE (strictest, prevents phantoms). Higher isolation = more locking = less concurrency. Adjust with SET TRANSACTION ISOLATION LEVEL.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html",
+      "version": "8.0"
+    },
+    {
+      "id": "limit-optimization",
+      "title": "LIMIT Query Optimization",
+      "keywords": ["limit", "offset", "pagination", "optimization"],
+      "content": "For pagination, avoid large OFFSET values (e.g., LIMIT 100000, 20) as MySQL must read and discard offset rows. Better approach: use WHERE id > last_seen_id ORDER BY id LIMIT 20. For random rows, avoid ORDER BY RAND() LIMIT n; instead, generate random IDs in application and fetch directly.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/limit-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "group-by-optimization",
+      "title": "GROUP BY Optimization",
+      "keywords": ["group by", "aggregate", "optimization", "filesort", "index"],
+      "content": "GROUP BY optimization: use index on GROUP BY columns to avoid filesort (check for 'Using temporary; Using filesort' in EXPLAIN), order matters for composite indexes (leftmost prefix rule), add ORDER BY NULL to suppress default sorting if not needed. Consider summary tables for frequently aggregated data.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/group-by-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "order-by-optimization",
+      "title": "ORDER BY Optimization",
+      "keywords": ["order by", "sort", "filesort", "index", "optimization"],
+      "content": "To avoid filesort: create index matching ORDER BY columns in exact order, use same sort direction (ASC/DESC) for all columns, or use separate indexes with matching directions. Filesort is expensive for large result sets. Check EXPLAIN for 'Using filesort'. Consider increasing sort_buffer_size for large sorts.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/order-by-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "implicit-commit",
+      "title": "Statements Causing Implicit Commit",
+      "keywords": ["transaction", "commit", "implicit commit", "ddl", "autocommit"],
+      "content": "DDL statements (CREATE, ALTER, DROP) cause implicit commit and cannot be rolled back. Other statements: TRUNCATE TABLE, LOCK/UNLOCK TABLES, LOAD DATA. These end any active transaction. Wrap DML in explicit transactions (START TRANSACTION...COMMIT) for rollback capability. Check autocommit setting.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html",
+      "version": "8.0"
+    },
+    {
+      "id": "cartesian-product",
+      "title": "Cartesian Product Anti-Pattern",
+      "keywords": ["cartesian product", "cross join", "join", "anti-pattern", "performance"],
+      "content": "Cartesian products occur when tables are joined without proper join conditions, producing rows = table1_rows × table2_rows. Symptoms: query runs indefinitely, huge result sets. Fix: always specify JOIN conditions with ON clause or WHERE clause relating tables. Review EXPLAIN for type='ALL' on multiple tables without conditions.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/nested-join-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "delete-update-without-where",
+      "title": "DELETE/UPDATE Without WHERE",
+      "keywords": ["delete", "update", "where", "anti-pattern", "safety", "truncate"],
+      "content": "DELETE or UPDATE without WHERE clause affects ALL rows - usually unintentional. Always add WHERE clause to limit scope. Enable sql_safe_updates mode to prevent this. For clearing entire table, TRUNCATE is faster than DELETE. Use transactions to allow rollback if mistake occurs.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/delete.html",
+      "version": "8.0"
+    },
+    {
+      "id": "index-unused",
+      "title": "Identifying Unused Indexes",
+      "keywords": ["unused index", "index", "performance schema", "optimization", "maintenance"],
+      "content": "Find unused indexes with Performance Schema: SELECT * FROM performance_schema.table_io_waits_summary_by_index_usage WHERE index_name IS NOT NULL AND count_star = 0. Unused indexes waste space and slow INSERT/UPDATE/DELETE. Drop carefully after monitoring production workload. Keep unique constraints even if unused for data integrity.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-table-io-waits-summary-by-index-usage-table.html",
+      "version": "8.0"
+    },
+    {
+      "id": "index-duplicate",
+      "title": "Duplicate and Redundant Indexes",
+      "keywords": ["duplicate index", "redundant index", "index", "optimization", "maintenance"],
+      "content": "Redundant indexes: INDEX(a) is redundant if INDEX(a,b) exists. Duplicate indexes: multiple identical indexes. Find with sys.schema_redundant_indexes. Remove to: reduce storage, speed up writes, simplify maintenance. Exception: different index types (BTREE vs FULLTEXT) serve different purposes.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/sys-schema-redundant-indexes.html",
+      "version": "8.0"
+    },
+    {
+      "id": "exists-vs-in",
+      "title": "EXISTS vs IN Performance",
+      "keywords": ["exists", "in", "subquery", "optimization", "performance"],
+      "content": "Use EXISTS for checking existence with subqueries: stops at first match (short-circuit), works well with indexes, better for correlated subqueries. Use IN for small static lists. Modern MySQL optimizes IN with subqueries using semi-join, but EXISTS is still preferred for large datasets or when you only need to check existence.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/subquery-optimization.html",
+      "version": "8.0"
+    },
+    {
+      "id": "function-on-column",
+      "title": "Functions on Indexed Columns",
+      "keywords": ["function", "index", "where", "anti-pattern", "functional index", "sargable"],
+      "content": "Applying functions to indexed columns prevents index usage: WHERE YEAR(date_col) = 2023 forces full table scan. Solutions: rewrite as sargable form (WHERE date_col >= '2023-01-01' AND date_col < '2024-01-01'), use generated/computed columns (MySQL 5.7+), or functional indexes (MySQL 8.0+). Check EXPLAIN for type='ALL'.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/create-index.html#create-index-functional-key-parts",
+      "version": "8.0"
+    },
+    {
+      "id": "type-conversion",
+      "title": "Implicit Type Conversion",
+      "keywords": ["type conversion", "implicit conversion", "cast", "index", "performance"],
+      "content": "Implicit type conversion prevents index usage and causes performance issues. Example: WHERE varchar_col = 123 converts strings to numbers for every row. Solution: use correct types (WHERE varchar_col = '123'). Check with EXPLAIN - watch for type='ALL'. Use CAST/CONVERT explicitly if conversion needed.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/type-conversion.html",
+      "version": "8.0"
+    },
+    {
+      "id": "wildcard-like",
+      "title": "LIKE with Leading Wildcard",
+      "keywords": ["like", "wildcard", "index", "full text search", "pattern matching"],
+      "content": "LIKE with leading wildcard (WHERE col LIKE '%text') cannot use index and requires full table scan. Alternatives: use FULLTEXT index for text search, reverse the pattern if possible (LIKE 'text%' uses index), consider external search engines (Elasticsearch) for complex text search, use LOCATE/INSTR functions sparingly.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html",
+      "version": "8.0"
+    },
+    {
+      "id": "lock-contention",
+      "title": "Lock Contention and Deadlocks",
+      "keywords": ["lock", "deadlock", "contention", "transaction", "innodb"],
+      "content": "Reduce lock contention: keep transactions short, access tables in consistent order, use appropriate isolation levels, add proper indexes to avoid gap locks, consider READ COMMITTED isolation for less locking. Handle deadlocks: implement retry logic, check innodb_deadlock_detect setting, review SHOW ENGINE INNODB STATUS for details.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-deadlocks.html",
+      "version": "8.0"
+    },
+    {
+      "id": "slow-query-log",
+      "title": "Slow Query Log Analysis",
+      "keywords": ["slow query log", "performance", "monitoring", "optimization", "long_query_time"],
+      "content": "Enable slow query log to identify problematic queries: set slow_query_log=ON, adjust long_query_time (default 10s), consider log_queries_not_using_indexes=ON. Analyze with mysqldumpslow or pt-query-digest. Focus on: high execution time, high row examination, queries not using indexes. Optimize top offenders first.",
+      "source": "https://dev.mysql.com/doc/refman/8.0/en/slow-query-log.html",
+      "version": "8.0"
+    }
+  ]
+}

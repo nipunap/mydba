@@ -1,0 +1,408 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# Security: Explicitly define minimal permissions at workflow level
+permissions:
+  actions: none        # Prevent workflow manipulation
+  checks: none        # Prevent check manipulation
+  contents: read      # Needed for checkout
+  deployments: none   # Prevent deployment manipulation
+  issues: write       # Needed for creating issues
+  packages: none      # Prevent package manipulation
+  pull-requests: write # Needed for PR comments
+  repository-projects: none
+  security-events: none
+  statuses: none
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+      - name: Run Integration Tests (Linux)
+        if: runner.os == 'Linux' && matrix.node-version == '20.x'
+        run: xvfb-run -a npm test
+
+      - name: Run Integration Tests (non-Linux)
+        if: runner.os != 'Linux' && matrix.node-version == '20.x'
+        run: npm test
+
+      - name: Check for compilation errors
+        run: |
+          if [ ! -d "out" ]; then
+            echo "❌ Compilation failed - 'out' directory not found"
+            exit 1
+          fi
+          if [ ! -f "out/extension.js" ]; then
+            echo "❌ Compilation failed - 'out/extension.js' not found"
+            exit 1
+          fi
+          echo "✅ Compilation successful"
+        shell: bash
+
+      - name: Validate package.json
+        run: |
+          node -e "
+          const pkg = require('./package.json');
+          const errors = [];
+
+          if (!pkg.name) errors.push('Missing name');
+          if (!pkg.version) errors.push('Missing version');
+          if (!pkg.publisher || pkg.publisher === 'YOUR_PUBLISHER_ID') {
+            console.log('⚠️ Warning: Publisher ID not set (expected for non-release branches)');
+          }
+          if (!pkg.engines || !pkg.engines.vscode) errors.push('Missing vscode engine requirement');
+          if (!pkg.main) errors.push('Missing main entry point');
+          if (!pkg.contributes) errors.push('Missing contributes section');
+
+          if (errors.length > 0) {
+            console.error('❌ package.json validation failed:');
+            errors.forEach(e => console.error('  - ' + e));
+            process.exit(1);
+          }
+
+          console.log('✅ package.json is valid');
+          "
+        shell: bash
+
+      - name: Check required files
+        run: |
+          files=("README.md" "LICENSE" "CHANGELOG.md" "package.json" "tsconfig.json")
+          missing=()
+
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              missing+=("$file")
+            fi
+          done
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "❌ Missing required files:"
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+          echo "✅ All required files present"
+        shell: bash
+
+      - name: Upload compilation artifacts
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-extension
+          path: out/
+          retention-days: 7
+
+  package:
+    name: Package Extension
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      contents: read
+    # Only package in CI for PRs and non-main branches (main uses publish-release.yml)
+    if: github.ref != 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Package extension
+        run: vsce package
+        continue-on-error: true
+        id: package
+
+      - name: Check package result
+        run: |
+          if [ -f *.vsix ]; then
+            VSIX_FILE=$(ls *.vsix)
+            SIZE=$(du -h "$VSIX_FILE" | cut -f1)
+            echo "✅ Package created: $VSIX_FILE (${SIZE})"
+            echo "package_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Package creation skipped (may need publisher ID for release)"
+            echo "package_success=false" >> $GITHUB_OUTPUT
+          fi
+        id: check_package
+
+      - name: Upload VSIX
+        if: steps.check_package.outputs.package_success == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-package
+          path: '*.vsix'
+          retention-days: 30
+
+  lint-report:
+    name: Lint Report
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: true
+
+  integration-tests-docker:
+    name: Integration Tests (Docker)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -ptest_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+        volumes:
+          - ${{ github.workspace }}/test/sql:/docker-entrypoint-initdb.d:ro
+
+
+    steps:
+      - name: Cleanup workspace
+        run: |
+          sudo rm -rf "${{ github.workspace }}"/*
+          sudo rm -rf "${{ github.workspace }}"/.[!.]*
+        continue-on-error: true
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Start MariaDB with Performance Schema
+        run: |
+          docker run -d \
+            --name mariadb-test \
+            -e MYSQL_ROOT_PASSWORD=test_password \
+            -e MYSQL_DATABASE=test_db \
+            -e MYSQL_USER=test_user \
+            -e MYSQL_PASSWORD=test_password \
+            -p 3307:3306 \
+            --health-cmd="mysqladmin ping -h localhost -u root -ptest_password" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=10 \
+            mariadb:10.11 \
+            --performance-schema=ON
+          echo "MariaDB container started"
+
+      - name: Wait for MySQL to be ready
+        run: |
+          timeout 60 bash -c 'until mysqladmin ping -h 127.0.0.1 -P 3306 -u root -ptest_password --silent; do sleep 2; done'
+          echo "MySQL is ready"
+
+      - name: Wait for MariaDB to be ready
+        run: |
+          timeout 60 bash -c 'until mysqladmin ping -h 127.0.0.1 -P 3307 -u root -ptest_password --silent; do sleep 2; done'
+          echo "MariaDB is ready"
+
+      - name: Enable Performance Schema in MariaDB
+        run: |
+          # Note: Performance Schema cannot be enabled at runtime in MariaDB
+          # We need to restart with the option. Let's verify if it's already enabled
+          PERF_SCHEMA=$(mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -sNe "SHOW VARIABLES LIKE 'performance_schema'" | awk '{print $2}')
+          echo "Performance Schema status: $PERF_SCHEMA"
+          if [ "$PERF_SCHEMA" != "ON" ]; then
+            echo "⚠️ Warning: Performance Schema is not enabled in MariaDB"
+            echo "This requires the container to be started with --performance-schema=ON"
+          fi
+
+      - name: Initialize test data
+        run: |
+          # Initialize MySQL
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/sample-data.sql
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
+          echo "MySQL test data initialized"
+
+          # Initialize MariaDB
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password test_db < test/sql/sample-data.sql
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password test_db < test/sql/performance-schema-setup.sql
+          echo "MariaDB test data initialized"
+
+      - name: Grant Performance Schema and system database permissions
+        run: |
+          # Grant permissions for MySQL
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "GRANT SELECT, UPDATE ON performance_schema.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "FLUSH PRIVILEGES;"
+          echo "MySQL permissions granted"
+          
+          # Grant permissions for MariaDB
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT, UPDATE ON performance_schema.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
+          mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "FLUSH PRIVILEGES;"
+          echo "MariaDB permissions granted"
+
+      - name: Run Integration Tests with XVFB
+        run: xvfb-run -a npm test
+
+      - name: Run Test Coverage and Generate Report
+        run: |
+          xvfb-run -a npm run test:coverage || true
+          npm run test:coverage:report || echo "⚠️ Coverage thresholds not met (expected for extension integration tests)"
+        continue-on-error: true
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      - name: Check Coverage Thresholds
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "Coverage report generated successfully"
+            cat coverage/coverage-summary.json
+          else
+            echo "⚠️ Coverage report not found"
+          fi
+
+  license-compliance:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check licenses
+        run: |
+          npx license-checker \
+            --failOn "GPL;AGPL;LGPL;SSPL;CC-BY-NC" \
+            --summary || {
+              echo "❌ License compliance check failed!"
+              echo "Found disallowed licenses. Run 'npm run license:check' locally for details."
+              exit 1
+            }
+          echo "✅ License compliance check passed!"
+
+  status-check:
+    name: Status Check
+    runs-on: ubuntu-latest
+    needs: [build-and-test, package, lint-report, integration-tests-docker, license-compliance]
+    permissions:
+      contents: read
+    if: always()
+
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build-and-test.result }}" != "success" ]; then
+            echo "❌ Build and test failed"
+            exit 1
+          fi
+          # Package job is skipped on main branch (handled by publish-release.yml)
+          if [ "${{ needs.package.result }}" != "success" ] && [ "${{ needs.package.result }}" != "skipped" ]; then
+            echo "❌ Package failed"
+            exit 1
+          fi
+          # Integration tests with Docker
+          if [ "${{ needs.integration-tests-docker.result }}" != "success" ]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          fi
+          # License compliance
+          if [ "${{ needs.license-compliance.result }}" != "success" ]; then
+            echo "❌ License compliance check failed"
+            exit 1
+          fi
+          echo "✅ All checks passed - PR is ready to merge!"

@@ -1,0 +1,495 @@
+{
+  "name": "mydba",
+  "displayName": "MyDBA - AI-Powered Database Assistant",
+  "description": "AI-powered database management and optimization for MySQL, MariaDB, PostgreSQL, Redis, and Valkey",
+  "version": "1.0.0-beta.1",
+  "publisher": "NipunaPerera",
+  "icon": "resources/mydba.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Data Science",
+    "Formatters"
+  ],
+  "keywords": [
+    "database",
+    "mysql",
+    "mariadb",
+    "postgresql",
+    "redis",
+    "valkey",
+    "ai",
+    "optimization",
+    "performance",
+    "dba"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mydba.connect",
+        "title": "Connect to Database",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.disconnect",
+        "title": "Disconnect",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.refresh",
+        "title": "Refresh",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.newConnection",
+        "title": "New Connection",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.deleteConnection",
+        "title": "Delete Connection",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.analyzeQuery",
+        "title": "Analyze Query with AI",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.configureAIProvider",
+        "title": "Configure AI Provider",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.explainQuery",
+        "title": "Explain Query",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.profileQuery",
+        "title": "Profile Query",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.toggleAI",
+        "title": "Toggle AI Features",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.generateSampleWorkload",
+        "title": "Generate Sample Unindexed Workload",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.showProcessList",
+        "title": "Show Process List",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.showVariables",
+        "title": "Show Variables",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.showQueryEditor",
+        "title": "Open Query Editor",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.previewTableData",
+        "title": "Preview Data",
+        "category": "MyDBA"
+      }
+    ],
+    "views": {
+      "mydba": [
+        {
+          "id": "mydba.treeView",
+          "name": "Connections"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mydba",
+          "title": "MyDBA",
+          "icon": "resources/mydba.svg"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "mydba.newConnection",
+          "when": "view == mydba.treeView",
+          "group": "navigation"
+        },
+        {
+          "command": "mydba.refresh",
+          "when": "view == mydba.treeView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "mydba.connect",
+          "when": "view == mydba.treeView && viewItem == connection",
+          "group": "inline"
+        },
+        {
+          "command": "mydba.disconnect",
+          "when": "view == mydba.treeView && viewItem == connected",
+          "group": "inline"
+        },
+        {
+          "command": "mydba.deleteConnection",
+          "when": "view == mydba.treeView && viewItem == connection",
+          "group": "inline"
+        },
+        {
+          "command": "mydba.previewTableData",
+          "when": "view == mydba.treeView && viewItem == table",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "MyDBA",
+      "properties": {
+        "mydba.ai.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable AI-powered query analysis and optimization"
+        },
+        "mydba.ai.provider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "vscode-lm",
+            "openai",
+            "anthropic",
+            "ollama",
+            "none"
+          ],
+          "default": "auto",
+          "description": "AI provider to use (auto = detect best available)"
+        },
+        "mydba.ai.openaiModel": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "description": "OpenAI model to use for query analysis"
+        },
+        "mydba.ai.anthropicModel": {
+          "type": "string",
+          "default": "claude-3-5-sonnet-20241022",
+          "description": "Anthropic model to use for query analysis"
+        },
+        "mydba.ai.ollamaEndpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama API endpoint URL"
+        },
+        "mydba.ai.ollamaModel": {
+          "type": "string",
+          "default": "llama3.1",
+          "description": "Ollama model to use for query analysis"
+        },
+        "mydba.ai.anonymizeQueries": {
+          "type": "boolean",
+          "default": true,
+          "description": "Anonymize query literals before sending to AI (replace with placeholders)"
+        },
+        "mydba.ai.includeSchemaContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table schema information in AI prompts"
+        },
+        "mydba.ai.anonymizeData": {
+          "type": "boolean",
+          "default": true,
+          "description": "Anonymize sensitive data before sending to AI (deprecated, use anonymizeQueries)"
+        },
+        "mydba.ai.allowSchemaContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table schema in AI context (deprecated, use includeSchemaContext)"
+        },
+        "mydba.ai.allowQueryHistory": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include recent query history in AI context"
+        },
+        "mydba.ai.chatEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable @mydba chat participant"
+        },
+        "mydba.ai.confirmBeforeSend": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ask for confirmation before sending data to AI"
+        },
+        "mydba.telemetry.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable telemetry and usage analytics"
+        },
+        "mydba.security.warnSensitiveColumns": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn when querying potentially sensitive columns"
+        },
+        "mydba.security.redactSensitiveColumns": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically redact sensitive column values in results"
+        },
+        "mydba.network.showActivityLog": {
+          "type": "boolean",
+          "default": true,
+          "description": "Log all network requests in Output panel for transparency"
+        },
+        "mydba.confirmDestructiveOperations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require confirmation for DROP/TRUNCATE/DELETE/UPDATE operations"
+        },
+        "mydba.warnMissingWhereClause": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn when UPDATE/DELETE statements lack a WHERE clause"
+        },
+        "mydba.dryRunMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Preview queries and affected rows without executing"
+        },
+        "mydba.safeMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable safe mode with additional warnings and confirmations"
+        },
+        "mydba.risk.rowEstimateWarnThreshold": {
+          "type": "number",
+          "default": 10000,
+          "description": "Warn when queries may affect more than this many rows"
+        },
+        "mydba.onboarding.showDisclaimer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show disclaimer and safety information on first connection"
+        },
+        "mydba.defaultEnvironment": {
+          "type": "string",
+          "enum": [
+            "dev",
+            "staging",
+            "prod"
+          ],
+          "default": "dev",
+          "description": "Default environment assigned to new connections (affects guardrails)"
+        },
+        "mydba.preview.maxRows": {
+          "type": "number",
+          "default": 1000,
+          "description": "Maximum rows returned in previews (SELECT samples, data viewers)"
+        },
+        "mydba.dml.maxAffectRows": {
+          "type": "number",
+          "default": 1000,
+          "description": "Block or escalate confirmation if DML would affect more than this many rows"
+        },
+        "mydba.refreshInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "Auto-refresh interval in milliseconds (0 to disable)"
+        },
+        "mydba.slowQueryThreshold": {
+          "type": "number",
+          "default": 1000,
+          "description": "Slow query threshold in milliseconds"
+        },
+        "mydba.qwi.minAvgRowsExamined": {
+          "type": "number",
+          "default": 1000,
+          "description": "Minimum average rows examined per execution to flag a query (Queries Without Indexes)"
+        },
+        "mydba.qwi.minExecutions": {
+          "type": "number",
+          "default": 5,
+          "description": "Minimum executions required to consider a digest (Queries Without Indexes)"
+        },
+        "mydba.qwi.maxEfficiencyPercent": {
+          "type": "number",
+          "default": 10,
+          "description": "Maximum efficiency percentage (rows_sent/rows_examined*100) to include a query (lower means worse)"
+        },
+        "mydba.processlist.defaultGroupBy": {
+          "type": "string",
+          "enum": [
+            "none",
+            "user",
+            "host",
+            "query"
+          ],
+          "default": "none",
+          "description": "Default grouping for process list (none, user, host, or query fingerprint)"
+        },
+        "mydba.maxConnections": {
+          "type": "number",
+          "default": 10,
+          "description": "Maximum number of concurrent database connections"
+        },
+        "mydba.queryTimeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Query execution timeout in milliseconds"
+        },
+        "mydba.metrics.connectionUsageWarning": {
+          "type": "number",
+          "default": 80,
+          "description": "Connection usage warning threshold (percentage)"
+        },
+        "mydba.metrics.connectionUsageCritical": {
+          "type": "number",
+          "default": 95,
+          "description": "Connection usage critical threshold (percentage)"
+        },
+        "mydba.metrics.bufferPoolHitRateWarning": {
+          "type": "number",
+          "default": 90,
+          "description": "Buffer pool hit rate warning threshold (percentage)"
+        },
+        "mydba.metrics.slowQueriesThreshold": {
+          "type": "number",
+          "default": 10,
+          "description": "Slow queries threshold (queries per minute)"
+        },
+        "mydba.metrics.customTimeRange": {
+          "type": "string",
+          "enum": [
+            "5min",
+            "15min",
+            "30min",
+            "1hour",
+            "2hours",
+            "6hours",
+            "12hours",
+            "24hours"
+          ],
+          "default": "1hour",
+          "description": "Custom time range for metrics dashboard"
+        },
+        "mydba.alerts.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable metric alerts and notifications"
+        },
+        "mydba.alerts.connectionsThreshold": {
+          "type": "number",
+          "default": 80,
+          "description": "Alert when connection usage exceeds this percentage"
+        },
+        "mydba.alerts.bufferPoolThreshold": {
+          "type": "number",
+          "default": 90,
+          "description": "Alert when buffer pool hit rate falls below this percentage"
+        },
+        "mydba.alerts.slowQueriesThreshold": {
+          "type": "number",
+          "default": 10,
+          "description": "Alert when slow queries per minute exceeds this value"
+        },
+        "mydba.alerts.slowQueryThreshold": {
+          "type": "number",
+          "default": 1000,
+          "description": "Alert when query execution time exceeds this value (milliseconds)"
+        },
+        "mydba.alerts.bufferPoolHitRateThreshold": {
+          "type": "number",
+          "default": 90,
+          "description": "Alert when buffer pool hit rate falls below this percentage"
+        }
+      }
+    },
+    "output": [
+      {
+        "id": "mydba",
+        "name": "MyDBA"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "test": "node ./out/test/runTest.js",
+    "test:unit": "jest --testPathIgnorePatterns=/src/test/suite/",
+    "test:integration": "npm run compile && npm test",
+    "test:mariadb": "npm run compile && docker-compose -f docker-compose.test.yml up -d mariadb-10.11 && sleep 10 && npm test",
+    "test:mysql": "npm run compile && docker-compose -f docker-compose.test.yml up -d mysql-8.0 && sleep 10 && npm test",
+    "test:db": "npm run compile && docker-compose -f docker-compose.test.yml up -d && sleep 15 && npm test",
+    "test:coverage": "c8 npm test",
+    "test:coverage:report": "c8 report --reporter=html --reporter=json-summary --reporter=text",
+    "license:check": "license-checker --summary",
+    "license:report": "license-checker --json --out license-report.json && license-checker --csv --out license-report.csv",
+    "license:verify": "license-checker --failOn 'GPL;AGPL;LGPL;SSPL;CC-BY-NC' --summary",
+    "package": "vsce package",
+    "install-extension": "code --install-extension mydba-*.vsix"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.38.0",
+    "@types/glob": "^8.1.0",
+    "@types/html2canvas": "^1.0.0",
+    "@types/jest": "^29.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "c8": "^8.0.1",
+    "esbuild": "^0.25.11",
+    "eslint": "^9.38.0",
+    "glob": "^10.0.0",
+    "jest": "^29.0.0",
+    "jsdom": "^24.1.3",
+    "license-checker": "^25.0.1",
+    "mocha": "^10.0.0",
+    "puppeteer": "^24.26.1",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.46.2",
+    "vsce": "^1.97.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@aws-sdk/client-rds": "^3.450.0",
+    "@aws-sdk/credential-providers": "^3.450.0",
+    "@vscode/webview-ui-toolkit": "^1.2.2",
+    "chart.js": "^4.5.1",
+    "d3": "^7.9.0",
+    "html2canvas": "^1.4.1",
+    "mysql2": "^3.6.0",
+    "node-sql-parser": "^5.3.3",
+    "ollama": "^0.5.14",
+    "openai": "^4.77.0"
+  },
+  "extensionDependencies": [],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/mydba.git"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/your-org/mydba/issues"
+  },
+  "homepage": "https://github.com/your-org/mydba#readme"
+}

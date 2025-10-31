@@ -1,0 +1,277 @@
+name: Publish Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+# Security: Explicitly define minimal permissions at workflow level
+permissions:
+  actions: none      # Prevent workflow manipulation
+  checks: none       # Prevent check manipulation
+  contents: write    # Needed for creating releases
+  deployments: none  # Prevent deployment manipulation
+  issues: write      # Needed for creating issues on publish failure
+  packages: none     # Prevent package manipulation
+  pull-requests: read # Needed for waiting on checks
+  repository-projects: none
+  security-events: none
+  statuses: none
+
+jobs:
+  wait-for-ci:
+    name: Wait for CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI checks
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.sha }}
+          check-regexp: '^(Build and Test|Lint Report|Status Check).*$'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 30
+          allowed-conclusions: success
+        timeout-minutes: 30
+
+  publish:
+    name: Publish to Marketplace
+    runs-on: ubuntu-latest
+    needs: wait-for-ci
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit to detect version change
+
+      - name: Check if version changed
+        id: version_check
+        run: |
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          # Get previous version from git history
+          git show HEAD~1:package.json > /tmp/prev-package.json 2>/dev/null || {
+            echo "First commit or package.json didn't exist before"
+            PREVIOUS_VERSION="0.0.0"
+          }
+
+          if [ -f /tmp/prev-package.json ]; then
+            PREVIOUS_VERSION=$(node -e "try { console.log(require('/tmp/prev-package.json').version); } catch(e) { console.log('0.0.0'); }")
+          else
+            PREVIOUS_VERSION="0.0.0"
+          fi
+
+          echo "Previous version: $PREVIOUS_VERSION"
+          echo "Current version: $CURRENT_VERSION"
+
+          # Validate semantic version format
+          if ! npx semver "$CURRENT_VERSION" >/dev/null 2>&1; then
+            echo "❌ Invalid semantic version format: $CURRENT_VERSION"
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Check version increment (must be greater than previous)
+          if [ "$PREVIOUS_VERSION" != "0.0.0" ]; then
+            if ! npx semver -r ">$PREVIOUS_VERSION" "$CURRENT_VERSION" >/dev/null 2>&1; then
+              echo "❌ Version $CURRENT_VERSION must be greater than previous version $PREVIOUS_VERSION"
+              echo "changed=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          fi
+
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "✅ Version changed: $PREVIOUS_VERSION → $CURRENT_VERSION"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️ Version unchanged, skipping release"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Security scan
+        if: steps.version_check.outputs.changed == 'true'
+        uses: github/super-linter@v4
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_YAML: true
+          VALIDATE_JSON: true
+          VALIDATE_JAVASCRIPT_ES: true
+          VALIDATE_TYPESCRIPT_ES: true
+
+      - name: Dependency review
+        if: steps.version_check.outputs.changed == 'true'
+        uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: moderate
+
+      - name: Setup Node.js
+        if: steps.version_check.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.version_check.outputs.changed == 'true'
+        run: npm ci
+
+      - name: Install tools
+        if: steps.version_check.outputs.changed == 'true'
+        run: |
+          npm install -g @vscode/vsce
+          npm install -g semver
+
+      - name: Compile TypeScript
+        if: steps.version_check.outputs.changed == 'true'
+        run: npm run compile
+
+      - name: Package extension
+        if: steps.version_check.outputs.changed == 'true'
+        run: vsce package
+
+      - name: Verify VSIX package
+        if: steps.version_check.outputs.changed == 'true'
+        run: |
+          # Find the VSIX file
+          VSIX_FILE=$(ls *.vsix)
+          echo "Verifying $VSIX_FILE..."
+          # Basic verification that the file exists and has reasonable size
+          if [ -f "$VSIX_FILE" ]; then
+            FILE_SIZE=$(stat -f%z "$VSIX_FILE" 2>/dev/null || stat -c%s "$VSIX_FILE" 2>/dev/null)
+            echo "✅ VSIX package verified: $VSIX_FILE ($FILE_SIZE bytes)"
+          else
+            echo "❌ VSIX package not found"
+            exit 1
+          fi
+
+      - name: Extract version-specific changelog
+        if: steps.version_check.outputs.changed == 'true'
+        id: extract_changelog
+        run: |
+          VERSION="${{ steps.version_check.outputs.version }}"
+
+          # Extract only this version's section from CHANGELOG.md
+          if [ -f CHANGELOG.md ]; then
+            echo "Extracting changelog for version $VERSION..."
+
+            # Look for the version header and extract until the next version header
+            awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > version_changelog.md
+
+            if [ -s version_changelog.md ]; then
+              echo "✅ Found changelog section for v$VERSION"
+              echo "has_changelog=true" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ No changelog section found for v$VERSION"
+              echo "has_changelog=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️ CHANGELOG.md not found"
+            echo "has_changelog=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version_check.outputs.version }}
+          name: Release v${{ steps.version_check.outputs.version }}
+          body_path: ${{ steps.extract_changelog.outputs.has_changelog == 'true' && 'version_changelog.md' || '' }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Azure token availability
+        id: check_token
+        if: steps.version_check.outputs.changed == 'true'
+        env:
+          AZURE_TOKEN: ${{ secrets.AZURE_TOKEN }}
+        run: |
+          if [ -n "$AZURE_TOKEN" ]; then
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_token=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to VS Code Marketplace
+        id: marketplace_publish
+        if: steps.version_check.outputs.changed == 'true' && steps.check_token.outputs.has_token == 'true'
+        run: |
+          # Find the VSIX file
+          VSIX_FILE=$(ls *.vsix)
+          echo "Publishing $VSIX_FILE to marketplace..."
+          vsce publish --packagePath "$VSIX_FILE" --pat $VSCE_PAT
+        env:
+          VSCE_PAT: ${{ secrets.AZURE_TOKEN }}
+        continue-on-error: true
+
+      - name: Report marketplace publish failure
+        if: steps.version_check.outputs.changed == 'true' && steps.marketplace_publish.outcome == 'failure'
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Failed to publish v${{ steps.version_check.outputs.version }} to VS Code Marketplace',
+              body: [
+                '## Marketplace Publish Failed',
+                '',
+                '**Version:** v${{ steps.version_check.outputs.version }}',
+                '**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',
+                '',
+                'The automated marketplace publish step failed. This may require manual intervention.',
+                '',
+                '### Next Steps:',
+                '1. Check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details',
+                '2. Verify AZURE_TOKEN secret is valid and has proper permissions',
+                '3. If needed, publish manually using: `vsce publish`',
+                '4. Close this issue once resolved',
+                '',
+                '**Note:** The GitHub Release and git tag were created successfully.'
+              ].join('\n'),
+              labels: ['release', 'automation', 'bug']
+            });
+
+      - name: Summary
+        if: steps.version_check.outputs.changed == 'true'
+        run: |
+          echo "## 🎉 Release v${{ steps.version_check.outputs.version }} Published!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 Dependency review passed" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 VSIX package verified" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ Git tag and GitHub Release created" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.check_token.outputs.has_token }}" == "true" ]; then
+            if [ "${{ steps.marketplace_publish.outcome }}" == "success" ]; then
+              echo "- ✅ Published to VS Code Marketplace" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ Marketplace publish failed (issue created automatically)" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ⚠️ Marketplace publish skipped (AZURE_TOKEN not configured)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: No release
+        if: steps.version_check.outputs.changed == 'false'
+        run: |
+          echo "## ℹ️ No Release" >> $GITHUB_STEP_SUMMARY
+          echo "Version in package.json unchanged, skipping release." >> $GITHUB_STEP_SUMMARY
