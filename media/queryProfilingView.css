@@ -57,3 +57,125 @@
 .citation-link { color: var(--vscode-textLink-foreground); text-decoration: none; }
 .citation-link:hover { text-decoration: underline; }
 .relevance-score { opacity: 0.6; font-size: 11px; }
+
+/* Waterfall Chart Styles */
+.waterfall-section { margin: 20px 0; }
+.waterfall-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 16px; 
+}
+.waterfall-header h3 { 
+  margin: 0; 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+}
+.waterfall-controls { 
+  display: flex; 
+  gap: 8px; 
+}
+
+.toggle-btn, .export-btn { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 6px;
+  padding: 6px 12px; 
+  border: 1px solid var(--vscode-button-border);
+  background: var(--vscode-button-secondaryBackground); 
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 4px; 
+  cursor: pointer; 
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover, .export-btn:hover { 
+  background: var(--vscode-button-secondaryHoverBackground); 
+}
+
+.toggle-btn:active, .export-btn:active {
+  transform: translateY(1px);
+}
+
+.chart-container { 
+  position: relative;
+  width: 100%; 
+  height: 500px;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.stages-table-container {
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.stages-table-container .stages-table {
+  margin: 0;
+}
+
+.stages-table-container .stages-table th {
+  position: sticky;
+  top: 0;
+  background: var(--vscode-editor-background);
+  z-index: 1;
+}
+
+/* Chart legend */
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vscode-widget-border);
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.legend-color.critical { background: rgba(255, 99, 132, 0.7); }
+.legend-color.warning { background: rgba(255, 206, 86, 0.7); }
+.legend-color.moderate { background: rgba(54, 162, 235, 0.7); }
+.legend-color.low { background: rgba(75, 192, 192, 0.7); }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .summary { 
+    grid-template-columns: repeat(2, 1fr); 
+  }
+  
+  .waterfall-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .chart-container {
+    height: 400px;
+  }
+  
+  .optimization-code {
+    grid-template-columns: 1fr;
+  }
+}

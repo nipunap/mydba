@@ -328,7 +328,7 @@ export class QueryProfilingPanel {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${this.panel.webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; font-src ${this.panel.webview.cspSource};">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="${styleUri}?v=${v}" rel="stylesheet">
   <title>Query Profiling</title>
@@ -350,12 +350,27 @@ export class QueryProfilingPanel {
         <div><strong>Rows Sent:</strong> <span id="rows-sent">-</span></div>
         <div><strong>Efficiency:</strong> <span id="efficiency">-</span></div>
       </div>
-      <div class="stages">
-        <h3>Stages</h3>
-        <table class="stages-table">
-          <thead><tr><th>Stage</th><th>Duration (µs)</th></tr></thead>
-          <tbody id="stages-body"></tbody>
-        </table>
+      <div class="waterfall-section">
+        <div class="waterfall-header">
+          <h3><span class="codicon codicon-graph"></span> Performance Waterfall</h3>
+          <div class="waterfall-controls">
+            <button id="toggle-view-btn" class="toggle-btn" title="Toggle between chart and table view">
+              <span class="codicon codicon-table"></span> Table View
+            </button>
+            <button id="export-chart-btn" class="export-btn" title="Export chart as PNG">
+              <span class="codicon codicon-export"></span> Export PNG
+            </button>
+          </div>
+        </div>
+        <div id="waterfall-chart-container" class="chart-container">
+          <canvas id="waterfall-chart"></canvas>
+        </div>
+        <div id="stages-table-container" class="stages-table-container" style="display:none;">
+          <table class="stages-table">
+            <thead><tr><th>Stage</th><th>Duration (µs)</th><th>% of Total</th></tr></thead>
+            <tbody id="stages-body"></tbody>
+          </table>
+        </div>
       </div>
       <div class="ai-insights-section">
         <h3 class="ai-insights-header"><span class="codicon codicon-sparkle"></span> AI Performance Insights</h3>
@@ -367,6 +382,7 @@ export class QueryProfilingPanel {
     </div>
   </div>
   <script type="module" nonce="${nonce}" src="${toolkitUri}"></script>
+  <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script nonce="${nonce}" src="${scriptUri}?v=${v}"></script>
 </body>
 </html>`;
