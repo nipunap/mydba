@@ -115,6 +115,14 @@ export class SlowQueriesPanel {
             const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
             cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
 
+            // Replace parameter placeholders with sample values for EXPLAIN
+            const { QueryDeanonymizer } = await import('../utils/query-deanonymizer');
+            if (QueryDeanonymizer.hasParameters(cleanQuery)) {
+                this.logger.info(`Query has ${QueryDeanonymizer.countParameters(cleanQuery)} parameters, replacing with sample values for EXPLAIN`);
+                cleanQuery = QueryDeanonymizer.replaceParametersForExplain(cleanQuery);
+                this.logger.debug(`Deanonymized query: ${cleanQuery}`);
+            }
+
             // Execute EXPLAIN query with FORMAT=JSON
             const explainQuery = `EXPLAIN FORMAT=JSON ${cleanQuery}`;
             const result = await adapter.query<unknown>(explainQuery);

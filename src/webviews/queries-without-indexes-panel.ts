@@ -248,6 +248,14 @@ export class QueriesWithoutIndexesPanel {
             const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
             cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
 
+            // Replace parameter placeholders with sample values for EXPLAIN
+            const { QueryDeanonymizer } = await import('../utils/query-deanonymizer');
+            if (QueryDeanonymizer.hasParameters(cleanQuery)) {
+                this.logger.info(`Query has ${QueryDeanonymizer.countParameters(cleanQuery)} parameters, replacing with sample values for EXPLAIN`);
+                cleanQuery = QueryDeanonymizer.replaceParametersForExplain(cleanQuery);
+                this.logger.debug(`Deanonymized query: ${cleanQuery}`);
+            }
+
             const explainResult = await adapter.query<unknown>(`EXPLAIN FORMAT=JSON ${cleanQuery}`);
 
             // Import ExplainViewerPanel and AIService
