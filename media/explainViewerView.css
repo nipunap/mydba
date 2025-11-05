@@ -998,3 +998,121 @@ vscode-text-field:focus {
     outline-offset: 4px;
     border-radius: 50%;
 }
+
+/* D3 Controls */
+.d3-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.zoom-control-btn {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 8px 12px;
+    transition: all 0.2s;
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.zoom-control-btn:hover {
+    background: rgba(54, 162, 235, 0.8);
+    border-color: rgb(54, 162, 235);
+    transform: scale(1.05);
+}
+
+.zoom-control-btn:active {
+    transform: scale(0.95);
+}
+
+.zoom-control-btn:focus {
+    outline: 2px solid rgb(54, 162, 235);
+    outline-offset: 2px;
+}
+
+/* D3 Legend */
+.d3-legend {
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 11px;
+    color: #cccccc;
+    max-width: 200px;
+    backdrop-filter: blur(10px);
+}
+
+.d3-legend > div:first-child {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #fff;
+    font-size: 12px;
+}
+
+/* D3 Tooltip */
+.d3-tooltip {
+    position: absolute;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    line-height: 1.6;
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+.d3-tooltip strong {
+    color: rgb(54, 162, 235);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.d3-tooltip em {
+    color: #999;
+    font-style: italic;
+    display: block;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+}
+
+/* D3 Node transitions */
+#tree-diagram .node {
+    transition: transform 0.4s ease-out;
+}
+
+#tree-diagram .link {
+    transition: stroke 0.4s ease-out, stroke-width 0.4s ease-out;
+}
+
+/* Enhanced collapsed node indicator */
+#tree-diagram circle {
+    transition: fill 0.3s ease, stroke 0.3s ease, r 0.2s ease, stroke-width 0.2s ease;
+}
+
+/* Pulsing animation for nodes with high cost */
+@keyframes pulse-critical {
+    0%, 100% {
+        filter: drop-shadow(0 0 0px rgba(255, 99, 132, 0));
+    }
+    50% {
+        filter: drop-shadow(0 0 8px rgba(255, 99, 132, 0.8));
+    }
+}
+
+#tree-diagram circle[style*="rgb(255, 99, 132)"] {
+    animation: pulse-critical 2s ease-in-out infinite;
+}

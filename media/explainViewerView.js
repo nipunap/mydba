@@ -906,6 +906,76 @@
         }
     }
 
+    /**
+     * Gets enhanced node color based on cost, severity, and access type
+     * @param {Object} nodeData - The node data
+     * @returns {string} RGB color string
+     */
+    function getEnhancedNodeColor(nodeData) {
+        // Priority 1: Use severity if explicitly set
+        if (nodeData.severity) {
+            return getNodeColor(nodeData.severity);
+        }
+
+        // Priority 2: Use cost thresholds
+        if (isValidNumber(nodeData.cost)) {
+            if (nodeData.cost > CONFIG.COST_THRESHOLDS.CRITICAL) {
+                return 'rgb(255, 99, 132)'; // Red
+            }
+            if (nodeData.cost > CONFIG.COST_THRESHOLDS.WARNING) {
+                return 'rgb(255, 206, 86)'; // Yellow
+            }
+        }
+
+        // Priority 3: Use access type heuristics
+        if (nodeData.accessType) {
+            const accessType = nodeData.accessType.toLowerCase();
+            if (accessType === 'all' || accessType === 'index') {
+                return 'rgb(255, 206, 86)'; // Yellow - potentially slow
+            }
+            if (accessType === 'const' || accessType === 'eq_ref' || accessType === 'ref') {
+                return 'rgb(75, 255, 192)'; // Green - efficient
+            }
+        }
+
+        // Priority 4: Use rows examined
+        if (nodeData.rows && nodeData.rows > CONFIG.ROWS_THRESHOLD) {
+            return 'rgb(255, 206, 86)'; // Yellow - many rows
+        }
+
+        // Default: Good/neutral
+        return 'rgb(75, 255, 192)'; // Green
+    }
+
+    /**
+     * Gets the stroke color for a node (border)
+     * @param {Object} nodeData - The node data
+     * @returns {string} RGB color string
+     */
+    function getNodeStrokeColor(nodeData) {
+        // Use white for most nodes
+        if (nodeData.key) {
+            return 'rgb(75, 255, 192)'; // Green border if using an index
+        }
+        return '#fff'; // White border by default
+    }
+
+    /**
+     * Gets the link color based on target node data
+     * @param {Object} nodeData - The target node data
+     * @returns {string} RGBA color string
+     */
+    function getLinkColor(nodeData) {
+        // Make links match the target node severity/cost
+        if (nodeData.severity === SEVERITY.CRITICAL || (isValidNumber(nodeData.cost) && nodeData.cost > CONFIG.COST_THRESHOLDS.CRITICAL)) {
+            return 'rgba(255, 99, 132, 0.4)'; // Red
+        }
+        if (nodeData.severity === SEVERITY.WARNING || (isValidNumber(nodeData.cost) && nodeData.cost > CONFIG.COST_THRESHOLDS.WARNING)) {
+            return 'rgba(255, 206, 86, 0.4)'; // Yellow
+        }
+        return 'rgba(255, 255, 255, 0.2)'; // Default white
+    }
+
     // ============================================================================
     // NODE DETAILS POPUP
     // ============================================================================
@@ -1344,7 +1414,7 @@
     }
 
     /**
-     * Handles export functionality
+     * Handles export functionality with PNG and SVG support
      * @param {Event} event - The change event
      */
     function handleExport(event) {
@@ -1352,15 +1422,113 @@
         const format = exportDropdown.value;
         if (!format) return;
 
-        vscode.postMessage({
-            type: MESSAGE_TYPES.EXPORT,
-            format: format,
-            data: currentData,
-            rawJson: currentRawJson
-        });
+        // Handle client-side exports (PNG, SVG)
+        if (format === 'png' || format === 'svg') {
+            exportDiagram(format);
+        } else {
+            // Handle server-side exports (JSON, etc.)
+            vscode.postMessage({
+                type: MESSAGE_TYPES.EXPORT,
+                format: format,
+                data: currentData,
+                rawJson: currentRawJson
+            });
+        }
 
         // Reset dropdown
         exportDropdown.value = '';
+    }
+
+    /**
+     * Exports the D3 diagram as PNG or SVG
+     * @param {string} format - Export format ('png' or 'svg')
+     */
+    function exportDiagram(format) {
+        const svg = document.querySelector('#tree-diagram svg');
+        if (!svg) {
+            vscode.postMessage({
+                type: MESSAGE_TYPES.ERROR,
+                message: 'No diagram available to export. Please ensure the tree view is displayed.'
+            });
+            return;
+        }
+
+        try {
+            if (format === 'svg') {
+                // Export as SVG
+                const svgData = new XMLSerializer().serializeToString(svg);
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const svgUrl = URL.createObjectURL(svgBlob);
+                
+                const downloadLink = document.createElement('a');
+                downloadLink.href = svgUrl;
+                downloadLink.download = `explain-diagram-${Date.now()}.svg`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                URL.revokeObjectURL(svgUrl);
+
+                vscode.postMessage({
+                    type: MESSAGE_TYPES.LOG,
+                    message: 'SVG export completed successfully'
+                });
+            } else if (format === 'png') {
+                // Export as PNG
+                const svgData = new XMLSerializer().serializeToString(svg);
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                // Get SVG dimensions
+                const svgRect = svg.getBoundingClientRect();
+                canvas.width = svgRect.width * 2; // 2x for better quality
+                canvas.height = svgRect.height * 2;
+
+                // Scale context for high DPI
+                ctx.scale(2, 2);
+
+                img.onload = function() {
+                    ctx.fillStyle = getComputedStyle(svg).backgroundColor || '#1e1e1e';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, svgRect.width, svgRect.height);
+
+                    canvas.toBlob(function(blob) {
+                        const pngUrl = URL.createObjectURL(blob);
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = pngUrl;
+                        downloadLink.download = `explain-diagram-${Date.now()}.png`;
+                        document.body.appendChild(downloadLink);
+                        downloadLink.click();
+                        document.body.removeChild(downloadLink);
+                        URL.revokeObjectURL(pngUrl);
+
+                        vscode.postMessage({
+                            type: MESSAGE_TYPES.LOG,
+                            message: 'PNG export completed successfully'
+                        });
+                    });
+                };
+
+                img.onerror = function(error) {
+                    console.error('Error loading SVG for PNG export:', error);
+                    vscode.postMessage({
+                        type: MESSAGE_TYPES.ERROR,
+                        message: 'Failed to export as PNG. Try SVG format instead.'
+                    });
+                };
+
+                // Convert SVG to data URL
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                img.src = url;
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            vscode.postMessage({
+                type: MESSAGE_TYPES.ERROR,
+                message: `Export failed: ${error.message || 'Unknown error'}`
+            });
+        }
     }
 
     // ============================================================================
