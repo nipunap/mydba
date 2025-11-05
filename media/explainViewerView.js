@@ -1676,6 +1676,29 @@
             html += '</div>';
         }
 
+        // Citations section
+        if (data.citations && data.citations.length > 0) {
+            html += '<div class="ai-citations">';
+            html += '<h4><span class="codicon codicon-book"></span> References & Citations</h4>';
+            html += '<ul class="citations-list">';
+
+            data.citations.forEach(citation => {
+                html += `<li>`;
+                if (citation.url) {
+                    html += `<a href="${escapeHtml(citation.url)}" class="citation-link" target="_blank">${escapeHtml(citation.title)}</a>`;
+                } else {
+                    html += `<span class="citation-link">${escapeHtml(citation.title)}</span>`;
+                }
+                if (citation.relevance) {
+                    html += `<div style="color: #999; font-size: 11px; margin-top: 4px;">${escapeHtml(citation.relevance)}</div>`;
+                }
+                html += `</li>`;
+            });
+
+            html += '</ul>';
+            html += '</div>';
+        }
+
         aiInsightsContent.innerHTML = html;
     }
 
