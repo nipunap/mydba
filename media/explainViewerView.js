@@ -423,7 +423,7 @@
     // ============================================================================
 
     /**
-     * Renders the D3 tree diagram visualization
+     * Renders the D3 tree diagram visualization with enhanced features
      * @param {Object} data - Hierarchical query execution plan data
      */
     function renderTreeDiagram(data) {
@@ -447,8 +447,91 @@
         const width = treeDiagram.clientWidth || CONFIG.DIAGRAM.WIDTH;
         const height = CONFIG.DIAGRAM.HEIGHT;
 
-        // Create SVG
-        const svg = d3.select(treeDiagram)
+        // Create container for controls and legend
+        const controlsContainer = d3.select(treeDiagram)
+            .append('div')
+            .attr('class', 'd3-controls')
+            .style('position', 'absolute')
+            .style('top', '10px')
+            .style('right', '10px')
+            .style('z-index', '100')
+            .style('display', 'flex')
+            .style('gap', '8px');
+
+        // Zoom controls
+        const zoomInBtn = controlsContainer.append('button')
+            .attr('class', 'zoom-control-btn')
+            .attr('aria-label', 'Zoom in')
+            .attr('title', 'Zoom In')
+            .html('➕');
+
+        const zoomOutBtn = controlsContainer.append('button')
+            .attr('class', 'zoom-control-btn')
+            .attr('aria-label', 'Zoom out')
+            .attr('title', 'Zoom Out')
+            .html('➖');
+
+        const resetZoomBtn = controlsContainer.append('button')
+            .attr('class', 'zoom-control-btn')
+            .attr('aria-label', 'Reset zoom')
+            .attr('title', 'Reset View')
+            .html('🔄');
+
+        const expandAllBtn = controlsContainer.append('button')
+            .attr('class', 'zoom-control-btn')
+            .attr('aria-label', 'Expand all nodes')
+            .attr('title', 'Expand All')
+            .html('⬇️');
+
+        const collapseAllBtn = controlsContainer.append('button')
+            .attr('class', 'zoom-control-btn')
+            .attr('aria-label', 'Collapse all nodes')
+            .attr('title', 'Collapse All')
+            .html('⬆️');
+
+        // Create legend
+        const legend = d3.select(treeDiagram)
+            .append('div')
+            .attr('class', 'd3-legend')
+            .style('position', 'absolute')
+            .style('bottom', '10px')
+            .style('left', '10px')
+            .style('z-index', '100')
+            .style('background', 'rgba(0, 0, 0, 0.8)')
+            .style('padding', '12px')
+            .style('border-radius', '6px')
+            .style('font-size', '11px')
+            .style('color', '#cccccc')
+            .html(`
+                <div style="font-weight: 600; margin-bottom: 8px; color: #fff;">Legend</div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; border-radius: 50%; background: rgb(75, 255, 192); border: 2px solid #fff;"></div>
+                        <span>Low Cost / Good</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; border-radius: 50%; background: rgb(255, 206, 86); border: 2px solid #fff;"></div>
+                        <span>Medium Cost / Warning</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; border-radius: 50%; background: rgb(255, 99, 132); border: 2px solid #fff;"></div>
+                        <span>High Cost / Critical</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); border: 2px solid #fff;"></div>
+                        <span>Collapsed (has children)</span>
+                    </div>
+                </div>
+            `);
+
+        // Create SVG with relative container
+        const svgContainer = d3.select(treeDiagram)
+            .append('div')
+            .style('position', 'relative')
+            .style('width', '100%')
+            .style('height', height + 'px');
+
+        const svg = svgContainer
             .append('svg')
             .attr('width', width)
             .attr('height', height)
@@ -461,105 +544,310 @@
 
         // Create tree layout
         const treeLayout = d3.tree()
-            .size([height - (CONFIG.DIAGRAM.MARGIN * 2), width - 200]);
+            .size([height - (CONFIG.DIAGRAM.MARGIN * 2), width - 200])
+            .nodeSize([60, 180]); // Better spacing
 
-        // Convert data to hierarchy
+        // Convert data to hierarchy and add collapse state
         const root = d3.hierarchy(data, d => d.children);
+        root.x0 = height / 2;
+        root.y0 = 0;
 
-        // Generate tree
-        const treeData = treeLayout(root);
-
-        // Create links
-        g.selectAll('.link')
-            .data(treeData.links())
-            .enter()
-            .append('path')
-            .attr('class', 'link')
-            .attr('fill', 'none')
-            .attr('stroke', 'rgba(255, 255, 255, 0.2)')
-            .attr('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH)
-            .attr('d', d3.linkHorizontal()
-                .x(d => d.y)
-                .y(d => d.x));
-
-        // Create nodes
-        const nodes = g.selectAll('.node')
-            .data(treeData.descendants())
-            .enter()
-            .append('g')
-            .attr('class', 'node')
-            .attr('transform', d => `translate(${d.y},${d.x})`)
-            .attr('role', 'button')
-            .attr('tabindex', '0')
-            .attr('aria-label', d => {
-                const table = d.data.table || d.data.type;
-                const access = d.data.accessType || '';
-                return `${table} ${access} node. Press Enter for details.`;
-            });
-
-        // Add circles for nodes
-        nodes.append('circle')
-            .attr('r', CONFIG.DIAGRAM.NODE_RADIUS)
-            .attr('fill', d => getNodeColor(d.data.severity))
-            .attr('stroke', '#fff')
-            .attr('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH)
-            .attr('class', d => {
-                const nodeId = generateNodeId(d.data, d.depth);
-                return highlightedNodeIds.has(nodeId) ? 'highlighted' : '';
-            })
-            .style('cursor', 'pointer')
-            .style('transition', 'all 0.2s ease')
-            .on('click', (event, d) => {
-                event.stopPropagation();
-                showNodeDetails(d.data, d.depth);
-            })
-            .on('mouseenter', function(event, d) {
-                d3.select(this)
-                    .attr('r', CONFIG.DIAGRAM.NODE_RADIUS_HOVER)
-                    .attr('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH_HOVER);
-            })
-            .on('mouseleave', function(event, d) {
-                d3.select(this)
-                    .attr('r', CONFIG.DIAGRAM.NODE_RADIUS)
-                    .attr('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH);
-            });
-
-        // Add keyboard interaction
-        nodes.on('keydown', (event, d) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                showNodeDetails(d.data, d.depth);
-            }
+        // Initialize all nodes as expanded
+        root.descendants().forEach(d => {
+            d._children = d.children;
         });
 
-        // Add labels
-        nodes.append('text')
-            .attr('dy', -15)
-            .attr('x', 0)
-            .style('text-anchor', 'middle')
-            .style('fill', '#cccccc')
+        // Tooltip div
+        const tooltip = d3.select('body')
+            .append('div')
+            .attr('class', 'd3-tooltip')
+            .style('position', 'absolute')
+            .style('padding', '8px 12px')
+            .style('background', 'rgba(0, 0, 0, 0.9)')
+            .style('border', '1px solid rgba(255, 255, 255, 0.2)')
+            .style('border-radius', '4px')
+            .style('color', '#fff')
             .style('font-size', '12px')
-            .style('font-weight', 'bold')
             .style('pointer-events', 'none')
-            .text(d => {
-                if (d.data.table) {
-                    return `${d.data.table} (${d.data.accessType || 'N/A'})`;
-                }
-                return d.data.type || 'Unknown';
+            .style('opacity', 0)
+            .style('z-index', '10000')
+            .style('transition', 'opacity 0.2s');
+
+        // Update function for dynamic tree
+        function update(source) {
+            const duration = 400;
+
+            // Compute the new tree layout
+            const treeData = treeLayout(root);
+            const nodes = treeData.descendants();
+            const links = treeData.links();
+
+            // Normalize for fixed-depth
+            nodes.forEach(d => { d.y = d.depth * 180; });
+
+            // ****************** Nodes section ***************************
+
+            // Update the nodes
+            const node = g.selectAll('g.node')
+                .data(nodes, d => d.id || (d.id = ++window.d3NodeId || 0));
+
+            // Enter any new nodes at the parent's previous position
+            const nodeEnter = node.enter().append('g')
+                .attr('class', 'node')
+                .attr('transform', d => `translate(${source.y0},${source.x0})`)
+                .attr('role', 'button')
+                .attr('tabindex', '0')
+                .attr('aria-label', d => {
+                    const table = d.data.table || d.data.type;
+                    const access = d.data.accessType || '';
+                    return `${table} ${access} node. Press Enter for details.`;
+                })
+                .style('cursor', 'pointer')
+                .on('click', (event, d) => {
+                    event.stopPropagation();
+                    if (d.children || d._children) {
+                        toggle(d);
+                        update(d);
+                    } else {
+                        showNodeDetails(d.data, d.depth);
+                    }
+                })
+                .on('contextmenu', (event, d) => {
+                    event.preventDefault();
+                    showNodeDetails(d.data, d.depth);
+                });
+
+            // Add Circle for the nodes
+            nodeEnter.append('circle')
+                .attr('r', 1e-6)
+                .style('fill', d => {
+                    if (d._children) return 'rgba(255, 255, 255, 0.3)'; // Collapsed
+                    return getEnhancedNodeColor(d.data);
+                })
+                .style('stroke', d => getNodeStrokeColor(d.data))
+                .style('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH)
+                .attr('class', d => {
+                    const nodeId = generateNodeId(d.data, d.depth);
+                    return highlightedNodeIds.has(nodeId) ? 'highlighted' : '';
+                });
+
+            // Add labels for the nodes
+            nodeEnter.append('text')
+                .attr('dy', -15)
+                .attr('x', 0)
+                .attr('text-anchor', 'middle')
+                .style('fill', '#cccccc')
+                .style('font-size', '11px')
+                .style('font-weight', 'bold')
+                .style('pointer-events', 'none')
+                .text(d => {
+                    if (d.data.table) {
+                        return `${d.data.table}`;
+                    }
+                    return d.data.type || 'Unknown';
+                });
+
+            // Add access type badge
+            nodeEnter.filter(d => d.data.accessType)
+                .append('text')
+                .attr('dy', 0)
+                .attr('x', 0)
+                .attr('text-anchor', 'middle')
+                .style('fill', '#999')
+                .style('font-size', '9px')
+                .style('pointer-events', 'none')
+                .text(d => d.data.accessType);
+
+            // Add row count
+            nodeEnter.filter(d => d.data.rows)
+                .append('text')
+                .attr('dy', 22)
+                .attr('x', 0)
+                .attr('text-anchor', 'middle')
+                .style('fill', '#888')
+                .style('font-size', '9px')
+                .style('pointer-events', 'none')
+                .text(d => `${d.data.rows.toLocaleString()} rows`);
+
+            // Add cost indicator
+            nodeEnter.filter(d => isValidNumber(d.data.cost))
+                .append('text')
+                .attr('dy', 32)
+                .attr('x', 0)
+                .attr('text-anchor', 'middle')
+                .style('fill', d => {
+                    if (d.data.cost > CONFIG.COST_THRESHOLDS.CRITICAL) return 'rgb(255, 99, 132)';
+                    if (d.data.cost > CONFIG.COST_THRESHOLDS.WARNING) return 'rgb(255, 206, 86)';
+                    return 'rgb(75, 255, 192)';
+                })
+                .style('font-size', '9px')
+                .style('font-weight', '600')
+                .style('pointer-events', 'none')
+                .text(d => `cost: ${d.data.cost.toFixed(1)}`);
+
+            // Hover tooltips
+            nodeEnter.on('mouseenter', function(event, d) {
+                const nodeData = d.data;
+                let tooltipHtml = `<strong>${escapeHtml(nodeData.type)}</strong>`;
+                if (nodeData.table) tooltipHtml += `<br/>Table: ${escapeHtml(nodeData.table)}`;
+                if (nodeData.accessType) tooltipHtml += `<br/>Access: ${escapeHtml(nodeData.accessType)}`;
+                if (nodeData.key) tooltipHtml += `<br/>Index: ${escapeHtml(nodeData.key)}`;
+                if (nodeData.rows) tooltipHtml += `<br/>Rows: ${nodeData.rows.toLocaleString()}`;
+                if (isValidNumber(nodeData.cost)) tooltipHtml += `<br/>Cost: ${nodeData.cost.toFixed(2)}`;
+                if (d.children || d._children) tooltipHtml += `<br/><em>Click to ${d.children ? 'collapse' : 'expand'}</em>`;
+                else tooltipHtml += `<br/><em>Click for details</em>`;
+
+                tooltip.html(tooltipHtml)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px')
+                    .style('opacity', 1);
+
+                d3.select(this).select('circle')
+                    .attr('r', CONFIG.DIAGRAM.NODE_RADIUS_HOVER)
+                    .style('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH_HOVER);
+            })
+            .on('mouseleave', function(event, d) {
+                tooltip.style('opacity', 0);
+                d3.select(this).select('circle')
+                    .attr('r', CONFIG.DIAGRAM.NODE_RADIUS)
+                    .style('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH);
+            })
+            .on('mousemove', function(event) {
+                tooltip
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px');
             });
 
-        // Add row count
-        nodes.filter(d => d.data.rows)
-            .append('text')
-            .attr('dy', 25)
-            .attr('x', 0)
-            .style('text-anchor', 'middle')
-            .style('fill', '#999')
-            .style('font-size', '10px')
-            .style('pointer-events', 'none')
-            .text(d => `${d.data.rows.toLocaleString()} rows`);
+            // Keyboard support
+            nodeEnter.on('keydown', (event, d) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    if (d.children || d._children) {
+                        toggle(d);
+                        update(d);
+                    } else {
+                        showNodeDetails(d.data, d.depth);
+                    }
+                }
+            });
 
-        // Add zoom behavior
+            // UPDATE
+            const nodeUpdate = nodeEnter.merge(node);
+
+            // Transition to the proper position
+            nodeUpdate.transition()
+                .duration(duration)
+                .attr('transform', d => `translate(${d.y},${d.x})`);
+
+            // Update the node attributes and style
+            nodeUpdate.select('circle')
+                .transition()
+                .duration(duration)
+                .attr('r', CONFIG.DIAGRAM.NODE_RADIUS)
+                .style('fill', d => {
+                    if (d._children) return 'rgba(255, 255, 255, 0.3)'; // Collapsed
+                    return getEnhancedNodeColor(d.data);
+                })
+                .style('stroke', d => getNodeStrokeColor(d.data))
+                .attr('class', d => {
+                    const nodeId = generateNodeId(d.data, d.depth);
+                    return highlightedNodeIds.has(nodeId) ? 'highlighted' : '';
+                });
+
+            // Remove any exiting nodes
+            const nodeExit = node.exit().transition()
+                .duration(duration)
+                .attr('transform', d => `translate(${source.y},${source.x})`)
+                .remove();
+
+            nodeExit.select('circle')
+                .attr('r', 1e-6);
+
+            nodeExit.select('text')
+                .style('fill-opacity', 1e-6);
+
+            // ****************** links section ***************************
+
+            // Update the links
+            const link = g.selectAll('path.link')
+                .data(links, d => d.target.id);
+
+            // Enter any new links at the parent's previous position
+            const linkEnter = link.enter().insert('path', 'g')
+                .attr('class', 'link')
+                .attr('d', d => {
+                    const o = { x: source.x0, y: source.y0 };
+                    return diagonal(o, o);
+                })
+                .style('fill', 'none')
+                .style('stroke', 'rgba(255, 255, 255, 0.2)')
+                .style('stroke-width', CONFIG.DIAGRAM.STROKE_WIDTH);
+
+            // UPDATE
+            const linkUpdate = linkEnter.merge(link);
+
+            // Transition back to the parent element position
+            linkUpdate.transition()
+                .duration(duration)
+                .attr('d', d => diagonal(d.source, d.target))
+                .style('stroke', d => getLinkColor(d.target.data));
+
+            // Remove any exiting links
+            link.exit().transition()
+                .duration(duration)
+                .attr('d', d => {
+                    const o = { x: source.x, y: source.y };
+                    return diagonal(o, o);
+                })
+                .remove();
+
+            // Store the old positions for transition
+            nodes.forEach(d => {
+                d.x0 = d.x;
+                d.y0 = d.y;
+            });
+        }
+
+        // Creates a curved (diagonal) path from parent to child
+        function diagonal(s, d) {
+            return `M ${s.y} ${s.x}
+                    C ${(s.y + d.y) / 2} ${s.x},
+                      ${(s.y + d.y) / 2} ${d.x},
+                      ${d.y} ${d.x}`;
+        }
+
+        // Toggle children on click
+        function toggle(d) {
+            if (d.children) {
+                d._children = d.children;
+                d.children = null;
+            } else {
+                d.children = d._children;
+                d._children = null;
+            }
+        }
+
+        // Expand all nodes
+        function expandAll(d) {
+            if (d._children) {
+                d.children = d._children;
+                d._children = null;
+            }
+            if (d.children) {
+                d.children.forEach(expandAll);
+            }
+        }
+
+        // Collapse all nodes except root
+        function collapseAll(d) {
+            if (d.children) {
+                d._children = d.children;
+                d.children = null;
+                d._children.forEach(collapseAll);
+            }
+        }
+
+        // Zoom behavior
         const zoom = d3.zoom()
             .scaleExtent([CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX])
             .on('zoom', (event) => {
@@ -567,6 +855,37 @@
             });
 
         svg.call(zoom);
+
+        // Store transform for controls
+        let currentTransform = d3.zoomIdentity;
+
+        // Zoom control handlers
+        zoomInBtn.on('click', () => {
+            svg.transition().call(zoom.scaleBy, 1.3);
+        });
+
+        zoomOutBtn.on('click', () => {
+            svg.transition().call(zoom.scaleBy, 0.7);
+        });
+
+        resetZoomBtn.on('click', () => {
+            svg.transition().call(zoom.transform, d3.zoomIdentity.translate(CONFIG.DIAGRAM.MARGIN, CONFIG.DIAGRAM.MARGIN));
+        });
+
+        expandAllBtn.on('click', () => {
+            expandAll(root);
+            update(root);
+        });
+
+        collapseAllBtn.on('click', () => {
+            if (root.children) {
+                root.children.forEach(collapseAll);
+            }
+            update(root);
+        });
+
+        // Initial render
+        update(root);
     }
 
     /**
