@@ -1536,6 +1536,108 @@
     // ============================================================================
 
     /**
+     * Attaches event handlers to optimization action buttons
+     * @param {Array} suggestions - Array of optimization suggestions
+     */
+    function attachOptimizationHandlers(suggestions) {
+        // Apply button handlers
+        document.querySelectorAll('.apply-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+                const suggestion = suggestions[index];
+                
+                if (!suggestion) {
+                    console.error('Suggestion not found for index:', index);
+                    return;
+                }
+
+                // Send apply optimization message to extension
+                vscode.postMessage({
+                    type: 'applyOptimization',
+                    suggestion: {
+                        title: suggestion.title,
+                        description: suggestion.description,
+                        before: suggestion.before,
+                        after: suggestion.after,
+                        ddl: suggestion.ddl || suggestion.after, // Use DDL if available, otherwise after
+                        impact: suggestion.impact,
+                        difficulty: suggestion.difficulty
+                    }
+                });
+            });
+        });
+
+        // Compare button handlers
+        document.querySelectorAll('.compare-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+                const suggestion = suggestions[index];
+                
+                if (!suggestion) {
+                    console.error('Suggestion not found for index:', index);
+                    return;
+                }
+
+                // Send compare message to extension
+                vscode.postMessage({
+                    type: 'compareOptimization',
+                    suggestion: {
+                        title: suggestion.title,
+                        before: suggestion.before || 'No before code available',
+                        after: suggestion.after || suggestion.ddl || 'No after code available'
+                    }
+                });
+            });
+        });
+
+        // Copy button handlers
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+                const suggestion = suggestions[index];
+                
+                if (!suggestion) {
+                    console.error('Suggestion not found for index:', index);
+                    return;
+                }
+
+                const codeToCopy = suggestion.after || suggestion.ddl || suggestion.before || '';
+                
+                try {
+                    // Use Clipboard API if available
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(codeToCopy);
+                        
+                        // Show feedback
+                        const button = e.currentTarget;
+                        const originalHTML = button.innerHTML;
+                        button.innerHTML = '<span class="codicon codicon-check"></span> Copied!';
+                        button.style.backgroundColor = 'rgba(75, 255, 192, 0.2)';
+                        
+                        setTimeout(() => {
+                            button.innerHTML = originalHTML;
+                            button.style.backgroundColor = '';
+                        }, 2000);
+                    } else {
+                        // Fallback: send message to extension to copy
+                        vscode.postMessage({
+                            type: 'copyToClipboard',
+                            text: codeToCopy
+                        });
+                    }
+                } catch (error) {
+                    console.error('Failed to copy:', error);
+                    // Fallback to extension
+                    vscode.postMessage({
+                        type: 'copyToClipboard',
+                        text: codeToCopy
+                    });
+                }
+            });
+        });
+    }
+
+    /**
      * Shows AI insights in the panel
      * @param {Object} data - The AI insights data
      */
@@ -1669,11 +1771,34 @@
                     html += `</div>`;
                 }
 
+                // Add action buttons for optimization
+                html += `<div class="optimization-actions">`;
+                
+                // Only show Apply button if there's executable code (after/DDL)
+                if (suggestion.after || suggestion.ddl) {
+                    html += `<button class="optimization-action-btn apply-btn" data-index="${index}" title="Apply this optimization">`;
+                    html += `<span class="codicon codicon-check"></span> Apply Fix`;
+                    html += `</button>`;
+                }
+                
+                html += `<button class="optimization-action-btn compare-btn" data-index="${index}" title="Compare before and after">`;
+                html += `<span class="codicon codicon-diff"></span> Compare`;
+                html += `</button>`;
+                
+                html += `<button class="optimization-action-btn copy-btn" data-index="${index}" title="Copy optimized code">`;
+                html += `<span class="codicon codicon-copy"></span> Copy`;
+                html += `</button>`;
+                
+                html += `</div>`;
+
                 html += `</div>`;
             });
 
             html += '</div>';
             html += '</div>';
+
+            // Add event listeners for optimization actions (after rendering)
+            setTimeout(() => attachOptimizationHandlers(data.optimizationSuggestions), 100);
         }
 
         // Citations section

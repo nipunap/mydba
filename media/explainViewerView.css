@@ -845,6 +845,61 @@ body {
     margin-bottom: 12px;
 }
 
+.optimization-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.optimization-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(54, 162, 235, 0.15);
+    border: 1px solid rgba(54, 162, 235, 0.3);
+    border-radius: 4px;
+    color: rgb(54, 162, 235);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.optimization-action-btn:hover {
+    background: rgba(54, 162, 235, 0.25);
+    border-color: rgba(54, 162, 235, 0.5);
+    transform: translateY(-1px);
+}
+
+.optimization-action-btn:active {
+    transform: translateY(0);
+}
+
+.optimization-action-btn.apply-btn {
+    background: rgba(75, 255, 192, 0.15);
+    border-color: rgba(75, 255, 192, 0.3);
+    color: rgb(75, 255, 192);
+}
+
+.optimization-action-btn.apply-btn:hover {
+    background: rgba(75, 255, 192, 0.25);
+    border-color: rgba(75, 255, 192, 0.5);
+}
+
+.optimization-action-btn.copy-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #cccccc;
+}
+
+.optimization-action-btn.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
 .optimization-code {
     display: grid;
     grid-template-columns: 1fr 1fr;
