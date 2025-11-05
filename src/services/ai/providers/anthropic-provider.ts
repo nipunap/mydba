@@ -141,7 +141,7 @@ Tables:
             for (let i = 0; i < context.ragDocs.length; i++) {
                 const doc = context.ragDocs[i];
                 prompt += `
-[Citation ${i + 1}] ${doc.title} (Score: ${doc.score?.toFixed(2) || 'N/A'}):
+[Citation ${i + 1}] ${doc.title}:
 ${doc.content}
 
 `;

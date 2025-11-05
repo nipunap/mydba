@@ -5,6 +5,7 @@ import { TreeViewProvider } from './providers/tree-view-provider';
 import { CommandRegistry } from './commands/command-registry';
 import { WebviewManager } from './webviews/webview-manager';
 import { Logger } from './utils/logger';
+import { MyDBAChatParticipant } from './chat/chat-participant';
 
 let serviceContainer: ServiceContainer;
 
@@ -53,6 +54,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // Initialize webview manager
         const webviewManager = serviceContainer.get(SERVICE_TOKENS.WebviewManager) as WebviewManager;
         webviewManager.initialize();
+
+        // Register chat participant
+        const chatParticipant = new MyDBAChatParticipant(context, logger, serviceContainer);
+        context.subscriptions.push(chatParticipant);
+        logger.info('Chat participant registered');
 
         // Create AI provider status bar item
         const aiStatusBar = vscode.window.createStatusBarItem(

@@ -6,7 +6,7 @@
   "publisher": "NipunaPerera",
   "icon": "resources/mydba.png",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Data Science",
@@ -112,6 +112,36 @@
         }
       ]
     },
+    "chatParticipants": [
+      {
+        "id": "mydba.chat",
+        "name": "mydba",
+        "description": "AI-powered database assistant for MySQL, MariaDB, and PostgreSQL",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "analyze",
+            "description": "Analyze a SQL query with AI-powered insights"
+          },
+          {
+            "name": "explain",
+            "description": "Show and visualize query execution plan (EXPLAIN)"
+          },
+          {
+            "name": "profile",
+            "description": "Profile query performance with detailed metrics"
+          },
+          {
+            "name": "optimize",
+            "description": "Get optimization suggestions with before/after code"
+          },
+          {
+            "name": "schema",
+            "description": "Explore database schema, tables, indexes, and relationships"
+          }
+        ]
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
