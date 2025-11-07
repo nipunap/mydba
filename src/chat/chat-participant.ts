@@ -3,6 +3,8 @@ import { Logger } from '../utils/logger';
 import { ServiceContainer, SERVICE_TOKENS } from '../core/service-container';
 import { ChatCommand, ChatCommandContext, IChatContextProvider } from './types';
 import { ChatCommandHandlers } from './command-handlers';
+import { NaturalLanguageQueryParser, QueryIntent } from './nl-query-parser';
+import { ChatResponseBuilder } from './response-builder';
 
 /**
  * MyDBA Chat Participant
@@ -11,6 +13,7 @@ import { ChatCommandHandlers } from './command-handlers';
 export class MyDBAChatParticipant implements IChatContextProvider {
     private participant: vscode.ChatParticipant;
     private commandHandlers: ChatCommandHandlers;
+    private nlParser: NaturalLanguageQueryParser;
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -32,6 +35,9 @@ export class MyDBAChatParticipant implements IChatContextProvider {
             this.serviceContainer,
             this
         );
+
+        // Initialize NL parser
+        this.nlParser = new NaturalLanguageQueryParser(this.logger);
 
         this.logger.info('MyDBA Chat Participant registered successfully');
     }
@@ -120,65 +126,159 @@ export class MyDBAChatParticipant implements IChatContextProvider {
      * Handles general queries without a specific command
      */
     private async handleGeneralQuery(context: ChatCommandContext): Promise<void> {
-        const { stream, prompt } = context;
+        const { stream, prompt, token } = context;
+        const builder = new ChatResponseBuilder(stream);
 
         // Show thinking indicator
-        stream.progress('Analyzing your question...');
+        stream.progress('Understanding your question...');
 
-        // Determine intent from prompt
-        const intent = this.detectIntent(prompt);
+        // Parse natural language query
+        const parsedQuery = this.nlParser.parse(prompt);
+        this.logger.debug(`Parsed query intent: ${parsedQuery.intent}`);
 
-        if (intent) {
-            // Route to specific handler based on detected intent
-            context.command = intent;
-            await this.handleCommand(intent, context);
-        } else {
-            // Fallback: provide general help or use analyze as default
-            await this.provideGeneralHelp(context);
+        // Check if there's an explicit SQL query in the prompt
+        if (parsedQuery.sqlQuery) {
+            this.logger.info('Found SQL query in prompt, routing to analyze');
+            context.command = ChatCommand.ANALYZE;
+            await this.handleCommand(ChatCommand.ANALYZE, context);
+            return;
+        }
+
+        // Map NL intent to chat command
+        const command = this.mapIntentToCommand(parsedQuery.intent);
+        
+        if (command) {
+            // Route to specific command handler
+            context.command = command;
+            await this.handleCommand(command, context);
+            return;
+        }
+
+        // Handle data retrieval intents with SQL generation
+        if (parsedQuery.intent === QueryIntent.RETRIEVE_DATA || parsedQuery.intent === QueryIntent.COUNT) {
+            await this.handleDataRetrievalQuery(parsedQuery, context, builder);
+            return;
+        }
+
+        // Check cancellation
+        if (token.isCancellationRequested) {
+            return;
+        }
+
+        // Fallback: provide general help
+        await this.provideGeneralHelp(context);
+    }
+
+    /**
+     * Handle data retrieval queries with SQL generation
+     */
+    private async handleDataRetrievalQuery(
+        parsedQuery: { intent: QueryIntent; parameters: { tableName?: string; condition?: string; limit?: number }; requiresConfirmation: boolean },
+        context: ChatCommandContext,
+        builder: ChatResponseBuilder
+    ): Promise<void> {
+        const { stream, activeConnectionId } = context;
+
+        if (!activeConnectionId) {
+            builder.warning('No active database connection')
+                .text('Please connect to a database first.')
+                .button('Connect to Database', 'mydba.newConnection');
+            return;
+        }
+
+        // Check if we have enough info to generate SQL
+        if (!parsedQuery.parameters.tableName) {
+            builder.warning('I couldn\'t identify which table you\'re asking about')
+                .text('Could you please specify the table name? For example:')
+                .text('- "Show me all records from **users** table"')
+                .text('- "Count rows in **orders** table"');
+            return;
+        }
+
+        try {
+            stream.progress('Generating SQL query...');
+
+            // Generate SQL from parsed query
+            const generatedSQL = await this.nlParser.generateSQL(parsedQuery);
+
+            if (!generatedSQL) {
+                builder.info('This query is a bit complex for automatic generation')
+                    .text('Could you rephrase it, or try using one of these commands:')
+                    .list([
+                        '`/analyze` - Analyze a specific SQL query',
+                        '`/schema` - Explore database structure',
+                        '`/explain` - Get execution plan'
+                    ]);
+                return;
+            }
+
+            // Show the generated SQL
+            builder.header('Generated SQL Query', '🔍')
+                .sql(generatedSQL)
+                .divider();
+
+            // Check if confirmation is needed
+            if (parsedQuery.requiresConfirmation) {
+                builder.warning('This query will modify data')
+                    .text('Please review the query carefully before executing.')
+                    .buttons([
+                        {
+                            label: '✅ Execute Query',
+                            command: 'mydba.executeQuery',
+                            args: [{ query: generatedSQL, connectionId: activeConnectionId }]
+                        },
+                        {
+                            label: '📋 Copy to Editor',
+                            command: 'mydba.copyToEditor',
+                            args: [generatedSQL]
+                        }
+                    ]);
+            } else {
+                // Provide action buttons
+                builder.quickActions([
+                    {
+                        label: '▶️  Execute Query',
+                        command: 'mydba.executeQuery',
+                        args: [{ query: generatedSQL, connectionId: activeConnectionId }]
+                    },
+                    {
+                        label: '📊 Analyze Query',
+                        command: 'mydba.chat.sendMessage',
+                        args: [`@mydba /analyze ${generatedSQL}`]
+                    },
+                    {
+                        label: '📋 Copy to Editor',
+                        command: 'mydba.copyToEditor',
+                        args: [generatedSQL]
+                    }
+                ]);
+            }
+
+        } catch (error) {
+            builder.error(`Failed to process your query: ${(error as Error).message}`)
+                .tip('Try rephrasing your question or use a specific command like `/schema` or `/analyze`');
         }
     }
 
     /**
-     * Detects user intent from natural language prompt
+     * Map NL intent to chat command
      */
-    private detectIntent(prompt: string): ChatCommand | null {
-        const lowerPrompt = prompt.toLowerCase();
-
-        // Analyze intent
-        if (lowerPrompt.includes('analyze') || lowerPrompt.includes('analysis')) {
-            return ChatCommand.ANALYZE;
+    private mapIntentToCommand(intent: QueryIntent): ChatCommand | null {
+        switch (intent) {
+            case QueryIntent.ANALYZE:
+                return ChatCommand.ANALYZE;
+            case QueryIntent.EXPLAIN:
+                return ChatCommand.EXPLAIN;
+            case QueryIntent.OPTIMIZE:
+                return ChatCommand.OPTIMIZE;
+            case QueryIntent.SCHEMA_INFO:
+                return ChatCommand.SCHEMA;
+            case QueryIntent.MONITOR:
+                // Could route to a process list command
+                return null;
+            default:
+                return null;
         }
-        
-        // Explain intent
-        if (lowerPrompt.includes('explain') || lowerPrompt.includes('execution plan')) {
-            return ChatCommand.EXPLAIN;
-        }
-        
-        // Profile intent
-        if (lowerPrompt.includes('profile') || lowerPrompt.includes('performance')) {
-            return ChatCommand.PROFILE;
-        }
-        
-        // Optimize intent
-        if (lowerPrompt.includes('optimize') || lowerPrompt.includes('optimization') || 
-            lowerPrompt.includes('improve') || lowerPrompt.includes('faster')) {
-            return ChatCommand.OPTIMIZE;
-        }
-        
-        // Schema intent
-        if (lowerPrompt.includes('schema') || lowerPrompt.includes('table') || 
-            lowerPrompt.includes('database structure') || lowerPrompt.includes('columns')) {
-            return ChatCommand.SCHEMA;
-        }
-
-        // Check if there's a SQL query in the prompt
-        if (lowerPrompt.includes('select') || lowerPrompt.includes('insert') || 
-            lowerPrompt.includes('update') || lowerPrompt.includes('delete')) {
-            // Default to analyze for SQL queries
-            return ChatCommand.ANALYZE;
-        }
-
-        return null;
     }
 
     /**
