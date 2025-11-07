@@ -15,6 +15,7 @@ interface TransactionState {
     operations: Array<{ sql: string; rollbackSQL?: string }>;
     startTime: number;
     timeout?: NodeJS.Timeout;
+    rollingBack: boolean; // Track if rollback is in progress or completed
 }
 
 /**
@@ -47,7 +48,8 @@ export class TransactionManager implements ITransactionManager {
         const state: TransactionState = {
             connectionId,
             operations: [],
-            startTime: Date.now()
+            startTime: Date.now(),
+            rollingBack: false
         };
 
         // Set timeout if specified
@@ -124,6 +126,20 @@ export class TransactionManager implements ITransactionManager {
                 } catch (error) {
                     this.logger.error(`Operation ${i + 1} failed:`, error as Error);
 
+                    // Check if rollback is already in progress (e.g., from timeout)
+                    if (state.rollingBack) {
+                        this.logger.warn('Rollback already in progress, skipping duplicate rollback');
+                        return {
+                            success: false,
+                            rollback: true,
+                            error: error as Error,
+                            affectedObjects
+                        };
+                    }
+
+                    // Mark rollback as in progress to prevent duplicate execution
+                    state.rollingBack = true;
+
                     // Rollback all previously executed operations
                     this.logger.warn(`Rolling back ${executedOps.length} operations`);
 
@@ -193,6 +209,15 @@ export class TransactionManager implements ITransactionManager {
             this.logger.warn(`No active transaction found for connection ${connectionId}`);
             return;
         }
+
+        // Check if rollback is already in progress or completed
+        if (transaction.rollingBack) {
+            this.logger.warn(`Rollback already in progress for connection ${connectionId}, skipping duplicate`);
+            return;
+        }
+
+        // Mark rollback as in progress to prevent duplicate execution
+        transaction.rollingBack = true;
 
         this.logger.info(`Rolling back transaction for connection ${connectionId}`);
 

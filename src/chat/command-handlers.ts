@@ -520,7 +520,7 @@ export class ChatCommandHandlers {
         builder.quickActions([
             {
                 label: '📊 View EXPLAIN Plan',
-                command: 'mydba.explainQuery',
+            command: 'mydba.explainQuery',
                 args: [{ query, connectionId }]
             },
             {
