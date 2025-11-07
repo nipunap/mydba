@@ -68,8 +68,6 @@ abstract class BaseDocParser {
             'their', 'they', 'then', 'than', 'when', 'where', 'which', 'while',
         ]);
 
-        const uniqueWords = [...new Set(words)].filter(w => !commonWords.has(w));
-
         // Return top 20 keywords by frequency
         const frequency = new Map<string, number>();
         words.forEach(w => {
@@ -236,8 +234,8 @@ export class MySQLDocParser extends BaseDocParser {
  * MariaDB Documentation Parser
  */
 export class MariaDBDocParser extends BaseDocParser {
-    getBaseUrl(version?: string): string {
-        const ver = version || '10.11';
+    getBaseUrl(_version?: string): string {
+        // Version is not used in URL for MariaDB KB, but kept for interface consistency
         return `https://mariadb.com/kb/en/`;
     }
 

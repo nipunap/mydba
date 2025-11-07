@@ -6,7 +6,6 @@
  */
 
 import { Logger } from '../../utils/logger';
-import { EmbeddingVector } from './embedding-provider';
 
 export interface VectorDocument {
     id: string;
@@ -202,14 +201,12 @@ export class VectorStore {
         const docText = `${doc.text} ${doc.metadata.title} ${doc.metadata.keywords?.join(' ') || ''}`;
         const docTerms = this.tokenize(docText.toLowerCase());
 
-        let matches = 0;
         let totalWeight = 0;
 
         for (const term of queryTerms) {
             const termFreq = docTerms.filter(t => t.includes(term) || term.includes(t)).length;
             
             if (termFreq > 0) {
-                matches++;
                 // TF-IDF-like: term frequency with diminishing returns
                 totalWeight += Math.log(1 + termFreq);
             }

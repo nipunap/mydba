@@ -246,7 +246,6 @@ export class DocumentChunker {
             // Extract header (first line)
             const lines = section.split('\n');
             const header = lines[0] || '';
-            const content = lines.slice(1).join('\n').trim();
             
             // Use header as sub-title if available
             const chunkTitle = header ? `${title} - ${header}` : title;

@@ -90,7 +90,11 @@ export class LiveDocService {
 
         try {
             while (this.fetchQueue.length > 0) {
-                const { dbType, version } = this.fetchQueue.shift()!;
+                const item = this.fetchQueue.shift();
+                if (!item) {
+                    break; // Queue is empty
+                }
+                const { dbType, version } = item;
                 
                 this.logger.info(`Fetching live documentation for ${dbType} ${version}...`);
 
