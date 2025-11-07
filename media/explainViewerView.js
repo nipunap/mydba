@@ -564,6 +564,10 @@
         root.x0 = height / 2;
         root.y0 = 0;
 
+        // Initialize node ID counter for D3 data binding
+        // This ensures each node gets a unique ID via ++window.d3NodeId
+        window.d3NodeId = 0;
+
         // Initialize all nodes as expanded (d.children set, d._children null)
         // d3.hierarchy already sets children properly, so no additional initialization needed
 
