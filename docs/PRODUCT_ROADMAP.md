@@ -430,6 +430,46 @@ One-click fixes require more UX polish and extensive testing to ensure safety.
 
 ---
 
+### **Milestone 12: UX & Code Quality Improvements** (3-4 hours)
+
+#### 12.1 DDL Transaction Clarity (1 hour)
+- [ ] **Update EXPLAIN Viewer UX**
+  - [ ] Remove misleading "transaction" language from DDL execution
+  - [ ] Add warning message: "DDL operations (CREATE INDEX, ALTER TABLE) auto-commit in MySQL/MariaDB"
+  - [ ] Update confirmation dialogs to clarify no rollback capability
+  - [ ] Add documentation link for MySQL DDL behavior
+
+**Note:** High severity issue from Cursor Bugbot review. MySQL/MariaDB DDL statements are auto-committed and cannot be rolled back, but the UI suggests they can be.
+
+#### 12.2 Optimization Plan Refresh (1-2 hours)
+- [ ] **Capture Post-Optimization EXPLAIN**
+  - [ ] Store new EXPLAIN result after applying DDL optimizations
+  - [ ] Update `this.explainData` with fresh execution plan
+  - [ ] Refresh tree visualization with new data
+  - [ ] Show before/after comparison metrics
+
+**Note:** High severity issue from Cursor Bugbot review. After applying optimizations, the panel shows stale data instead of the updated execution plan.
+
+#### 12.3 Chat Response File References (30 min)
+- [ ] **Fix Range Parameter Support**
+  - [ ] Update `ChatResponseStream.reference()` to support Location object
+  - [ ] Pass range to VSCode API when available
+  - [ ] Enable line-specific file references in chat
+
+**Note:** Medium severity issue from Cursor Bugbot review. Currently ignores range parameter, loses precision.
+
+#### 12.4 Type Refactoring (30 min)
+- [ ] **Remove Duplicated ParsedQuery Type**
+  - [ ] Import `ParsedQuery` interface from `nl-query-parser.ts`
+  - [ ] Remove inline type definition in `chat-participant.ts`
+  - [ ] Ensure type consistency across chat features
+
+**Note:** Medium severity issue from Cursor Bugbot review. Duplicated inline type creates maintenance burden.
+
+**Estimated Time:** 3-4 hours
+
+---
+
 ## 📊 **Phase 2 Timeline**
 
 | Milestone | Estimated Time | Priority | Target |
