@@ -119,6 +119,12 @@
 
     const ctx = waterfallCanvas.getContext('2d');
 
+    // Get theme-aware colors from CSS variables
+    const computedStyle = getComputedStyle(document.body);
+    const foregroundColor = computedStyle.getPropertyValue('--vscode-foreground').trim() || '#cccccc';
+    const backgroundColor = computedStyle.getPropertyValue('--vscode-editor-background').trim() || '#1e1e1e';
+    const borderColor = computedStyle.getPropertyValue('--vscode-widget-border').trim() || '#666666';
+
     chartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -157,10 +163,10 @@
                 ];
               }
             },
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            titleColor: '#fff',
-            bodyColor: '#fff',
-            borderColor: '#666',
+            backgroundColor: backgroundColor,
+            titleColor: foregroundColor,
+            bodyColor: foregroundColor,
+            borderColor: borderColor,
             borderWidth: 1,
             padding: 12,
             displayColors: true
@@ -171,32 +177,37 @@
             title: {
               display: true,
               text: 'Duration (µs)',
-              color: 'var(--vscode-foreground)',
+              color: foregroundColor,
               font: {
-                size: 13,
+                size: 14,
                 weight: 'bold'
-              }
+              },
+              padding: { top: 10, bottom: 0 }
             },
             ticks: {
-              color: 'var(--vscode-foreground)',
+              color: foregroundColor,
               font: {
-                size: 12,
-                weight: '500'
-              }
+                size: 13,
+                weight: '600'
+              },
+              padding: 5
             },
             grid: {
-              color: 'var(--vscode-widget-border)'
+              color: 'rgba(128, 128, 128, 0.3)',
+              lineWidth: 1
             }
           },
           y: {
             ticks: {
-              color: 'var(--vscode-foreground)',
+              color: foregroundColor,
               font: {
-                size: 12,
-                weight: '500'
+                size: 13,
+                weight: '600',
+                lineHeight: 1.2
               },
               autoSkip: false,
-              padding: 5
+              padding: 8,
+              crossAlign: 'far'
             },
             grid: {
               display: false

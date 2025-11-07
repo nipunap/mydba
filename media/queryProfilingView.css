@@ -103,7 +103,7 @@
   position: relative;
   width: 100%;
   height: 500px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--vscode-editor-background);
   border: 1px solid var(--vscode-widget-border);
   border-radius: 8px;
   padding: 16px;
@@ -113,6 +113,7 @@
 /* Ensure canvas text is visible */
 .chart-container canvas {
   background: transparent;
+  font-family: var(--vscode-font-family);
 }
 
 .stages-table-container {

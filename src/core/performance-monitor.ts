@@ -119,7 +119,12 @@ export class PerformanceMonitor implements IPerformanceMonitor {
      * Get all spans (active + completed)
      */
     getAllSpans(): IPerformanceSpan[] {
-        return [...this.completedSpans];
+        // Include both active and completed spans as documented
+        const activeSpansList = Array.from(this.activeSpans)
+            .map(spanId => this.spans.get(spanId))
+            .filter((span): span is IPerformanceSpan => span !== undefined);
+
+        return [...activeSpansList, ...this.completedSpans];
     }
 
     /**
@@ -162,6 +167,25 @@ export class PerformanceMonitor implements IPerformanceMonitor {
      * Export in OpenTelemetry format
      */
     private exportOpenTelemetry(): unknown {
+        // Generate a single traceId for all spans in this trace (per OpenTelemetry standards)
+        const traceId = this.generateTraceId();
+
+        // Create a mapping from span IDs to their indices in completedSpans array
+        // This ensures parent-child relationships are consistent
+        const spanIdToIndex = new Map<string, number>();
+
+        // First pass: Build the span ID to index mapping
+        // We need to reconstruct the original span IDs to map them properly
+        this.completedSpans.forEach((span, index) => {
+            // Try to find the span in the spans Map to get its actual ID
+            for (const [spanId, storedSpan] of this.spans.entries()) {
+                if (storedSpan === span) {
+                    spanIdToIndex.set(spanId, index);
+                    break;
+                }
+            }
+        });
+
         return {
             resourceSpans: [
                 {
@@ -177,20 +201,25 @@ export class PerformanceMonitor implements IPerformanceMonitor {
                                 name: 'mydba-performance-monitor',
                                 version: '1.0.0'
                             },
-                            spans: this.completedSpans.map((span, index) => ({
-                                traceId: this.generateTraceId(),
-                                spanId: this.generateSpanId(index),
-                                parentSpanId: span.parent ? this.generateSpanId(parseInt(span.parent.split('-')[1] || '0')) : undefined,
-                                name: span.operation,
-                                kind: 1, // SPAN_KIND_INTERNAL
-                                startTimeUnixNano: Math.floor(span.startTime * 1000000),
-                                endTimeUnixNano: span.endTime ? Math.floor(span.endTime * 1000000) : undefined,
-                                attributes: Object.entries(span.metadata || {}).map(([key, value]) => ({
-                                    key,
-                                    value: { stringValue: String(value) }
-                                })),
-                                status: { code: 1 } // STATUS_CODE_OK
-                            }))
+                            spans: this.completedSpans.map((span, index) => {
+                                // Find parent's index in the completedSpans array
+                                const parentIndex = span.parent ? spanIdToIndex.get(span.parent) : undefined;
+
+                                return {
+                                    traceId, // Shared traceId for all spans in this trace
+                                    spanId: this.generateSpanId(index),
+                                    parentSpanId: parentIndex !== undefined ? this.generateSpanId(parentIndex) : undefined,
+                                    name: span.operation,
+                                    kind: 1, // SPAN_KIND_INTERNAL
+                                    startTimeUnixNano: Math.floor(span.startTime * 1000000),
+                                    endTimeUnixNano: span.endTime ? Math.floor(span.endTime * 1000000) : undefined,
+                                    attributes: Object.entries(span.metadata || {}).map(([key, value]) => ({
+                                        key,
+                                        value: { stringValue: String(value) }
+                                    })),
+                                    status: { code: 1 } // STATUS_CODE_OK
+                                };
+                            })
                         }
                     ]
                 }

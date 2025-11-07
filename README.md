@@ -7,9 +7,8 @@
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=mydba.mydba)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![VSCode](https://img.shields.io/badge/VSCode-1.85%2B-blue.svg)](https://code.visualstudio.com/)
-[![Phase 1](https://img.shields.io/badge/Phase%201-Complete-brightgreen.svg)](docs/PHASE1_COMPLETION_PLAN.md)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/your-org/mydba/actions)
-[![Coverage](https://img.shields.io/badge/coverage-%3E70%25-brightgreen.svg)](coverage/index.html)
+[![Tests](https://img.shields.io/badge/tests-186_passing-brightgreen.svg)](https://github.com/your-org/mydba/actions)
+[![Coverage](https://img.shields.io/badge/coverage-10.76%25-yellow.svg)](coverage/index.html)
 [![License Compliance](https://img.shields.io/badge/licenses-compliant-brightgreen.svg)](https://github.com/your-org/mydba/actions)
 [![PR Checks](https://img.shields.io/badge/PR%20checks-automated-blue.svg)](https://github.com/your-org/mydba/actions)
 
@@ -17,27 +16,18 @@ MyDBA is an AI-powered VSCode extension that brings database management, monitor
 
 ## 🚀 Features
 
-### Phase 1 MVP ✅ (Complete)
 - **Multi-Database Support**: MySQL 8.0+, MariaDB 10.6+ (GA versions only)
 - **AI-Powered Query Analysis**: Multi-provider support (VSCode LM, OpenAI, Anthropic, Ollama)
 - **Visual EXPLAIN Plans**: Interactive tree diagrams with pain point highlighting
 - **Query Profiling**: Performance Schema integration with waterfall charts
 - **Database Explorer**: Tree view with databases, tables, indexes, and processes
-- **Enhanced Process List**: Transaction detection with grouping by user/host/query
+- **Enhanced Process List**: Transaction detection with grouping by user/host/query, lock status badges
+- **Query History**: Track executed queries with favorites, search, and replay
 - **Security-First Design**: Credential isolation, production safeguards, query anonymization
 - **Documentation-Grounded AI**: RAG system with MySQL/MariaDB docs to reduce hallucinations
+- **Chat Integration**: `@mydba` commands in VSCode Chat with natural language support
 - **Editor Compatibility**: Works in VSCode, Cursor, Windsurf, and VSCodium
-- **Comprehensive Testing**: Integration tests with Docker, 70%+ code coverage
-
-### Phase 1.5 Status (Quality Sprint)
-> Current focus: Code Quality & Production Readiness prior to Phase 2.
->
-> - Test Coverage: Raising from 1.7% to ≥ 70% (with CI gate)
-> - AI Service: Completing coordinator (real responses, provider fallback)
-> - Technical Debt: Resolving CRITICAL/HIGH TODOs
-> - Production Readiness: Error recovery, disposables hygiene, caching, audit logging
->
-> See the roadmap for details: [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md). For current coverage, open `coverage/index.html` after running tests.
+- **Testing**: 186 unit tests passing, integration tests with Docker (coverage improving to 70%)
 
 ### Metrics Dashboard
 
@@ -130,7 +120,6 @@ FLUSH PRIVILEGES;
 
 **Quick Links**:
 - 📖 [Database Setup Guide](docs/DATABASE_SETUP.md) - Detailed setup instructions
-- ⚡ [Quick Reference](docs/QUICK_REFERENCE.md) - Quick setup checklist and commands
 - 🧪 [Testing Guide](test/MARIADB_TESTING.md) - Docker setup for development
 
 ## 🛠️ Installation
@@ -292,17 +281,39 @@ No configuration needed! If you have GitHub Copilot, MyDBA will automatically us
 }
 ```
 
-## 💬 VSCode Chat Integration
+## 💬 VSCode Chat Integration ✨ NEW
 
-Use `@mydba` in VSCode Chat for natural language database assistance:
+Use `@mydba` in VSCode Chat for conversational database assistance powered by AI.
+
+### Available Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/analyze` | Analyze query for anti-patterns and optimization opportunities | `@mydba /analyze SELECT * FROM users` |
+| `/explain` | Visualize query execution plan with pain point detection | `@mydba /explain SELECT * FROM orders WHERE status = 'active'` |
+| `/profile` | Profile query performance with stage-by-stage breakdown | `@mydba /profile SELECT COUNT(*) FROM large_table` |
+| `/optimize` | Get AI-powered optimization suggestions | `@mydba /optimize SELECT * FROM users JOIN orders` |
+| `/schema` | Explore table schema and relationships | `@mydba /schema users` |
+
+### Natural Language Queries
+
+Ask questions in plain English:
 
 ```
-@mydba /analyze SELECT * FROM users WHERE email = 'test@example.com'
-@mydba /explain SELECT * FROM orders WHERE created_at > '2024-01-01'
-@mydba /profile SELECT COUNT(*) FROM large_table
 @mydba how do I optimize this slow query?
 @mydba what indexes should I add to the users table?
+@mydba why is my query doing a full table scan?
+@mydba explain the difference between INNER JOIN and LEFT JOIN
+@mydba show me the current connections
 ```
+
+### Requirements
+
+- VSCode with Chat API support (VSCode 1.90+)
+- Requires an AI provider configured (VSCode LM/OpenAI/Anthropic/Ollama)
+- Enable with `mydba.ai.chatEnabled: true` (enabled by default)
+
+**Note**: Chat participant is not available in all VSCode-compatible editors. Works best in official VSCode with GitHub Copilot.
 
 ## 🔒 Security & Privacy
 
@@ -424,7 +435,6 @@ See [SECURITY.md](SECURITY.md) for security policies and supported versions.
 - **Discussions**: [GitHub Discussions](https://github.com/your-org/mydba/discussions)
 - **Documentation**:
   - [Database Setup Guide](docs/DATABASE_SETUP.md)
-  - [Quick Reference](docs/QUICK_REFERENCE.md)
   - [Testing Guide](test/MARIADB_TESTING.md)
 
 ## 🙏 Acknowledgments

@@ -270,7 +270,7 @@
         },
         "mydba.ai.chatEnabled": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Enable @mydba chat participant"
         },
         "mydba.ai.confirmBeforeSend": {

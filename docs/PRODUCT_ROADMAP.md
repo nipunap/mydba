@@ -148,7 +148,7 @@
 
 ---
 
-## ✅ **Milestone 4: AI Integration** (95% COMPLETE)
+## ✅ **Milestone 4: AI Integration** (100% COMPLETE)
 
 ### Phase 1 Scope - Completed ✅
 - [x] **Multi-Provider AI Integration** (15 hours)
@@ -185,14 +185,36 @@
   - [x] Automated marketplace publishing
   - [x] Integration test infrastructure
 
-### Phase 1 Scope - Remaining ⏳
-- [ ] **Enhanced Process List UI** (6-8 hours) - **IN PROGRESS**
-  - [ ] Grouping by user, host, and query fingerprint
-  - [ ] Transaction indicator badges (🔄, ⚠️, ✅)
-  - [ ] Collapsible group headers
-- [ ] **Docker Test Environment** (2-3 hours)
-  - [ ] docker-compose.test.yml for MySQL/MariaDB
-  - [ ] Integration test execution
+### Phase 1 Scope - Completed ✅ (Nov 7, 2025)
+- [x] **Enhanced Process List UI** (6-8 hours) ✅ COMPLETE
+  - [x] Grouping by user, host, db, command, state, query fingerprint, locks
+  - [x] Transaction indicator badges (🔄, ⚠️, ✅)
+  - [x] **Lock status badges** (🔒 Blocked, ⛔ Blocking, 🔐 Has Locks)
+  - [x] Collapsible group headers with stats
+  - [x] 11-column table layout (added Locks column)
+- [x] **Docker Test Environment** (2-3 hours) ✅ COMPLETE
+  - [x] docker-compose.test.yml for MySQL 8.0 + MariaDB 10.11
+  - [x] Test database initialization scripts (test/sql/init-*.sql)
+  - [x] Integration test execution with Docker
+- [x] **Query History Panel** (4-6 hours) ✅ COMPLETE
+  - [x] Track executed queries with timestamps
+  - [x] Favorite queries
+  - [x] Search and replay functionality
+- [x] **Enhanced AI Citations** (2 hours) ✅ COMPLETE
+  - [x] [Citation X] format in AI responses
+  - [x] Citations array in AI response schema
+  - [x] OpenAI and Anthropic providers updated
+- [x] **macOS Testing Support** (1 hour) ✅ COMPLETE
+  - [x] fix-vscode-test-macos.sh script
+  - [x] TESTING_MACOS_ISSUES.md documentation
+- [x] **Query Deanonymizer** (2 hours) ✅ COMPLETE
+  - [x] Parameter placeholder replacement for EXPLAIN
+  - [x] Sample value generation for profiling
+- [x] **Code Quality Improvements** (4 hours) ✅ COMPLETE
+  - [x] Removed eslint-disable @typescript-eslint/no-explicit-any
+  - [x] Proper type assertions in connection-manager.ts
+  - [x] Coverage thresholds in jest.config.js (70% target)
+  - [x] System schema filtering in slow-queries-service.ts
 
 **Editor Compatibility**:
 - ✅ VSCode (all providers)
@@ -211,6 +233,7 @@
 - Unit tests: security validators, adapters, core services
 - Integration tests: query execution E2E, webviews
 - CI coverage gate and reporting
+- **Current Status**: 186 tests passing, 10.76% coverage (Target: 70%)
 - DoD: Coverage ≥ 70%; tests green; ESLint clean; gates enforced in CI
 
 ### Milestone 4.6: AI Service Coordinator (12–16h)
@@ -499,31 +522,22 @@ One-click fixes require more UX polish and extensive testing to ensure safety.
 
 ---
 
-## 🎯 **Immediate Next Steps (Final 5% to MVP)**
+## ✅ **Phase 1 MVP Complete! (100%)**
 
-### **Priority 1: Process List UI** (6-8 hours) 🔴 CRITICAL
-**Status:** Backend complete, UI implementation needed
-**Tasks:**
-1. Add grouping dropdown to HTML template
-2. Implement grouping logic in JavaScript
-3. Add transaction indicator badges (🔄, ⚠️, ✅)
-4. Implement collapsible group headers
-5. Add CSS styling for groups and badges
-6. Persist grouping preference
+All Phase 1 features are now implemented and tested:
+- ✅ Connection Management
+- ✅ Database Explorer
+- ✅ Process List (with lock badges and 7 grouping modes)
+- ✅ Query History Panel
+- ✅ System Variables
+- ✅ Monitoring Dashboards
+- ✅ AI Integration (4 providers + RAG with citations)
+- ✅ EXPLAIN Visualization (D3.js tree + AI interpretation)
+- ✅ Query Profiling (Performance Schema + waterfall charts)
+- ✅ Docker Test Environment (MySQL 8.0 + MariaDB 10.11)
+- ✅ macOS Testing Support
 
-**Blockers:** None
-**Target:** December 27, 2025
-
-### **Priority 2: Docker Test Environment** (2-3 hours) 🟡 QUALITY
-**Status:** Test infrastructure ready, Docker setup needed
-**Tasks:**
-1. Create `docker-compose.test.yml` for MySQL 8.0 + MariaDB 10.11
-2. Add test database initialization scripts
-3. Update `CONTRIBUTING.md` with Docker setup
-4. Integrate with CI workflows
-
-**Blockers:** None
-**Target:** December 28, 2025
+**Next Focus:** Phase 1.5 Code Quality Sprint (70% test coverage target)
 
 ---
 
@@ -535,7 +549,7 @@ One-click fixes require more UX polish and extensive testing to ensure safety.
 | **Phase 1** | 2. Core UI | ✅ Complete | 100% | ✅ Done |
 | **Phase 1** | 3. Monitoring | ✅ Complete | 90% | ✅ Done |
 | **Phase 1** | 4. AI Integration | ✅ Complete | 85% | 🔄 Code Review |
-| **Phase 1.5** | Code Quality Sprint | 🔄 In Progress | 45% | 📅 Nov 2025 |
+| **Phase 1.5** | Code Quality Sprint | 🔄 In Progress | 60% | 📅 Nov 2025 |
 | **Phase 2** | 5. Visual Query Analysis | ✅ Complete | 100% | ✅ Nov 7, 2025 |
 | **Phase 2** | 6. Conversational AI | 🔄 In Progress | 80% | 📅 Nov 2025 |
 | **Phase 2** | 7. Architecture Improvements | 🚫 Pending | 0% | 📅 Q1 2026 |
@@ -552,14 +566,17 @@ One-click fixes require more UX polish and extensive testing to ensure safety.
 
 ### **Phase 1 Accomplishments**
 - ✅ Multi-provider AI system (VSCode LM, OpenAI, Anthropic, Ollama)
-- ✅ RAG system with 46 curated documentation snippets
+- ✅ RAG system with 46 curated documentation snippets + **[Citation X] format**
 - ✅ Query analysis engine with anti-pattern detection
-- ✅ Process List with transaction detection backend
+- ✅ **Process List with lock status badges** (Blocked, Blocking, Active Locks)
+- ✅ Process List with transaction detection + **7 grouping modes**
+- ✅ **Query History Panel** with favorites and search
 - ✅ AI configuration UI with status bar integration
-- ✅ Multi-OS CI/CD with CodeQL security scanning
+- ✅ Multi-OS CI/CD with CodeQL security scanning + **macOS testing fixes**
 - ✅ Automated VSCode Marketplace publishing
-- ✅ Integration test infrastructure
-- ✅ 22 passing unit tests with strict linting
+- ✅ Integration test infrastructure + **Docker test environment**
+- ✅ 186 passing unit tests with strict linting
+- ✅ **Query Deanonymizer** for EXPLAIN/profiling parameter handling
 
 ### **Phase 2 Accomplishments (Nov 7, 2025)**
 - ✅ **Milestone 5: Visual Query Analysis** (100% Complete)
@@ -571,8 +588,8 @@ One-click fixes require more UX polish and extensive testing to ensure safety.
   - ✅ Stage-by-stage breakdown with duration percentages
   - ✅ RAG-grounded citations from MySQL docs
   - ✅ Performance predictions (current vs. optimized)
-- ✅ **Phase 1.5 Progress**
-  - ✅ Test Infrastructure (154 tests, 70%+ coverage)
+- 🔄 **Phase 1.5 Progress**
+  - 🔄 Test Infrastructure (186 tests passing, 10.76% coverage - Target: 70%)
   - ✅ AI Service Coordinator implementation
   - ✅ Config reload without restart
   - ✅ Production readiness (error recovery, disposables, audit logs)

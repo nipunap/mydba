@@ -96,6 +96,9 @@ export class VariablesPanel {
                     case 'validateVariable':
                         await this.handleValidateVariable(message.name, message.value);
                         break;
+                    case 'getAIDescription':
+                        await this.handleGetAIDescription(message.name, message.currentValue);
+                        break;
                 }
             },
             null,
@@ -223,6 +226,80 @@ export class VariablesPanel {
         }
 
         return { valid: true, message: 'Valid' };
+    }
+
+    private async handleGetAIDescription(name: string, currentValue: string): Promise<void> {
+        try {
+            this.logger.info(`Generating AI description for variable: ${name}`);
+
+            // Send loading state
+            this.panel.webview.postMessage({
+                type: 'aiDescriptionLoading',
+                name
+            });
+
+            // Get database type
+            const connection = this.connectionManager.getConnection(this.connectionId);
+            const dbType = connection?.type === 'mariadb' ? 'mariadb' : 'mysql';
+
+            // Initialize AI service coordinator
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
+            const aiCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiCoordinator.initialize();
+
+            // Check if AI is available
+            const providerInfo = aiCoordinator.getProviderInfo();
+            if (!providerInfo || !providerInfo.available) {
+                throw new Error('AI service not available. Please configure an AI provider in settings.');
+            }
+
+            // Create a prompt for the AI to describe the variable
+            const prompt = `You are a senior database administrator expert. Provide a clear, concise description for the MySQL/MariaDB system variable '${name}' which currently has the value '${currentValue}'.
+
+Include:
+1. What this variable controls
+2. Common use cases
+3. Recommended values or best practices
+4. Any risks or warnings about changing it
+
+Be concise (2-3 sentences) and practical. Focus on actionable information for a DBA.`;
+
+            // Get AI response
+            const response = await aiCoordinator.analyzeQuery(
+                prompt,
+                { tables: {} },
+                dbType
+            );
+
+            // Extract description from summary
+            const description = response.summary || 'AI was unable to generate a description.';
+
+            // Determine risk level based on variable name patterns
+            let risk: 'safe' | 'caution' | 'dangerous' = 'safe';
+            if (name.includes('binlog') || name.includes('log_bin') || name.includes('gtid') ||
+                name.includes('sql_mode') || name.includes('read_only')) {
+                risk = 'dangerous';
+            } else if (name.includes('timeout') || name.includes('lock') || name.includes('innodb')) {
+                risk = 'caution';
+            }
+
+            // Send the AI-generated description
+            this.panel.webview.postMessage({
+                type: 'aiDescriptionReceived',
+                name,
+                description,
+                recommendation: response.optimizationSuggestions?.[0]?.description || 'Review documentation before changing',
+                risk
+            });
+
+        } catch (error) {
+            this.logger.error('Failed to generate AI description:', error as Error);
+            this.panel.webview.postMessage({
+                type: 'aiDescriptionError',
+                name,
+                error: (error as Error).message
+            });
+        }
     }
 
     private getVariableMetadata(name: string): VariableMetadata {
@@ -431,6 +508,9 @@ export class VariablesPanel {
                     <div class="info-section">
                         <strong>Description:</strong>
                         <p id="var-description"></p>
+                        <button id="get-ai-description-btn" class="ai-description-btn" style="display: none;">
+                            <span class="codicon codicon-sparkle"></span> Get AI Description
+                        </button>
                     </div>
                     <div class="info-section">
                         <strong>Recommendation:</strong>

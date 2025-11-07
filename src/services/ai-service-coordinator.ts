@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { AIService } from './ai-service';
 import { QueryAnalyzer } from './query-analyzer';
 import { Logger } from '../utils/logger';
-import { SchemaContext, AIAnalysisResult } from '../types/ai-types';
+import { SchemaContext, AIAnalysisResult, OptimizationSuggestion, Citation, AntiPattern } from '../types/ai-types';
 
 /**
  * AI Service Coordinator
@@ -145,6 +145,12 @@ export class AIServiceCoordinator {
         this.logger.info('Interpreting profiling data');
 
         try {
+            // Extract efficiency from profile summary if available
+            const profile = profilingData as { summary?: { efficiency?: number; totalRowsExamined?: number; totalRowsSent?: number } };
+            const efficiency = profile.summary?.efficiency;
+            const rowsExamined = profile.summary?.totalRowsExamined;
+            const rowsSent = profile.summary?.totalRowsSent;
+
             // Calculate stage percentages
             const stages = this.calculateStagePercentages(profilingData);
 
@@ -159,7 +165,10 @@ export class AIServiceCoordinator {
                     stages,
                     bottlenecks,
                     query,
-                    dbType
+                    dbType,
+                    efficiency,
+                    rowsExamined,
+                    rowsSent
                 );
 
                 return {
@@ -349,54 +358,125 @@ export class AIServiceCoordinator {
     }
 
     private async getAIExplainInterpretation(
-        _explainData: unknown,
-        _query: string,
-        _painPoints: PainPoint[],
-        _dbType: string
+        explainData: unknown,
+        query: string,
+        painPoints: PainPoint[],
+        dbType: string
     ): Promise<{ summary: string; suggestions: string[]; performancePrediction: null; citations: Array<{ source: string; url: string; excerpt: string }> }> {
-        // This would call the AI service with appropriate prompting
-        // For now, returning a placeholder structure
-        return {
-            summary: 'AI interpretation not yet implemented',
-            suggestions: [],
-            performancePrediction: null,
-            citations: []
-        };
+        this.logger.info('Getting AI EXPLAIN interpretation');
+
+        try {
+            // Build schema context with EXPLAIN data
+            const schemaContext: SchemaContext & { explainPlan?: unknown; painPoints?: unknown[] } = {
+                tables: {},
+                explainPlan: explainData,
+                painPoints: painPoints.map(p => ({
+                    type: p.type,
+                    severity: p.severity,
+                    description: p.description,
+                    table: p.table,
+                    rowsAffected: p.rowsAffected
+                }))
+            };
+
+            // Use AI service to analyze the query with EXPLAIN context
+            const aiResult = await this.aiService.analyzeQuery(query, schemaContext, dbType as 'mysql' | 'mariadb');
+
+            // Extract suggestions from AI result
+            const suggestions: string[] = [];
+
+            // Add pain point suggestions first
+            painPoints.forEach(pp => {
+                if (pp.suggestion) {
+                    suggestions.push(pp.suggestion);
+                }
+            });
+
+            // Add AI optimization suggestions
+            if (aiResult.optimizationSuggestions && aiResult.optimizationSuggestions.length > 0) {
+                aiResult.optimizationSuggestions.forEach((opt: OptimizationSuggestion) => {
+                    const suggestion = opt.title ? `${opt.title}: ${opt.description}` : opt.description;
+                    if (suggestion && !suggestions.includes(suggestion)) {
+                        suggestions.push(suggestion);
+                    }
+                });
+            }
+
+            // Extract citations if available
+            const citations: Array<{ source: string; url: string; excerpt: string }> = [];
+            if (aiResult.citations && Array.isArray(aiResult.citations)) {
+                aiResult.citations.forEach((citation: Citation) => {
+                    citations.push({
+                        source: citation.title || citation.source || 'Unknown',
+                        url: '',
+                        excerpt: citation.relevance?.toString() || ''
+                    });
+                });
+            }
+
+            // Build comprehensive summary
+            let summary = aiResult.summary || '';
+            if (painPoints.length > 0) {
+                const criticalCount = painPoints.filter(p => p.severity === 'CRITICAL').length;
+                const warningCount = painPoints.filter(p => p.severity === 'WARNING').length;
+
+                if (criticalCount > 0) {
+                    summary = `⚠️ Found ${criticalCount} critical issue(s) and ${warningCount} warning(s). ${summary}`;
+                } else if (warningCount > 0) {
+                    summary = `Found ${warningCount} warning(s). ${summary}`;
+                }
+            }
+
+            return {
+                summary: summary || 'Query execution plan analyzed.',
+                suggestions: suggestions.length > 0 ? suggestions : ['No specific optimizations recommended.'],
+                performancePrediction: null,
+                citations
+            };
+
+        } catch (error) {
+            this.logger.error('Failed to get AI EXPLAIN interpretation:', error as Error);
+            // Return basic analysis instead of throwing
+            return {
+                summary: `Unable to generate AI insights: ${(error as Error).message}. ${this.generateStaticExplainSummary(explainData, painPoints)}`,
+                suggestions: this.generateStaticSuggestions(painPoints),
+                performancePrediction: null,
+                citations: []
+            };
+        }
     }
 
     private async getAIProfilingInsights(
         stages: ProfilingStage[],
         bottlenecks: ProfilingStage[],
         query: string,
-        dbType: string
+        dbType: string,
+        efficiency?: number,
+        rowsExamined?: number,
+        rowsSent?: number
     ): Promise<{ insights: string[]; suggestions: string[]; citations: Array<{ source: string; url: string; excerpt: string }> }> {
         this.logger.info('Getting AI profiling insights');
 
         try {
             // Build a schema context with performance data
             const totalDuration = this.calculateTotalDuration(stages);
-            const efficiency = stages.length > 0 ? (stages.reduce((sum, s) => sum + s.duration, 0) / totalDuration) * 100 : 0;
 
-            const schemaContext = {
+            const schemaContext: SchemaContext = {
                 tables: {},
                 performance: {
                     totalDuration,
                     efficiency,
+                    rowsExamined,
+                    rowsSent,
                     stages: stages.map(s => ({
                         name: s.name,
-                        duration: s.duration,
-                        percentage: s.percentage
-                    })),
-                    bottlenecks: bottlenecks.map(b => ({
-                        name: b.name,
-                        duration: b.duration,
-                        percentage: b.percentage
+                        duration: s.duration
                     }))
                 }
             };
 
             // Use AI service to analyze the query with profiling context
-            const aiResult = await this.aiService.analyzeQuery(query, schemaContext as Record<string, unknown>, dbType as 'mysql' | 'mariadb');
+            const aiResult = await this.aiService.analyzeQuery(query, schemaContext, dbType as 'mysql' | 'mariadb');
 
             // Extract insights and suggestions from AI result
             const insights: string[] = [];
@@ -409,17 +489,17 @@ export class AIServiceCoordinator {
 
             // Add anti-patterns as insights
             if (aiResult.antiPatterns && aiResult.antiPatterns.length > 0) {
-                aiResult.antiPatterns.forEach((ap: Record<string, unknown>) => {
+                aiResult.antiPatterns.forEach((ap: AntiPattern) => {
                     insights.push(`⚠️ ${ap.type || 'Issue'}: ${ap.message}`);
                     if (ap.suggestion) {
-                        suggestions.push(String(ap.suggestion));
+                        suggestions.push(ap.suggestion);
                     }
                 });
             }
 
             // Add optimization suggestions
             if (aiResult.optimizationSuggestions && aiResult.optimizationSuggestions.length > 0) {
-                aiResult.optimizationSuggestions.forEach((opt: Record<string, unknown>) => {
+                aiResult.optimizationSuggestions.forEach((opt: OptimizationSuggestion) => {
                     suggestions.push(`${opt.title}: ${opt.description}`);
                 });
             }
@@ -427,11 +507,11 @@ export class AIServiceCoordinator {
             // Extract citations if available
             const citations: Array<{ source: string; url: string; excerpt: string }> = [];
             if (aiResult.citations && Array.isArray(aiResult.citations)) {
-                aiResult.citations.forEach((citation: Record<string, unknown>) => {
+                aiResult.citations.forEach((citation: Citation) => {
                     citations.push({
-                        source: String(citation.title || citation.source || 'Unknown'),
-                        url: String(citation.url || ''),
-                        excerpt: String(citation.relevance || citation.excerpt || '')
+                        source: citation.title || citation.source || 'Unknown',
+                        url: '',
+                        excerpt: citation.relevance?.toString() || ''
                     });
                 });
             }

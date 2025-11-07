@@ -55,10 +55,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const webviewManager = serviceContainer.get(SERVICE_TOKENS.WebviewManager) as WebviewManager;
         webviewManager.initialize();
 
-        // Register chat participant
-        const chatParticipant = new MyDBAChatParticipant(context, logger, serviceContainer);
-        context.subscriptions.push(chatParticipant);
-        logger.info('Chat participant registered');
+        // Register chat participant (if enabled and supported)
+        const config = vscode.workspace.getConfiguration('mydba');
+        const chatEnabled = config.get<boolean>('ai.chatEnabled', true);
+
+        if (chatEnabled && vscode.chat) {
+            try {
+                const chatParticipant = new MyDBAChatParticipant(context, logger, serviceContainer);
+                context.subscriptions.push(chatParticipant);
+                logger.info('Chat participant registered successfully');
+            } catch (error) {
+                logger.warn('Chat participant registration failed (may not be supported in this environment):', error as Error);
+            }
+        } else {
+            logger.info('Chat participant disabled or not supported');
+        }
 
         // Create AI provider status bar item
         const aiStatusBar = vscode.window.createStatusBarItem(

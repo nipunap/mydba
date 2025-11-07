@@ -50,6 +50,7 @@
     const varCurrent = document.getElementById('var-current');
     const varDescription = document.getElementById('var-description');
     const varRecommendation = document.getElementById('var-recommendation');
+    const getAIDescriptionBtn = document.getElementById('get-ai-description-btn');
 
     // Event listeners
     refreshBtn?.addEventListener('click', () => {
@@ -79,6 +80,16 @@
     cancelBtn?.addEventListener('click', closeModal);
     saveBtn?.addEventListener('click', saveVariable);
 
+    getAIDescriptionBtn?.addEventListener('click', () => {
+        if (currentEditingVariable) {
+            vscode.postMessage({
+                type: 'getAIDescription',
+                name: currentEditingVariable.name,
+                currentValue: currentEditingVariable.value
+            });
+        }
+    });
+
     editVarValue?.addEventListener('input', debounce((e) => {
         if (currentEditingVariable) {
             vscode.postMessage({
@@ -91,7 +102,7 @@
 
     // Close modal on ESC key
     window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && editModal.style.display === 'flex') {
+        if (e.key === 'Escape' && editModal?.style.display === 'flex') {
             closeModal();
         }
     });
@@ -132,6 +143,15 @@
                 break;
             case 'editCancelled':
                 closeModal();
+                break;
+            case 'aiDescriptionLoading':
+                handleAIDescriptionLoading();
+                break;
+            case 'aiDescriptionReceived':
+                handleAIDescriptionReceived(message.name, message.description, message.recommendation, message.risk);
+                break;
+            case 'aiDescriptionError':
+                handleAIDescriptionError(message.error);
                 break;
         }
     });
@@ -251,6 +271,17 @@
             varRisk.className = `risk-badge risk-${variable.metadata.risk}`;
             varDescription.textContent = variable.metadata.description || 'No description available';
             varRecommendation.textContent = variable.metadata.recommendation || 'Consult MySQL documentation';
+
+            // Show AI description button if no description is available
+            if (getAIDescriptionBtn) {
+                if (variable.metadata.description === 'No description available') {
+                    getAIDescriptionBtn.style.display = 'inline-flex';
+                    getAIDescriptionBtn.disabled = false;
+                    getAIDescriptionBtn.innerHTML = '<span class="codicon codicon-sparkle"></span> Get AI Description';
+                } else {
+                    getAIDescriptionBtn.style.display = 'none';
+                }
+            }
         }
 
         // Show modal
@@ -424,6 +455,49 @@
 
     function hideError() {
         error.style.display = 'none';
+    }
+
+    function handleAIDescriptionLoading() {
+        if (getAIDescriptionBtn) {
+            getAIDescriptionBtn.disabled = true;
+            getAIDescriptionBtn.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin"></span> Generating...';
+        }
+    }
+
+    function handleAIDescriptionReceived(name, description, recommendation, risk) {
+        if (currentEditingVariable && currentEditingVariable.name === name) {
+            varDescription.textContent = description;
+            varRecommendation.textContent = recommendation;
+
+            // Update risk level if provided
+            if (risk && varRisk) {
+                varRisk.textContent = risk.charAt(0).toUpperCase() + risk.slice(1);
+                varRisk.className = `risk-badge risk-${risk}`;
+            }
+
+            // Hide the button after successful generation
+            if (getAIDescriptionBtn) {
+                getAIDescriptionBtn.style.display = 'none';
+            }
+
+            // Update the variable's metadata in cache
+            if (currentEditingVariable.metadata) {
+                currentEditingVariable.metadata.description = description;
+                currentEditingVariable.metadata.recommendation = recommendation;
+                if (risk) {
+                    currentEditingVariable.metadata.risk = risk;
+                }
+            }
+        }
+    }
+
+    function handleAIDescriptionError(errorMsg) {
+        if (getAIDescriptionBtn) {
+            getAIDescriptionBtn.disabled = false;
+            getAIDescriptionBtn.innerHTML = '<span class="codicon codicon-sparkle"></span> Get AI Description';
+        }
+        // Show error message
+        alert(`Failed to generate AI description: ${errorMsg}`);
     }
 
     function debounce(func, wait) {

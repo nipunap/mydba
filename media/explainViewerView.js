@@ -564,10 +564,8 @@
         root.x0 = height / 2;
         root.y0 = 0;
 
-        // Initialize all nodes as expanded
-        root.descendants().forEach(d => {
-            d._children = d.children;
-        });
+        // Initialize all nodes as expanded (d.children set, d._children null)
+        // d3.hierarchy already sets children properly, so no additional initialization needed
 
         // Tooltip div
         const tooltip = d3.select('body')

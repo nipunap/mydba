@@ -212,6 +212,7 @@ vscode-panels {
 
 .action-btn:hover:not(:disabled) {
     background: var(--vscode-button-secondaryHoverBackground);
+    border-color: var(--vscode-focusBorder);
 }
 
 .action-btn:active:not(:disabled) {
@@ -225,6 +226,19 @@ vscode-panels {
 
 .action-btn .codicon {
     font-size: 14px;
+    /* Ensure icons are visible with explicit color inheritance */
+    color: inherit;
+}
+
+/* Specific button styling for better visibility */
+.edit-btn:hover:not(:disabled) {
+    background: rgba(14, 99, 156, 0.2);
+    border-color: var(--vscode-focusBorder);
+}
+
+.rollback-btn:hover:not(:disabled) {
+    background: rgba(204, 102, 0, 0.2);
+    border-color: var(--vscode-editorWarning-foreground);
 }
 
 /* Modal Styles */
@@ -465,4 +479,48 @@ vscode-panels {
     .info-label {
         min-width: auto;
     }
+}
+
+/* AI Description Button */
+.ai-description-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--vscode-font-family);
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.ai-description-btn:hover:not(:disabled) {
+    background: var(--vscode-button-hoverBackground);
+    transform: translateY(-1px);
+}
+
+.ai-description-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.ai-description-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ai-description-btn .codicon {
+    font-size: 16px;
+}
+
+.ai-description-btn .codicon-modifier-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
