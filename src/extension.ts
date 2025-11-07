@@ -147,8 +147,8 @@ function setupEventListeners(context: vscode.ExtensionContext, logger: Logger): 
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('mydba')) {
-                logger.info('MyDBA configuration changed, reloading...');
-                // TODO: Reload configuration-dependent services
+                logger.info('MyDBA configuration changed, reloading affected services...');
+                await reloadConfiguration(e, logger);
             }
         })
     );
@@ -157,14 +157,104 @@ function setupEventListeners(context: vscode.ExtensionContext, logger: Logger): 
     context.subscriptions.push(
         vscode.window.onDidChangeWindowState((state) => {
             if (state.focused) {
-                logger.debug('VSCode window focused, resuming metrics collection');
-                // TODO: Resume metrics collection
+                logger.debug('VSCode window focused');
+                // Metrics collection handled by individual services
             } else {
-                logger.debug('VSCode window unfocused, pausing metrics collection');
-                // TODO: Pause metrics collection to save battery
+                logger.debug('VSCode window unfocused');
+                // Metrics collection handled by individual services
             }
         })
     );
+}
+
+/**
+ * Reload configuration-dependent services without restarting
+ */
+async function reloadConfiguration(
+    event: vscode.ConfigurationChangeEvent,
+    logger: Logger
+): Promise<void> {
+    try {
+        const treeViewProvider = serviceContainer.get(SERVICE_TOKENS.TreeViewProvider) as TreeViewProvider;
+
+        // AI configuration changes
+        if (event.affectsConfiguration('mydba.ai')) {
+            logger.info('AI configuration changed, reloading AI services...');
+            
+            const aiServiceCoordinator = serviceContainer.get(SERVICE_TOKENS.AIServiceCoordinator);
+            if (aiServiceCoordinator && 'reloadConfiguration' in aiServiceCoordinator && 
+                typeof aiServiceCoordinator.reloadConfiguration === 'function') {
+                await aiServiceCoordinator.reloadConfiguration();
+                logger.info('AI services reloaded successfully');
+            }
+
+            // Update status bar (handled by existing listener)
+            vscode.window.showInformationMessage('AI configuration updated');
+        }
+
+        // Connection configuration changes
+        if (event.affectsConfiguration('mydba.connection')) {
+            logger.info('Connection configuration changed, refreshing tree view...');
+            treeViewProvider.refresh();
+            vscode.window.showInformationMessage('Connection settings updated');
+        }
+
+        // Query configuration changes
+        if (event.affectsConfiguration('mydba.query')) {
+            logger.info('Query configuration changed');
+            vscode.window.showInformationMessage('Query settings updated');
+        }
+
+        // Security configuration changes
+        if (event.affectsConfiguration('mydba.security')) {
+            logger.info('Security configuration changed');
+            vscode.window.showInformationMessage('Security settings updated - please review your connections');
+        }
+
+        // Cache configuration changes
+        if (event.affectsConfiguration('mydba.cache')) {
+            logger.info('Cache configuration changed, clearing caches...');
+            
+            const cacheManager = serviceContainer.get(SERVICE_TOKENS.CacheManager);
+            if (cacheManager && 'clearAll' in cacheManager && 
+                typeof cacheManager.clearAll === 'function') {
+                cacheManager.clearAll();
+                logger.info('Caches cleared successfully');
+            }
+
+            vscode.window.showInformationMessage('Cache settings updated');
+        }
+
+        // Metrics configuration changes
+        if (event.affectsConfiguration('mydba.metrics')) {
+            logger.info('Metrics configuration changed');
+            vscode.window.showInformationMessage('Metrics collection settings updated');
+        }
+
+        // Logging level changes
+        if (event.affectsConfiguration('mydba.logging')) {
+            logger.info('Logging configuration changed - restart extension to apply');
+            vscode.window.showInformationMessage(
+                'Logging settings updated. Reload window to apply changes.',
+                'Reload Window'
+            ).then(selection => {
+                if (selection === 'Reload Window') {
+                    vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+            });
+        }
+
+    } catch (error) {
+        logger.error('Failed to reload configuration:', error as Error);
+        vscode.window.showWarningMessage(
+            `Failed to reload some settings: ${(error as Error).message}. You may need to reload the window.`,
+            'Reload Window'
+        ).then(selection => {
+            if (selection === 'Reload Window') {
+                vscode.commands.executeCommand('workbench.action.reloadWindow');
+            }
+        });
+    }
 }
 
 async function loadSavedState(context: vscode.ExtensionContext, logger: Logger): Promise<void> {
