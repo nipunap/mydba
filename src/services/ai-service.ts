@@ -14,6 +14,7 @@ import { RAGService } from './rag-service';
  */
 export class AIService {
     private provider: AIProvider | null = null;
+    private fallbackProviders: AIProvider[] = [];
     private anonymizer: QueryAnonymizer;
     private analyzer: QueryAnalyzer;
     private providerFactory: AIProviderFactory;
@@ -48,11 +49,12 @@ export class AIService {
             const ragStats = this.ragService.getStats();
             this.logger.info(`RAG: ${ragStats.total} docs loaded (MySQL: ${ragStats.mysql}, MariaDB: ${ragStats.mariadb})`);
 
-            // Initialize AI provider
-            this.provider = await this.providerFactory.createProvider(config);
+            // Initialize primary AI provider and fallback chain
+            await this.initializeProviders(config);
 
             if (this.provider) {
-                this.logger.info(`AI Service initialized with provider: ${this.provider.name}`);
+                const fallbackCount = this.fallbackProviders.length;
+                this.logger.info(`AI Service initialized with provider: ${this.provider.name}${fallbackCount > 0 ? ` (${fallbackCount} fallbacks)` : ''}`);
             } else {
                 this.logger.warn('No AI provider configured');
             }
@@ -60,6 +62,46 @@ export class AIService {
             this.logger.error('Failed to initialize AI Service:', error as Error);
             // Don't throw - allow extension to work without AI
         }
+    }
+
+    /**
+     * Initialize primary provider and fallback chain
+     */
+    private async initializeProviders(config: AIProviderConfig): Promise<void> {
+        // Clear existing providers
+        this.provider = null;
+        this.fallbackProviders = [];
+
+        // If provider is explicitly set (not 'auto'), initialize it
+        if (config.provider !== 'auto' && config.provider !== 'none') {
+            this.provider = await this.providerFactory.createProvider(config);
+            
+            // Build fallback chain (try other providers)
+            const fallbackOrder = this.getFallbackOrder(config.provider);
+            for (const fallbackProviderName of fallbackOrder) {
+                try {
+                    const fallbackConfig = { ...config, provider: fallbackProviderName };
+                    const fallbackProvider = await this.providerFactory.createProvider(fallbackConfig);
+                    if (fallbackProvider) {
+                        this.fallbackProviders.push(fallbackProvider);
+                        this.logger.debug(`Initialized fallback provider: ${fallbackProvider.name}`);
+                    }
+                } catch (error) {
+                    this.logger.debug(`Fallback provider ${fallbackProviderName} not available:`, error as Error);
+                }
+            }
+        } else {
+            // Auto mode - just use factory's auto-detection
+            this.provider = await this.providerFactory.createProvider(config);
+        }
+    }
+
+    /**
+     * Get fallback provider order based on primary provider
+     */
+    private getFallbackOrder(primaryProvider: string): string[] {
+        const allProviders = ['vscode-lm', 'openai', 'anthropic', 'ollama'];
+        return allProviders.filter(p => p !== primaryProvider);
     }
 
     /**
@@ -133,21 +175,49 @@ export class AIService {
                 estimatedComplexity: aiResult.estimatedComplexity || staticAnalysis.complexity,
                 citations: aiResult.citations
             };
-        } catch (error) {
-            this.logger.error('AI analysis failed, returning static analysis:', error as Error);
+        } catch (primaryError) {
+            this.logger.warn(`Primary AI provider failed: ${(primaryError as Error).message}`);
 
-            // Show error to user
-            vscode.window.showErrorMessage(
-                `AI analysis failed: ${(error as Error).message}. Showing static analysis only.`
+            // Try fallback providers
+            for (const fallbackProvider of this.fallbackProviders) {
+                try {
+                    this.logger.info(`Trying fallback provider: ${fallbackProvider.name}`);
+                    const aiResult = await fallbackProvider.analyzeQuery(anonymizedQuery, context);
+
+                    // Success! Log and return
+                    this.logger.info(`Fallback provider ${fallbackProvider.name} succeeded`);
+                    vscode.window.showInformationMessage(
+                        `Primary AI provider failed. Using fallback: ${fallbackProvider.name}`
+                    );
+
+                    return {
+                        summary: aiResult.summary,
+                        antiPatterns: [
+                            ...staticAnalysis.antiPatterns,
+                            ...aiResult.antiPatterns
+                        ],
+                        optimizationSuggestions: aiResult.optimizationSuggestions,
+                        estimatedComplexity: aiResult.estimatedComplexity || staticAnalysis.complexity,
+                        citations: aiResult.citations
+                    };
+                } catch (fallbackError) {
+                    this.logger.debug(`Fallback provider ${fallbackProvider.name} failed:`, fallbackError as Error);
+                    // Continue to next fallback
+                }
+            }
+
+            // All providers failed - return static analysis
+            this.logger.error('All AI providers failed, returning static analysis');
+            vscode.window.showWarningMessage(
+                `AI analysis unavailable. Showing static analysis only.`
             );
 
-            // Return static analysis as fallback
             return {
                 summary: `Query type: ${staticAnalysis.queryType}, Complexity: ${staticAnalysis.complexity}`,
                 antiPatterns: staticAnalysis.antiPatterns,
                 optimizationSuggestions: [{
                     title: 'AI Analysis Unavailable',
-                    description: 'Static analysis completed successfully. Configure AI provider for detailed suggestions.',
+                    description: 'All AI providers failed. Static analysis completed successfully. Check your API keys and network connection.',
                     impact: 'low',
                     difficulty: 'easy'
                 }],
@@ -176,6 +246,25 @@ export class AIService {
     async reinitialize(): Promise<void> {
         this.provider = null;
         await this.initialize();
+    }
+
+    /**
+     * Reload configuration (called when settings change)
+     */
+    async reloadConfiguration(): Promise<void> {
+        this.logger.info('Reloading AI Service configuration...');
+        const config = this.getConfig();
+        
+        if (!config.enabled) {
+            this.logger.info('AI features disabled, clearing providers');
+            this.provider = null;
+            this.fallbackProviders = [];
+            return;
+        }
+
+        await this.initializeProviders(config);
+        const fallbackCount = this.fallbackProviders.length;
+        this.logger.info(`AI configuration reloaded: ${this.provider?.name || 'none'}${fallbackCount > 0 ? ` (${fallbackCount} fallbacks)` : ''}`);
     }
 
     /**
