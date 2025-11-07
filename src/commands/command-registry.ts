@@ -3,13 +3,15 @@ import { ConnectionManager } from '../services/connection-manager';
 import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 import { WebviewManager } from '../webviews/webview-manager';
 import { Logger } from '../utils/logger';
+import { ServiceContainer, SERVICE_TOKENS } from '../core/service-container';
 
 export class CommandRegistry {
     constructor(
         private connectionManager: ConnectionManager,
         private aiServiceCoordinator: AIServiceCoordinator,
         private webviewManager: WebviewManager,
-        private logger: Logger
+        private logger: Logger,
+        private serviceContainer: ServiceContainer
     ) {}
 
     registerCommands(context: vscode.ExtensionContext, _treeViewProvider?: unknown): void {
@@ -285,10 +287,7 @@ export class CommandRegistry {
     private async showQueryHistory(): Promise<void> {
         try {
             this.logger.info('Opening query history...');
-            // Import service container to get query history service
-            const { ServiceContainer, SERVICE_TOKENS } = await import('../core/service-container');
-            const serviceContainer = ServiceContainer.getInstance();
-            const historyService = serviceContainer.get(SERVICE_TOKENS.QueryHistoryService);
+            const historyService = this.serviceContainer.get(SERVICE_TOKENS.QueryHistoryService);
             await this.webviewManager.showQueryHistory(historyService);
         } catch (error) {
             this.logger.error('Failed to show query history:', error as Error);

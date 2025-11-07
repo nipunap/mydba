@@ -188,7 +188,8 @@ export class ServiceContainer {
                 c.get(SERVICE_TOKENS.ConnectionManager),
                 c.get(SERVICE_TOKENS.AIServiceCoordinator),
                 c.get(SERVICE_TOKENS.WebviewManager),
-                c.get(SERVICE_TOKENS.Logger)
+                c.get(SERVICE_TOKENS.Logger),
+                c // Pass the service container itself
             )
         );
     }
