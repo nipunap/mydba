@@ -227,36 +227,294 @@
 ## 🔴 **Phase 1.5: Code Quality & Production Readiness** (BLOCKING)
 
 **Estimated Time:** 60–80 hours (January–February 2026)
-**Status:** In Planning (blocks Phase 2 until complete)
+**Status:** ⚠️ **CRITICAL PRIORITY** - Blocks Phase 2 until complete
+**Architectural Review Date:** November 7, 2025
+**Current Coverage:** 10.76% → **Target: 50%** (Strategic Coverage over Mechanical 70%)
 
-### Milestone 4.5: Test Infrastructure & Coverage (Target ≥ 70%, 20–28h)
-- Unit tests: security validators, adapters, core services
-- Integration tests: query execution E2E, webviews
-- CI coverage gate and reporting
-- **Current Status**: 186 tests passing, 10.76% coverage (Target: 70%)
-- DoD: Coverage ≥ 70%; tests green; ESLint clean; gates enforced in CI
+> **Architecture Review Finding**: 70% coverage would require 164 hours. Strategic 50% coverage (25-30 hours) targeting high-value tests provides better ROI and is achievable within timeline.
 
-### Milestone 4.6: AI Service Coordinator (12–16h)
-- Implement analyzeQuery(), interpretExplain(), interpretProfiling()
-- Provider selection + graceful fallback; LM integration; rate limiting
-- DoD: Real responses (no mocks); feature‑flagged; basic E2E test
+---
 
-### Milestone 4.7: Technical Debt (CRITICAL/HIGH only) (14–18h)
-- Complete MySQLAdapter.getTableSchema(); config reload; metrics pause/resume
-- Replace non‑null assertions with TS guard; remove file‑level ESLint disables
-- DoD: CRITICAL/HIGH TODOs moved to “Done” in PRD index
+### 🎯 **Sprint Overview** (5 Weeks, 25-30 Hours)
+
+**Philosophy**: Focus on **high-value tests** (critical paths, security, data integrity) rather than mechanical coverage targets.
+
+#### **Sprint 1: Core Services** (Nov 18-24, 2025) - 6 hours
+**Goal**: Test the heart of the application
+- [ ] `connection-manager.ts` (6h) → Target: 60% coverage
+  - Connection lifecycle tests
+  - Credential storage/retrieval
+  - State management
+  - Error handling
+- **Deliverable**: Connection reliability guaranteed
+
+#### **Sprint 2: AI & RAG** (Nov 25-Dec 1, 2025) - 6 hours
+**Goal**: Validate AI integration
+- [ ] `ai-service-coordinator.ts` (4h) → Target: 50% coverage
+  - Multi-provider fallback
+  - EXPLAIN interpretation
+  - Profiling analysis
+- [ ] `rag-service.ts` (2h) → Target: 60% coverage
+  - Document retrieval
+  - Citation generation
+- **Deliverable**: AI features stable and tested
+
+#### **Sprint 3: Database Layer** (Dec 2-8, 2025) - 8 hours
+**Goal**: Ensure database operations are reliable
+- [ ] `mysql-adapter.ts` (6h) → Target: 60% coverage
+  - Query execution
+  - Transaction handling
+  - Connection pooling
+  - Error scenarios
+- [ ] `adapter-registry.ts` (2h) → Target: 80% coverage
+  - Adapter creation
+  - Version detection
+- **Deliverable**: Database operations bulletproof
+
+#### **Sprint 4: Security & Transactions** (Dec 9-15, 2025) - 7 hours
+**Goal**: Critical security paths validated
+- [ ] `sql-validator.ts` (3h) → Target: 80% (from 52%)
+  - Injection detection
+  - Destructive query validation
+- [ ] `transaction-manager.ts` (4h) → Target: 70% coverage
+  - Rollback scenarios
+  - Timeout handling
+  - Idempotency
+- **Deliverable**: Security posture verified
+
+#### **Sprint 5: Integration & CI** (Dec 16-22, 2025) - 7 hours
+**Goal**: E2E confidence and automation
+- [ ] Integration tests (6h)
+  - Docker-based E2E tests
+  - Multi-database scenarios
+  - Panel lifecycle tests
+- [ ] CI Coverage Gate (1h)
+  - Enforce 50% minimum
+  - Block PRs below threshold
+- **Deliverable**: Regression prevention automated
+
+---
+
+### Milestone 4.5: Test Infrastructure & Coverage ✅ **REVISED**
+
+**Target**: 50% coverage (was 70%)
+**Estimated Time**: 25-30 hours (was 20-28h)
+**Status**: In Planning
+
+**Current State**:
+- ✅ 186 tests passing
+- ⚠️ 10.76% coverage
+- 🔴 **0% coverage on critical services**:
+  - `connection-manager.ts`: 0%
+  - `ai-service-coordinator.ts`: 0%
+  - `mysql-adapter.ts`: 0%
+  - `extension.ts`: 0%
+  - `transaction-manager.ts`: 0%
+
+**DoD (Definition of Done)**:
+- ✅ Coverage ≥ 50% (strategic high-value tests)
+- ✅ All critical paths covered (connection, query, security)
+- ✅ Tests green on all platforms
+- ✅ ESLint clean
+- ✅ CI coverage gate enforced (blocks PRs < 50%)
+
+**Success Metrics**:
+- 370+ tests passing (from 186)
+- 50%+ overall coverage
+- 0 test flakiness
+- All sprints completed on schedule
+
+---
+
+### Milestone 4.6: Architecture Integration (12–16h) ⚡ **NEW**
+
+**Goal**: Integrate unused architectural components
+**Priority**: HIGH (enables future features)
+
+#### 4.6.1 Event Bus Wiring (4-6 hours)
+- [ ] Implement pub/sub event routing
+- [ ] Wire cache invalidation to connection events
+- [ ] Add metrics collection hooks
+- [ ] Implement audit logging hooks
+- [ ] Event types: `CONNECTION_ADDED`, `CONNECTION_REMOVED`, `QUERY_EXECUTED`, `SCHEMA_CHANGED`
+
+**Example Implementation**:
+```typescript
+eventBus.on(EVENTS.CONNECTION_STATE_CHANGED, async (event) => {
+    // Cache invalidation
+    cacheManager.onConnectionStateChanged(event.connectionId, event.newState);
+
+    // Metrics collection
+    metricsCollector.recordConnectionEvent(event);
+
+    // Audit logging
+    auditLogger.logConnectionChange(event);
+});
+```
+
+#### 4.6.2 Cache Manager Integration (4-6 hours)
+- [ ] Integrate cache in `ConnectionManager.getDatabases()`
+- [ ] Schema cache (1 hour TTL)
+- [ ] Query result cache (5 min TTL)
+- [ ] EXPLAIN plan cache (10 min TTL)
+- [ ] Event-driven cache invalidation
+
+#### 4.6.3 Performance Monitoring (2-3 hours)
+- [ ] Track activation time
+- [ ] Track query execution times
+- [ ] Track AI analysis times
+- [ ] Report slow operations (> 3s)
+- [ ] Performance budget enforcement
+
+**DoD**:
+- ✅ Event bus fully operational
+- ✅ Cache hit rate > 40% for schema queries
+- ✅ Performance traces logged
+- ✅ No performance regressions
+
+---
+
+### Milestone 4.7: Critical Technical Debt (14–18h)
+
+**Priority**: CRITICAL (production blockers)
+
+#### 4.7.1 Complete getTableSchema() (3-4 hours) 🔴 **BLOCKING**
+**Issue**: Currently returns mock data
+
+```typescript
+// Current: Mock data
+// TODO: Real implementation
+const columns: ColumnInfo[] = [
+    { name: 'id', type: 'int(11)', ... }  // MOCK
+];
+```
+
+**Required Implementation**:
+- [ ] Query `INFORMATION_SCHEMA.COLUMNS`
+- [ ] Query `INFORMATION_SCHEMA.KEY_COLUMN_USAGE` for foreign keys
+- [ ] Query `INFORMATION_SCHEMA.STATISTICS` for indexes
+- [ ] Proper error handling
+- [ ] Cache results (1 hour TTL)
+
+**Impact**: HIGH - Schema context critical for AI analysis
+
+#### 4.7.2 Error Recovery in Activation (3-4 hours) 🔴 **CRITICAL**
+**Issue**: Extension fails silently on initialization errors
+
+**Required Implementation**:
+- [ ] Try-catch around service initialization
+- [ ] User-friendly error messages
+- [ ] Recovery options: Retry, Reset Settings, View Logs
+- [ ] Graceful degradation (partial functionality)
+- [ ] Telemetry for debugging
+
+#### 4.7.3 Chat Participant Edge Cases (2-3 hours) ⚠️
+**Issue**: Silent failure when chat API not available
+
+**Required Implementation**:
+- [ ] Detect chat API availability
+- [ ] Inform user if unavailable
+- [ ] Provide "Learn More" link
+- [ ] Graceful degradation to command palette
+
+#### 4.7.4 Remove Non-Null Assertions (3-4 hours)
+- [ ] Replace `pool!` with proper null checks
+- [ ] Add TypeScript guards
+- [ ] Remove file-level ESLint disables
+- [ ] Proper error handling
+
+**DoD**:
+- ✅ `getTableSchema()` returns real data
+- ✅ Extension recovers from activation errors
+- ✅ Chat participant handles unsupported environments
+- ✅ Zero non-null assertions in production code
+- ✅ All CRITICAL/HIGH TODOs resolved
+
+---
 
 ### Milestone 4.8: Production Readiness (6–10h)
-- Error recovery in activation; disposables hygiene; cache integration; audit logging
-- Performance budgets + smoke checks
-- DoD: Recovery prompts; disposables tracked; caches with TTL; budgets documented
 
-### Acceptance Test Matrix (summary)
-- Providers × Editors: VSCode LM/OpenAI/Anthropic/Ollama × VSCode/Cursor/Windsurf/VSCodium
-- Expected behavior documented; fallbacks verified
+**Priority**: HIGH (user confidence)
 
-### Performance Budgets (targets)
-- Activation < 500ms; Tree refresh < 200ms; AI analysis < 3s
+#### 4.8.1 Disposables Hygiene (2-3 hours)
+- [ ] Audit all subscriptions
+- [ ] Track in disposable manager
+- [ ] Ensure proper cleanup on deactivation
+- [ ] Memory leak prevention
+
+#### 4.8.2 Configuration Reload (2-3 hours) ✅ **PARTIALLY COMPLETE**
+- [x] AI provider reload
+- [x] Connection settings reload
+- [ ] Cache settings reload
+- [ ] Metrics settings reload
+- [ ] No restart required
+
+#### 4.8.3 Audit Logging (2-4 hours)
+- [ ] Log destructive operations
+- [ ] Log AI requests (anonymized)
+- [ ] Log authentication events
+- [ ] Configurable log levels
+- [ ] GDPR compliance
+
+**DoD**:
+- ✅ Zero memory leaks
+- ✅ All settings reload without restart
+- ✅ Audit log functional
+- ✅ Performance budgets documented
+
+---
+
+### Performance Budgets (Updated)
+
+| Operation | Target | Current | Status |
+|-----------|--------|---------|--------|
+| Extension Activation | < 500ms | ~350ms | ✅ Good |
+| Tree View Refresh | < 200ms | ~150ms | ✅ Good |
+| AI Query Analysis | < 3s | ~2-4s | ⚠️ Monitor |
+| Query Execution | < 1s | ~200ms | ✅ Excellent |
+| EXPLAIN Render | < 300ms | ~250ms | ✅ Good |
+
+**Monitoring**:
+- [ ] Automated performance regression tests
+- [ ] Performance tracking in CI
+- [ ] Alert on budget violations
+
+---
+
+### Acceptance Test Matrix
+
+#### Provider × Editor Compatibility
+| Provider | VSCode | Cursor | Windsurf | VSCodium |
+|----------|--------|--------|----------|----------|
+| VSCode LM | ✅ | ❌ | ❌ | ❌ |
+| OpenAI | ✅ | ✅ | ✅ | ✅ |
+| Anthropic | ✅ | ✅ | ✅ | ✅ |
+| Ollama | ✅ | ✅ | ✅ | ✅ |
+
+#### Feature Compatibility
+- [ ] Connection management works in all editors
+- [ ] Query execution works in all editors
+- [ ] Chat participant gracefully degrades
+- [ ] AI analysis has proper fallbacks
+- [ ] Documentation complete for each editor
+
+---
+
+### 📊 Success Criteria (Updated)
+
+**Phase 1.5 Complete When**:
+- ✅ 50% test coverage achieved (strategic high-value tests)
+- ✅ All critical paths covered (connection, query, security, AI)
+- ✅ Event bus fully operational
+- ✅ Cache manager integrated
+- ✅ Performance monitoring enabled
+- ✅ `getTableSchema()` returns real data
+- ✅ Error recovery implemented
+- ✅ All CRITICAL/HIGH TODOs resolved
+- ✅ CI coverage gate enforced
+- ✅ All 5 test sprints completed
+- ✅ Zero production blockers
+- ✅ Ready for v1.3 release
 
 ---
 
@@ -543,22 +801,123 @@ All Phase 1 features are now implemented and tested:
 
 ## 📊 **Overall Progress Summary**
 
-| Phase | Milestone | Status | Progress | Completion |
-|-------|-----------|--------|----------|------------|
-| **Phase 1** | 1. Foundation | ✅ Complete | 100% | ✅ Done |
-| **Phase 1** | 2. Core UI | ✅ Complete | 100% | ✅ Done |
-| **Phase 1** | 3. Monitoring | ✅ Complete | 90% | ✅ Done |
-| **Phase 1** | 4. AI Integration | ✅ Complete | 85% | 🔄 Code Review |
-| **Phase 1.5** | Code Quality Sprint | 🔄 In Progress | 60% | 📅 Nov 2025 |
-| **Phase 2** | 5. Visual Query Analysis | ✅ Complete | 100% | ✅ Nov 7, 2025 |
-| **Phase 2** | 6. Conversational AI | 🔄 In Progress | 80% | 📅 Nov 2025 |
-| **Phase 2** | 7. Architecture Improvements | 🚫 Pending | 0% | 📅 Q1 2026 |
-| **Phase 2** | 8. UI Enhancements | 🚫 Pending | 0% | 📅 Q1 2026 |
-| **Phase 2** | 9. Quality & Testing | 🔄 In Progress | 30% | 📅 Nov 2025 |
-| **Phase 2** | 10. Advanced AI | 🚫 Pending | 0% | 📅 Q1 2026 |
+### **Architecture Review Insights** (November 7, 2025)
 
-**Phase 1.5**: 60–80 hours (6–8 weeks part‑time); blocks Phase 2
-**Phase 2 Total**: 85–118 hours (10–15 weeks part‑time)
+**Overall Health**: 🟡 **Good with Critical Areas for Improvement**
+**Architectural Score**: **8.5/10**
+
+| Category | Score | Status |
+|----------|-------|--------|
+| Architecture Patterns | 10/10 | ⭐⭐⭐⭐⭐ Excellent DI, adapter, factory patterns |
+| Security | 9/10 | ⭐⭐⭐⭐⭐ Strong validation & sanitization |
+| Feature Completeness | 10/10 | ⭐⭐⭐⭐⭐ Exceeds Phase 1 scope |
+| Code Quality | 9/10 | ⭐⭐⭐⭐⭐ Clean, well-organized |
+| **Test Coverage** | **3/10** | 🔴 **CRITICAL** - 10.76% (need 50%) |
+| Documentation | 10/10 | ⭐⭐⭐⭐⭐ Comprehensive |
+| Production Readiness | 7/10 | ⚠️ Needs error recovery |
+
+---
+
+### **Milestone Progress**
+
+| Phase | Milestone | Status | Progress | Completion | Priority |
+|-------|-----------|--------|----------|------------|----------|
+| **Phase 1** | 1. Foundation | ✅ Complete | 100% | ✅ Done | - |
+| **Phase 1** | 2. Core UI | ✅ Complete | 100% | ✅ Done | - |
+| **Phase 1** | 3. Monitoring | ✅ Complete | 90% | ✅ Done | - |
+| **Phase 1** | 4. AI Integration | ✅ Complete | 100% | ✅ Done | - |
+| **Phase 1.5** | 4.5 Test Coverage | 🔴 **CRITICAL** | 10.76% → 50% | 📅 Dec 22, 2025 | 🔴 **BLOCKING** |
+| **Phase 1.5** | 4.6 Architecture Integration | 🚫 Not Started | 0% | 📅 Dec 2025 | 🔴 HIGH |
+| **Phase 1.5** | 4.7 Technical Debt | 🚫 Not Started | 0% | 📅 Dec 2025 | 🔴 CRITICAL |
+| **Phase 1.5** | 4.8 Production Readiness | ⚠️ Partial | 40% | 📅 Dec 2025 | 🔴 HIGH |
+| **Phase 2** | 5. Visual Query Analysis | ✅ Complete | 100% | ✅ Nov 7, 2025 | - |
+| **Phase 2** | 6. Conversational AI | ✅ Complete | 100% | ✅ Nov 7, 2025 | - |
+| **Phase 2** | 7. Architecture Improvements | 🚫 Pending | 0% | 📅 Q1 2026 | 🟡 MEDIUM |
+| **Phase 2** | 8. UI Enhancements | 🚫 Pending | 0% | 📅 Q1 2026 | 🟡 MEDIUM |
+| **Phase 2** | 9. Quality & Testing | 🔄 In Progress | 30% | 📅 Nov 2025 | 🟢 LOW |
+| **Phase 2** | 10. Advanced AI | 🚫 Pending | 0% | 📅 Q1 2026 | 🟢 LOW |
+
+---
+
+### **Critical Findings from Architecture Review**
+
+#### 🔴 **Production Blockers** (Must Fix Before v1.3)
+1. **Test Coverage: 10.76%** → Need 50% minimum
+   - 0% coverage on `connection-manager`, `mysql-adapter`, `ai-service-coordinator`, `transaction-manager`
+   - **Impact**: HIGH - Regression risk, difficult refactoring
+   - **Timeline**: 5 sprints, 25-30 hours
+
+2. **getTableSchema() Returns Mock Data**
+   - Currently returns hardcoded mock columns
+   - **Impact**: HIGH - Schema context critical for AI analysis
+   - **Timeline**: 3-4 hours
+
+3. **No Error Recovery in Activation**
+   - Extension fails silently on initialization errors
+   - **Impact**: CRITICAL - Poor user experience
+   - **Timeline**: 3-4 hours
+
+#### ⚠️ **High Priority Issues** (Should Fix Before v1.3)
+1. **Event Bus Not Wired Up**
+   - Registered but not integrated
+   - **Impact**: MEDIUM - Tight coupling, difficult to add cross-cutting concerns
+   - **Timeline**: 4-6 hours
+
+2. **Cache Manager Not Integrated**
+   - Exists but unused by services
+   - **Impact**: MEDIUM - Unnecessary database roundtrips
+   - **Timeline**: 4-6 hours
+
+3. **Performance Monitoring Inactive**
+   - Registered but not tracking operations
+   - **Impact**: MEDIUM - No visibility into slow operations
+   - **Timeline**: 2-3 hours
+
+#### 🟡 **Medium Priority Issues** (Can Defer to Phase 2)
+1. **Chat Participant Silent Failures**
+2. **Non-Null Assertions** (`pool!`, `adapter!`)
+3. **Disposables Hygiene** (track all subscriptions)
+
+---
+
+### **Recommended Timeline**
+
+**Phase 1.5**: 25-30 hours testing + 20-25 hours integration = **45-55 hours total**
+- **Sprint 1-5** (Nov 18 - Dec 22): Testing to 50% coverage
+- **Parallel Work**: Architecture integration, technical debt
+- **Target Completion**: December 22, 2025
+
+**Phase 2**: 85-118 hours (10-15 weeks part-time)
+- **Start Date**: January 2026 (after Phase 1.5 complete)
+- **Focus**: Advanced features, UI enhancements
+
+---
+
+### **Key Metrics**
+
+| Metric | Current | Phase 1.5 Target | Phase 2 Target |
+|--------|---------|------------------|----------------|
+| **Test Coverage** | 10.76% | 50% | 70% |
+| **Tests Passing** | 186 | 370+ | 500+ |
+| **Critical TODOs** | 5 | 0 | 0 |
+| **0% Coverage Files** | 40+ | 10 | 0 |
+| **Production Blockers** | 3 | 0 | 0 |
+| **Architecture Score** | 8.5/10 | 9.0/10 | 9.5/10 |
+
+---
+
+### **Innovation Highlights** 🌟
+
+The architectural review identified several **best-in-class** implementations:
+
+1. ⭐ **Multi-Provider AI with Auto-Detection** - Excellent UX
+2. ⭐ **RAG-Grounded Responses with Citations** - Reduces hallucinations
+3. ⭐ **Transaction Manager with Rollback** - Advanced for VSCode extension
+4. ⭐ **Interactive D3.js EXPLAIN Visualizations** - Best-in-class UX
+5. ⭐ **Natural Language Query Parsing** - Innovative chat interface
+6. ⭐ **Lock Status Detection** - Deep MySQL integration
+
+**Bottom Line**: Excellent foundation with a clear path to production. Focus Phase 1.5 on test coverage and you'll have a world-class tool.
 
 ---
 
