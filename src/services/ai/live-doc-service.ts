@@ -1,6 +1,6 @@
 /**
  * Live Documentation Service
- * 
+ *
  * Orchestrates live documentation fetching, parsing, caching, and indexing
  * Integrates with Enhanced RAG Service for vector search
  */
@@ -95,12 +95,12 @@ export class LiveDocService {
                     break; // Queue is empty
                 }
                 const { dbType, version } = item;
-                
+
                 this.logger.info(`Fetching live documentation for ${dbType} ${version}...`);
 
                 try {
                     const docs = await this.fetchDocs(dbType, version, maxPages);
-                    
+
                     if (docs.length > 0) {
                         // Cache the docs
                         this.docCache.set(dbType, version, docs);
@@ -146,9 +146,9 @@ export class LiveDocService {
         for (const url of limitedUrls) {
             try {
                 const sections = await parser.parseDoc(url);
-                
+
                 // Convert to RAG documents
-                const docs = dbType === 'mysql' 
+                const docs = dbType === 'mysql'
                     ? (parser as MySQLDocParser).toRAGDocuments(sections, version)
                     : (parser as MariaDBDocParser).toRAGDocuments(sections, version);
 
@@ -177,7 +177,7 @@ export class LiveDocService {
         this.fetchAndIndexDocs(dbType, version, { maxPages }).catch(error => {
             this.logger.error('Background doc fetch failed:', error as Error);
         });
-        
+
         this.logger.info(`Queued background documentation fetch for ${dbType} ${version}`);
     }
 
@@ -218,4 +218,3 @@ export class LiveDocService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
-

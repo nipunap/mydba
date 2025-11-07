@@ -35,7 +35,8 @@ class RPCClient {
             // Set timeout
             const timeoutId = setTimeout(() => {
                 this.pendingRequests.delete(id);
-                reject(new Error(`Request timeout: ${method}`));
+                // Sanitize method name to prevent format string injection
+                reject(new Error(`Request timeout: ${String(method || 'unknown').replace(/[<>]/g, '')}`));
             }, timeout);
 
             // Store pending request
@@ -143,8 +144,9 @@ class RPCClient {
         const handlers = this.messageHandlers.get(method);
         if (!handlers || handlers.length === 0) {
             if (id) {
-                // Send error response
-                this.sendErrorResponse(id, -32601, `Method not found: ${method}`);
+                // Send error response - sanitize method name
+                const safeMethod = String(method || 'unknown').replace(/[<>]/g, '');
+                this.sendErrorResponse(id, -32601, `Method not found: ${safeMethod}`);
             }
             return;
         }
@@ -160,7 +162,8 @@ class RPCClient {
                 this.sendSuccessResponse(id, results[0]); // Return first result
             }
         } catch (error) {
-            console.error(`Error handling ${method}:`, error);
+            // Use separate arguments to avoid potential format string injection
+            console.error('Error handling method:', String(method || 'unknown'), error);
 
             if (id) {
                 this.sendErrorResponse(

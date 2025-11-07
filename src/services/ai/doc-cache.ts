@@ -1,6 +1,6 @@
 /**
  * Documentation Cache Service
- * 
+ *
  * Caches parsed documentation with TTL
  * Supports persistence to disk for faster cold starts
  */
@@ -129,7 +129,7 @@ export class DocCache {
     private loadFromDisk(key: string): CacheEntry | null {
         try {
             const filePath = this.getCacheFilePath(key);
-            
+
             if (!fs.existsSync(filePath)) {
                 return null;
             }
@@ -157,7 +157,7 @@ export class DocCache {
     private deleteFromDisk(key: string): void {
         try {
             const filePath = this.getCacheFilePath(key);
-            
+
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
                 this.logger.debug(`Deleted cache file: ${filePath}`);
@@ -172,7 +172,7 @@ export class DocCache {
      */
     clear(): void {
         this.cache.clear();
-        
+
         // Clear disk cache
         try {
             if (fs.existsSync(this.cacheDir)) {
@@ -220,4 +220,3 @@ export class DocCache {
         };
     }
 }
-

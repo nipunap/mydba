@@ -1,6 +1,6 @@
 /**
  * Enhanced RAG Service with Vector Search
- * 
+ *
  * Combines keyword-based retrieval (Phase 1) with vector-based semantic search (Phase 2.5)
  * Falls back to keyword-only if embeddings are not available
  */
@@ -119,7 +119,7 @@ export class EnhancedRAGService {
                 for (const chunk of chunks) {
                     const chunkId = `${docId}-chunk-${chunk.metadata.chunkIndex}`;
                     textsToEmbed.push(chunk.text);
-                    
+
                     vectorDocuments.push({
                         id: chunkId,
                         text: chunk.text,
@@ -138,7 +138,7 @@ export class EnhancedRAGService {
                 }
             } else {
                 textsToEmbed.push(doc.content);
-                
+
                 vectorDocuments.push({
                     id: docId,
                     text: doc.content,
@@ -163,7 +163,7 @@ export class EnhancedRAGService {
 
         // Generate embeddings in batch
         this.logger.info(`Generating ${textsToEmbed.length} embeddings...`);
-        
+
         try {
             const embeddings = await this.embeddingProvider.embedBatch(textsToEmbed);
 
@@ -206,7 +206,7 @@ export class EnhancedRAGService {
 
             // Hybrid search
             const weights = options?.hybridSearchWeights ?? { semantic: 0.7, keyword: 0.3 };
-            
+
             const results = this.vectorStore.hybridSearch(
                 queryEmbedding.vector,
                 query,
@@ -283,7 +283,7 @@ export class EnhancedRAGService {
      */
     private detectDbType(source: string): 'mysql' | 'mariadb' | 'postgresql' | 'general' {
         const lowerSource = source.toLowerCase();
-        
+
         if (lowerSource.includes('mariadb')) {
             return 'mariadb';
         }
@@ -293,7 +293,7 @@ export class EnhancedRAGService {
         if (lowerSource.includes('postgres')) {
             return 'postgresql';
         }
-        
+
         return 'general';
     }
 
@@ -313,4 +313,3 @@ export class EnhancedRAGService {
         }));
     }
 }
-

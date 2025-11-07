@@ -200,10 +200,18 @@
         metadata.className = 'metadata';
 
         if (entry.database) {
-            metadata.innerHTML += `<div><span class="label">Database:</span> ${escapeHtml(entry.database)}</div>`;
+            const dbDiv = document.createElement('div');
+            dbDiv.innerHTML = `<span class="label">Database:</span> ${escapeHtml(entry.database)}`;
+            metadata.appendChild(dbDiv);
         }
-        metadata.innerHTML += `<div><span class="label">Duration:</span> ${formatDuration(entry.duration)}</div>`;
-        metadata.innerHTML += `<div><span class="label">Rows:</span> ${entry.rowsAffected}</div>`;
+
+        const durationDiv = document.createElement('div');
+        durationDiv.innerHTML = `<span class="label">Duration:</span> ${escapeHtml(formatDuration(entry.duration))}`;
+        metadata.appendChild(durationDiv);
+
+        const rowsDiv = document.createElement('div');
+        rowsDiv.innerHTML = `<span class="label">Rows:</span> ${escapeHtml(String(entry.rowsAffected || 0))}`;
+        metadata.appendChild(rowsDiv);
 
         if (entry.error) {
             const errorDiv = document.createElement('div');
@@ -326,18 +334,25 @@
             return;
         }
 
+        // Sanitize all numeric values to prevent XSS
+        const safeStats = {
+            totalQueries: escapeHtml(String(stats.totalQueries || 0)),
+            successRate: escapeHtml(String((stats.successRate || 0).toFixed(1))),
+            avgDuration: escapeHtml(formatDuration(stats.avgDuration || 0))
+        };
+
         statsContent.innerHTML = `
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value">${stats.totalQueries}</div>
+                    <div class="stat-value">${safeStats.totalQueries}</div>
                     <div class="stat-label">Total Queries</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${stats.successRate.toFixed(1)}%</div>
+                    <div class="stat-value">${safeStats.successRate}%</div>
                     <div class="stat-label">Success Rate</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${formatDuration(stats.avgDuration)}</div>
+                    <div class="stat-value">${safeStats.avgDuration}</div>
                     <div class="stat-label">Avg Duration</div>
                 </div>
             </div>
@@ -355,7 +370,7 @@
                         ${stats.mostFrequent.slice(0, 5).map(item => `
                             <tr>
                                 <td><code>${escapeHtml(truncate(item.query, 80))}</code></td>
-                                <td>${item.count}</td>
+                                <td>${escapeHtml(String(item.count || 0))}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -376,7 +391,7 @@
                     <tbody>
                         ${stats.recentErrors.slice(0, 5).map(entry => `
                             <tr>
-                                <td>${new Date(entry.timestamp).toLocaleTimeString()}</td>
+                                <td>${escapeHtml(new Date(entry.timestamp).toLocaleTimeString())}</td>
                                 <td><code>${escapeHtml(truncate(entry.query, 40))}</code></td>
                                 <td class="error-text">${escapeHtml(truncate(entry.error || '', 60))}</td>
                             </tr>
