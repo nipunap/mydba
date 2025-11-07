@@ -3,6 +3,7 @@ import { Logger } from '../utils/logger';
 import { ServiceContainer, SERVICE_TOKENS } from '../core/service-container';
 import { ChatCommandContext, IChatContextProvider } from './types';
 import { ConnectionError, QueryExecutionError } from '../core/errors';
+import { ChatResponseBuilder } from './response-builder';
 
 /**
  * Handles all chat commands
@@ -438,70 +439,101 @@ export class ChatCommandHandlers {
         query: string,
         connectionId: string
     ): Promise<void> {
+        const builder = new ChatResponseBuilder(stream);
+
+        // Analysis Summary Box
+        if (analysis.queryType || analysis.complexity !== undefined) {
+            builder.analysisSummary({
+                queryType: analysis.queryType,
+                complexity: analysis.complexity,
+                estimatedRows: analysis.estimatedRows,
+                usesIndex: analysis.usesIndex,
+                antiPatterns: analysis.antiPatterns?.length || 0,
+                suggestions: analysis.optimizationSuggestions?.length || 0
+            });
+        }
+
         // Summary
         if (analysis.summary) {
-            stream.markdown('### 💡 Summary\n\n');
-            stream.markdown(analysis.summary + '\n\n');
+            builder.header('Summary', '💡')
+                .text(analysis.summary);
         }
 
         // Anti-patterns
         if (analysis.antiPatterns && analysis.antiPatterns.length > 0) {
-            stream.markdown('### ⚠️  Issues & Anti-Patterns\n\n');
+            builder.header('Issues & Anti-Patterns', '⚠️');
             
             for (const pattern of analysis.antiPatterns) {
                 const icon = pattern.severity === 'critical' ? '🔴' : pattern.severity === 'warning' ? '🟡' : 'ℹ️';
-                stream.markdown(`${icon} **${pattern.type}**\n\n`);
-                stream.markdown(`${pattern.message}\n\n`);
+                builder.subheader(`${icon} ${pattern.type}`)
+                    .text(pattern.message);
+                
                 if (pattern.suggestion) {
-                    stream.markdown(`💡 **Suggestion:** ${pattern.suggestion}\n\n`);
+                    builder.tip(pattern.suggestion);
                 }
-                stream.markdown('---\n\n');
+                builder.hr();
             }
         }
 
         // Optimizations
         if (analysis.optimizationSuggestions && analysis.optimizationSuggestions.length > 0) {
-            stream.markdown('### 🚀 Optimization Opportunities\n\n');
+            builder.header('Optimization Opportunities', '🚀');
             
             const topSuggestions = analysis.optimizationSuggestions.slice(0, 3);
             
             for (const suggestion of topSuggestions) {
                 const impactEmoji = this.getImpactEmoji(suggestion.impact);
-                stream.markdown(`${impactEmoji} **${suggestion.title}**\n\n`);
-                stream.markdown(`${suggestion.description}\n\n`);
+                builder.subheader(`${impactEmoji} ${suggestion.title}`)
+                    .text(suggestion.description);
                 
-                if (suggestion.after) {
-                    stream.markdown('```sql\n' + suggestion.after + '\n```\n\n');
+                if (suggestion.before && suggestion.after) {
+                    builder.comparison(suggestion.before, suggestion.after);
+                } else if (suggestion.after) {
+                    builder.sql(suggestion.after, 'Suggested Code');
                 }
             }
 
             if (analysis.optimizationSuggestions.length > 3) {
-                stream.markdown(`*...and ${analysis.optimizationSuggestions.length - 3} more suggestions*\n\n`);
+                builder.text(`*...and ${analysis.optimizationSuggestions.length - 3} more suggestions*`);
             }
+        }
+
+        // Performance Rating
+        if (analysis.performanceScore !== undefined) {
+            builder.performanceRating(analysis.performanceScore);
         }
 
         // Citations
         if (analysis.citations && analysis.citations.length > 0) {
-            stream.markdown('### 📚 References\n\n');
+            builder.header('References', '📚');
             
-            for (const citation of analysis.citations) {
+            const citationLinks = analysis.citations.map((citation: { url?: string; title: string }) => {
                 if (citation.url) {
-                    stream.markdown(`- [${citation.title}](${citation.url})\n`);
-                } else {
-                    stream.markdown(`- ${citation.title}\n`);
+                    return `[${citation.title}](${citation.url})`;
                 }
-            }
-            stream.markdown('\n');
+                return citation.title;
+            });
+            builder.list(citationLinks);
         }
 
-        // Action buttons
-        stream.markdown('**Next Steps:**\n\n');
-        
-        stream.button({
-            command: 'mydba.explainQuery',
-            title: 'View EXPLAIN Plan',
-            arguments: [{ query, connectionId }]
-        });
+        // Quick Actions
+        builder.quickActions([
+            {
+                label: '📊 View EXPLAIN Plan',
+                command: 'mydba.explainQuery',
+                args: [{ query, connectionId }]
+            },
+            {
+                label: '⚡ Profile Query',
+                command: 'mydba.profileQuery',
+                args: [{ query, connectionId }]
+            },
+            {
+                label: '📋 Copy to Editor',
+                command: 'mydba.copyToEditor',
+                args: [query]
+            }
+        ]);
     }
 
     /**
