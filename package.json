@@ -2,7 +2,7 @@
   "name": "mydba",
   "displayName": "MyDBA - AI-Powered Database Assistant",
   "description": "AI-powered database management and optimization for MySQL, MariaDB, PostgreSQL, Redis, and Valkey",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "NipunaPerera",
   "icon": "resources/mydba.png",
   "engines": {
