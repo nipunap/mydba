@@ -312,7 +312,7 @@ jobs:
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "FLUSH PRIVILEGES;"
           echo "MySQL permissions granted"
-          
+
           # Grant permissions for MariaDB
           mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT, UPDATE ON performance_schema.* TO 'test_user'@'%';"
           mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
@@ -404,19 +404,19 @@ jobs:
 
           # Check if any metric is below threshold
           FAILED=0
-          if (( $(echo "$LINES_PCT < $MIN_THRESHOLD" | bc -l) )); then
+          if awk "BEGIN {exit !($LINES_PCT < $MIN_THRESHOLD)}"; then
             echo "❌ Lines coverage ($LINES_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
             FAILED=1
           fi
-          if (( $(echo "$STATEMENTS_PCT < $MIN_THRESHOLD" | bc -l) )); then
+          if awk "BEGIN {exit !($STATEMENTS_PCT < $MIN_THRESHOLD)}"; then
             echo "❌ Statements coverage ($STATEMENTS_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
             FAILED=1
           fi
-          if (( $(echo "$BRANCHES_PCT < $MIN_THRESHOLD" | bc -l) )); then
+          if awk "BEGIN {exit !($BRANCHES_PCT < $MIN_THRESHOLD)}"; then
             echo "❌ Branches coverage ($BRANCHES_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
             FAILED=1
           fi
-          if (( $(echo "$FUNCTIONS_PCT < $MIN_THRESHOLD" | bc -l) )); then
+          if awk "BEGIN {exit !($FUNCTIONS_PCT < $MIN_THRESHOLD)}"; then
             echo "❌ Functions coverage ($FUNCTIONS_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
             FAILED=1
           fi
@@ -438,20 +438,20 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            
+
             let coverageComment = '## 📊 Coverage Report\n\n';
-            
+
             if (fs.existsSync('coverage/coverage-summary.json')) {
               const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
               const total = coverage.total;
-              
+
               const status = '${{ steps.coverage_check.outputs.status }}';
               const statusEmoji = status === 'passed' ? '✅' : '❌';
-              
+
               coverageComment += `**Status:** ${statusEmoji} ${status === 'passed' ? 'PASSED' : 'FAILED'}\n\n`;
               coverageComment += '| Metric | Coverage | Threshold | Status |\n';
               coverageComment += '|--------|----------|-----------|--------|\n';
-              
+
               const minThreshold = 25;
               const metrics = [
                 { name: 'Lines', pct: total.lines.pct },
@@ -459,31 +459,31 @@ jobs:
                 { name: 'Branches', pct: total.branches.pct },
                 { name: 'Functions', pct: total.functions.pct }
               ];
-              
+
               metrics.forEach(metric => {
                 const emoji = metric.pct >= minThreshold ? '✅' : '❌';
                 coverageComment += `| ${metric.name} | ${metric.pct.toFixed(2)}% | ${minThreshold}% | ${emoji} |\n`;
               });
-              
+
               if (status !== 'passed') {
                 coverageComment += '\n⚠️ **Coverage is below the minimum threshold of 25%.** Please add tests to improve coverage.\n';
               }
             } else {
               coverageComment += '❌ Coverage report not found.\n';
             }
-            
+
             // Find existing comment and update or create new
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
               comment.body.includes('📊 Coverage Report')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
