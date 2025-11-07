@@ -22,7 +22,7 @@ export class MyDBAChatParticipant implements IChatContextProvider {
     ) {
         // Create the chat participant
         this.participant = vscode.chat.createChatParticipant('mydba.chat', this.handleRequest.bind(this));
-        
+
         this.participant.iconPath = vscode.Uri.joinPath(
             this.context.extensionUri,
             'resources',
@@ -74,14 +74,37 @@ export class MyDBAChatParticipant implements IChatContextProvider {
 
         } catch (error) {
             this.logger.error('Chat request failed:', error as Error);
-            
-            // Send error to user
-            stream.markdown(`❌ **Error**: ${(error as Error).message}\n\n`);
-            stream.markdown('Please try again or rephrase your question.');
+
+            // Send error to user with helpful recovery suggestions
+            const builder = new ChatResponseBuilder(stream);
+            const errorMessage = (error as Error).message;
+
+            builder.error(`Something went wrong: ${errorMessage}`)
+                .divider()
+                .header('Troubleshooting Tips', '🔧')
+                .list([
+                    'Check that you have an active database connection',
+                    'Verify your SQL syntax is correct',
+                    'Try rephrasing your question',
+                    'Use a specific command like `/analyze` or `/schema`'
+                ])
+                .divider()
+                .quickActions([
+                    {
+                        label: '🔌 Check Connections',
+                        command: 'mydba.refresh',
+                        args: []
+                    },
+                    {
+                        label: '❓ Show Help',
+                        command: 'mydba.chat.sendMessage',
+                        args: ['@mydba help']
+                    }
+                ]);
 
             return {
                 errorDetails: {
-                    message: (error as Error).message
+                    message: errorMessage
                 }
             };
         }
@@ -95,28 +118,28 @@ export class MyDBAChatParticipant implements IChatContextProvider {
         context: ChatCommandContext
     ): Promise<void> {
         const commandEnum = command as ChatCommand;
-        
+
         switch (commandEnum) {
             case ChatCommand.ANALYZE:
                 await this.commandHandlers.handleAnalyze(context);
                 break;
-            
+
             case ChatCommand.EXPLAIN:
                 await this.commandHandlers.handleExplain(context);
                 break;
-            
+
             case ChatCommand.PROFILE:
                 await this.commandHandlers.handleProfile(context);
                 break;
-            
+
             case ChatCommand.OPTIMIZE:
                 await this.commandHandlers.handleOptimize(context);
                 break;
-            
+
             case ChatCommand.SCHEMA:
                 await this.commandHandlers.handleSchema(context);
                 break;
-            
+
             default:
                 throw new Error(`Unknown command: ${command}`);
         }
@@ -146,7 +169,7 @@ export class MyDBAChatParticipant implements IChatContextProvider {
 
         // Map NL intent to chat command
         const command = this.mapIntentToCommand(parsedQuery.intent);
-        
+
         if (command) {
             // Route to specific command handler
             context.command = command;
@@ -177,7 +200,12 @@ export class MyDBAChatParticipant implements IChatContextProvider {
         context: ChatCommandContext,
         builder: ChatResponseBuilder
     ): Promise<void> {
-        const { stream, activeConnectionId } = context;
+        const { stream, activeConnectionId, token } = context;
+
+        // Check cancellation
+        if (token.isCancellationRequested) {
+            return;
+        }
 
         if (!activeConnectionId) {
             builder.warning('No active database connection')
@@ -198,8 +226,18 @@ export class MyDBAChatParticipant implements IChatContextProvider {
         try {
             stream.progress('Generating SQL query...');
 
+            // Check cancellation
+            if (token.isCancellationRequested) {
+                return;
+            }
+
             // Generate SQL from parsed query
             const generatedSQL = await this.nlParser.generateSQL(parsedQuery);
+
+            // Check cancellation
+            if (token.isCancellationRequested) {
+                return;
+            }
 
             if (!generatedSQL) {
                 builder.info('This query is a bit complex for automatic generation')
@@ -285,30 +323,97 @@ export class MyDBAChatParticipant implements IChatContextProvider {
      * Provides general help when intent is unclear
      */
     private async provideGeneralHelp(context: ChatCommandContext): Promise<void> {
-        const { stream } = context;
+        const { stream, activeConnectionId } = context;
+        const builder = new ChatResponseBuilder(stream);
 
-        stream.markdown('👋 **Hi! I\'m MyDBA, your AI-powered database assistant.**\n\n');
-        stream.markdown('I can help you with:\n\n');
-        
-        const commands = [
-            { cmd: '/analyze', desc: 'Analyze SQL queries with AI-powered insights' },
-            { cmd: '/explain', desc: 'Visualize query execution plans (EXPLAIN)' },
-            { cmd: '/profile', desc: 'Profile query performance with detailed metrics' },
-            { cmd: '/optimize', desc: 'Get optimization suggestions with before/after code' },
-            { cmd: '/schema', desc: 'Explore database schema, tables, and indexes' }
-        ];
+        builder.header('Hi! I\'m MyDBA 👋', '🤖')
+            .text('Your AI-powered database assistant for MySQL & MariaDB');
 
-        for (const { cmd, desc } of commands) {
-            stream.markdown(`- **\`${cmd}\`** - ${desc}\n`);
+        builder.divider();
+
+        // Connection status
+        if (activeConnectionId) {
+            builder.success(`Connected to database: **${activeConnectionId}**`);
+        } else {
+            builder.warning('No active database connection')
+                .button('Connect to Database', 'mydba.newConnection');
         }
 
-        stream.markdown('\n**Examples:**\n');
-        stream.markdown('- *"Analyze this query: SELECT * FROM users WHERE email LIKE \'%@example.com\'"*\n');
-        stream.markdown('- *"Show me the execution plan for my slow query"*\n');
-        stream.markdown('- *"How can I optimize this JOIN query?"*\n');
-        stream.markdown('- *"What tables are in my database?"*\n\n');
+        builder.divider();
 
-        stream.markdown('💡 **Tip:** Select a SQL query in your editor and ask me to analyze it!\n');
+        // Commands section
+        builder.header('What I Can Do', '✨');
+
+        const commands = [
+            { 
+                icon: '📊', 
+                cmd: '/analyze', 
+                desc: 'Analyze SQL queries with AI-powered insights and anti-pattern detection' 
+            },
+            { 
+                icon: '🔍', 
+                cmd: '/explain', 
+                desc: 'Visualize query execution plans with interactive tree diagrams' 
+            },
+            { 
+                icon: '⚡', 
+                cmd: '/profile', 
+                desc: 'Profile query performance with detailed timing and resource metrics' 
+            },
+            { 
+                icon: '🚀', 
+                cmd: '/optimize', 
+                desc: 'Get AI-powered optimization suggestions with before/after comparisons' 
+            },
+            { 
+                icon: '🗄️', 
+                cmd: '/schema', 
+                desc: 'Explore database schema, tables, columns, and indexes' 
+            }
+        ];
+
+        for (const { icon, cmd, desc } of commands) {
+            builder.text(`${icon} **\`${cmd}\`** - ${desc}`);
+        }
+
+        builder.divider();
+
+        // Natural language section
+        builder.header('Ask Me Anything', '💬')
+            .text('You can ask questions in plain English! I understand:')
+            .list([
+                '**"Show me all users created last week"** - I\'ll generate the SQL',
+                '**"Count orders from yesterday"** - Get quick counts',
+                '**"Why is this query slow?"** - Performance analysis',
+                '**"What columns are in the users table?"** - Schema exploration',
+                '**"Find all tables with more than 1M rows"** - Database insights'
+            ]);
+
+        builder.divider();
+
+        // Quick actions
+        builder.header('Quick Actions', '⚡');
+        builder.quickActions([
+            {
+                label: '📝 Open Query Editor',
+                command: 'mydba.showQueryEditor',
+                args: [activeConnectionId]
+            },
+            {
+                label: '📊 View Schema',
+                command: 'mydba.chat.sendMessage',
+                args: ['@mydba /schema']
+            },
+            {
+                label: '🔌 New Connection',
+                command: 'mydba.newConnection',
+                args: []
+            }
+        ]);
+
+        builder.divider();
+
+        builder.tip('**Pro Tip:** Select SQL code in your editor and ask me to analyze, explain, or optimize it!');
     }
 
     /**
@@ -341,7 +446,7 @@ export class MyDBAChatParticipant implements IChatContextProvider {
         try {
             const connectionManager = this.serviceContainer.get(SERVICE_TOKENS.ConnectionManager);
             const connections = connectionManager.listConnections();
-            
+
             // Get the first active connection
             const activeConnection = connections.find((conn: { isConnected: boolean }) => conn.isConnected);
             return activeConnection?.id;
@@ -355,7 +460,7 @@ export class MyDBAChatParticipant implements IChatContextProvider {
         try {
             const connectionManager = this.serviceContainer.get(SERVICE_TOKENS.ConnectionManager);
             const connections = connectionManager.listConnections();
-            
+
             const activeConnection = connections.find((conn: { isConnected: boolean }) => conn.isConnected);
             return activeConnection?.database;
         } catch (error) {
@@ -373,7 +478,7 @@ export class MyDBAChatParticipant implements IChatContextProvider {
 
             // Check if it's a SQL file
             const isSqlFile = editor.document.languageId === 'sql';
-            
+
             // Get selected text
             const selection = editor.selection;
             const selectedText = editor.document.getText(selection);
@@ -406,4 +511,3 @@ export class MyDBAChatParticipant implements IChatContextProvider {
         this.logger.info('MyDBA Chat Participant disposed');
     }
 }
-
