@@ -258,13 +258,12 @@ export class QueriesWithoutIndexesPanel {
 
             const explainResult = await adapter.query<unknown>(`EXPLAIN FORMAT=JSON ${cleanQuery}`);
 
-            // Import ExplainViewerPanel and AIService
+            // Import ExplainViewerPanel and AIServiceCoordinator
             const { ExplainViewerPanel } = await import('./explain-viewer-panel');
-            const { AIService } = await import('../services/ai-service');
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
 
-            // Create AI service for enhanced analysis
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
+            // Create AI service coordinator for enhanced EXPLAIN analysis
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
 
             // Show EXPLAIN viewer with AI insights
             ExplainViewerPanel.show(
@@ -274,7 +273,7 @@ export class QueriesWithoutIndexesPanel {
                 this.connectionId,
                 cleanQuery,
                 Array.isArray(explainResult) ? explainResult[0] : (explainResult.rows?.[0] || {}),
-                aiService
+                aiServiceCoordinator
             );
 
         } catch (error) {

@@ -132,13 +132,12 @@ export class SlowQueriesPanel {
 
             // Show the EXPLAIN viewer with actual data and AI insights
             const { ExplainViewerPanel } = await import('./explain-viewer-panel');
-            const { AIService } = await import('../services/ai-service');
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
 
-            // Create AI service instance for analysis
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
+            // Create AI service coordinator for enhanced analysis
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
 
-            ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiService);
+            ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiServiceCoordinator);
         } catch (error) {
             this.logger.error('Failed to EXPLAIN query:', error as Error);
             vscode.window.showErrorMessage(`Failed to EXPLAIN query: ${(error as Error).message}`);

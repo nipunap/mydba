@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
-import { AIService } from '../services/ai-service';
+import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 
 interface ExplainNode {
     id: string;
@@ -58,7 +58,7 @@ export class ExplainViewerPanel {
         private connectionId: string,
         private query: string,
         private explainData: unknown,
-        private aiService?: AIService
+        private aiServiceCoordinator?: AIServiceCoordinator
     ) {
         this.panel = panel;
         this.panel.webview.html = this.getHtml();
@@ -74,7 +74,7 @@ export class ExplainViewerPanel {
         connectionId: string,
         query: string,
         explainData: unknown,
-        aiService?: AIService
+        aiServiceCoordinator?: AIServiceCoordinator
     ): void {
         const panelKey = `explainViewer-${connectionId}-${Date.now()}`;
         const connection = connectionManager.getConnection(connectionId);
@@ -107,7 +107,7 @@ export class ExplainViewerPanel {
             connectionId,
             query,
             explainData,
-            aiService
+            aiServiceCoordinator
         );
         ExplainViewerPanel.panelRegistry.set(panelKey, explainViewerPanel);
     }
@@ -169,8 +169,8 @@ export class ExplainViewerPanel {
     }
 
     private async getAIInsights(explainJson: unknown, treeData: ExplainNode): Promise<void> {
-        if (!this.aiService) {
-            this.logger.debug('AI service not available, skipping AI insights');
+        if (!this.aiServiceCoordinator) {
+            this.logger.debug('AI service coordinator not available, skipping AI insights');
             return;
         }
 
@@ -182,33 +182,38 @@ export class ExplainViewerPanel {
                 type: 'aiInsightsLoading'
             });
 
-            // Build a comprehensive context for AI
-            const issues = this.collectAllIssues(treeData);
+            // Get connection to determine DB type
+            const connection = this.connectionManager.getConnection(this.connectionId);
+            const dbType = connection?.type === 'mariadb' ? 'mariadb' : 'mysql';
+
+            // Use AIServiceCoordinator's interpretExplain for specialized EXPLAIN analysis
+            const interpretation = await this.aiServiceCoordinator.interpretExplain(
+                explainJson,
+                this.query,
+                dbType
+            );
+
+            // Collect additional metadata
             const tables = this.extractTableNames(explainJson);
             const totalCost = treeData.cost || 0;
             const estimatedRows = this.getTotalRowCount(treeData);
 
-            // Create a detailed prompt context
-            const explainSummary = this.buildExplainSummary(explainJson, treeData, issues);
-            const analysisPrompt = `${this.query}\n\n--- EXECUTION PLAN ANALYSIS ---\n${explainSummary}`;
-
-            // Get AI analysis
-            const aiResult = await this.aiService.analyzeQuery(analysisPrompt);
-
-            // Send AI insights to webview
+            // Send enhanced AI insights to webview
             this.panel.webview.postMessage({
                 type: 'aiInsights',
                 data: {
-                    summary: aiResult.summary,
-                    antiPatterns: aiResult.antiPatterns,
-                    optimizationSuggestions: aiResult.optimizationSuggestions,
-                    estimatedComplexity: aiResult.estimatedComplexity,
-                    citations: aiResult.citations,
+                    // Core interpretation from AI
+                    summary: interpretation.summary,
+                    painPoints: interpretation.painPoints,
+                    suggestions: interpretation.suggestions,
+                    performancePrediction: interpretation.performancePrediction,
+                    citations: interpretation.citations,
+                    // Additional metadata
                     metadata: {
                         totalCost,
                         estimatedRows,
                         tablesCount: tables.size,
-                        issuesCount: issues.length
+                        painPointsCount: interpretation.painPoints.length
                     }
                 }
             });

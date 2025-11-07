@@ -196,10 +196,9 @@ export class QueryEditorPanel {
             const explainQuery = `EXPLAIN FORMAT=JSON ${cleanQuery}`;
             const result = await adapter.query<unknown>(explainQuery);
 
-            // Create AI service for enhanced analysis
-            const { AIService } = await import('../services/ai-service');
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
+            // Create AI service coordinator for enhanced EXPLAIN analysis
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
 
             // Open the enhanced EXPLAIN viewer panel with AI insights
             ExplainViewerPanel.show(
@@ -209,7 +208,7 @@ export class QueryEditorPanel {
                 this.connectionId,
                 cleanQuery,
                 result.rows?.[0] || {},
-                aiService
+                aiServiceCoordinator
             );
 
         } catch (error) {
