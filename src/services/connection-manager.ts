@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as vscode from 'vscode';
 import { SecretStorageService } from './secret-storage-service';

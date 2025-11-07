@@ -180,9 +180,9 @@ async function reloadConfiguration(
         // AI configuration changes
         if (event.affectsConfiguration('mydba.ai')) {
             logger.info('AI configuration changed, reloading AI services...');
-            
+
             const aiServiceCoordinator = serviceContainer.get(SERVICE_TOKENS.AIServiceCoordinator);
-            if (aiServiceCoordinator && 'reloadConfiguration' in aiServiceCoordinator && 
+            if (aiServiceCoordinator && 'reloadConfiguration' in aiServiceCoordinator &&
                 typeof aiServiceCoordinator.reloadConfiguration === 'function') {
                 await aiServiceCoordinator.reloadConfiguration();
                 logger.info('AI services reloaded successfully');
@@ -214,9 +214,9 @@ async function reloadConfiguration(
         // Cache configuration changes
         if (event.affectsConfiguration('mydba.cache')) {
             logger.info('Cache configuration changed, clearing caches...');
-            
+
             const cacheManager = serviceContainer.get(SERVICE_TOKENS.CacheManager);
-            if (cacheManager && 'clearAll' in cacheManager && 
+            if (cacheManager && 'clearAll' in cacheManager &&
                 typeof cacheManager.clearAll === 'function') {
                 cacheManager.clearAll();
                 logger.info('Caches cleared successfully');

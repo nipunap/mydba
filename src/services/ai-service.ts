@@ -75,7 +75,7 @@ export class AIService {
         // If provider is explicitly set (not 'auto'), initialize it
         if (config.provider !== 'auto' && config.provider !== 'none') {
             this.provider = await this.providerFactory.createProvider(config);
-            
+
             // Build fallback chain (try other providers)
             const fallbackOrder = this.getFallbackOrder(config.provider);
             for (const fallbackProviderName of fallbackOrder) {
@@ -254,7 +254,7 @@ export class AIService {
     async reloadConfiguration(): Promise<void> {
         this.logger.info('Reloading AI Service configuration...');
         const config = this.getConfig();
-        
+
         if (!config.enabled) {
             this.logger.info('AI features disabled, clearing providers');
             this.provider = null;
