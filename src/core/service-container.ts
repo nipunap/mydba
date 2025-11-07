@@ -117,6 +117,11 @@ export class ServiceContainer {
         this.register(SERVICE_TOKENS.SQLValidator, (c) =>
             new SQLValidator(c.get(SERVICE_TOKENS.Logger))
         );
+
+        // Query history service
+        this.register(SERVICE_TOKENS.QueryHistoryService, (c) =>
+            new QueryHistoryService(c.context, c.get(SERVICE_TOKENS.Logger))
+        );
     }
 
     private registerBusinessServices(): void {
@@ -232,7 +237,8 @@ export const SERVICE_TOKENS = {
     CacheManager: { name: 'CacheManager' } as ServiceToken<CacheManager>,
     TransactionManager: { name: 'TransactionManager' } as ServiceToken<TransactionManager>,
     PromptSanitizer: { name: 'PromptSanitizer' } as ServiceToken<PromptSanitizer>,
-    SQLValidator: { name: 'SQLValidator' } as ServiceToken<SQLValidator>
+    SQLValidator: { name: 'SQLValidator' } as ServiceToken<SQLValidator>,
+    QueryHistoryService: { name: 'QueryHistoryService' } as ServiceToken<QueryHistoryService>
 };
 
 // Import service classes (will be implemented)
@@ -252,3 +258,4 @@ import { CacheManager } from './cache-manager';
 import { TransactionManager } from './transaction-manager';
 import { PromptSanitizer } from '../security/prompt-sanitizer';
 import { SQLValidator } from '../security/sql-validator';
+import { QueryHistoryService } from '../services/query-history-service';
