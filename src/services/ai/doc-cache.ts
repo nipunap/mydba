@@ -34,7 +34,7 @@ export class DocCache {
         private logger: Logger,
         options?: DocCacheOptions
     ) {
-        this.cacheDir = options?.cacheDir || '.doc-cache';
+        this.cacheDir = options?.cachedir || '.doc-cache';
         this.ttl = options?.ttl || 7 * 24 * 60 * 60 * 1000; // 7 days default
     }
 

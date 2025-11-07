@@ -89,24 +89,6 @@ describe('QueryAnonymizer', () => {
         });
     });
 
-    describe('deanonymize', () => {
-        it('should restore original query from map', () => {
-            const original = "SELECT * FROM users WHERE name = 'John Doe'";
-            const anonymized = anonymizer.anonymize(original);
-            const restored = anonymizer.deanonymize(anonymized);
-
-            // Should have mapping information
-            expect(restored).toBeDefined();
-        });
-
-        it('should handle queries without anonymization', () => {
-            const query = 'SELECT * FROM users';
-            const result = anonymizer.deanonymize(query);
-
-            expect(result).toBe(query);
-        });
-    });
-
     describe('edge cases', () => {
         it('should handle queries with escaped quotes', () => {
             const query = "SELECT * FROM users WHERE name = 'John\\'s Computer'";

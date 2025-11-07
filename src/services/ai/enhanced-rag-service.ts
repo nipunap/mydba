@@ -187,7 +187,7 @@ export class EnhancedRAGService {
      */
     async retrieveRelevantDocs(
         query: string,
-        dbType: 'mysql' | 'mariadb' | 'postgresql' = 'mysql',
+        dbType: 'mysql' | 'mariadb' = 'mysql',
         maxDocs: number = 3,
         options?: EnhancedRAGOptions
     ): Promise<RAGDocument[]> {

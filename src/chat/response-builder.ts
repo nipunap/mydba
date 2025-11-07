@@ -193,7 +193,9 @@ export class ChatResponseBuilder {
      */
     fileReference(uri: vscode.Uri, range?: vscode.Range): this {
         this.stream.markdown(`📄 `);
-        this.stream.reference(uri, range);
+        // VSCode ChatResponseStream.reference expects (uri, iconPath?) not (uri, range?)
+        // Range information is not supported in the API
+        this.stream.reference(uri);
         this.stream.markdown('\n\n');
         return this;
     }

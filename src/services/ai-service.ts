@@ -80,7 +80,7 @@ export class AIService {
             const fallbackOrder = this.getFallbackOrder(config.provider);
             for (const fallbackProviderName of fallbackOrder) {
                 try {
-                    const fallbackConfig = { ...config, provider: fallbackProviderName };
+                    const fallbackConfig = { ...config, provider: fallbackProviderName as 'auto' | 'vscode-lm' | 'openai' | 'anthropic' | 'ollama' | 'none' };
                     const fallbackProvider = await this.providerFactory.createProvider(fallbackConfig);
                     if (fallbackProvider) {
                         this.fallbackProviders.push(fallbackProvider);

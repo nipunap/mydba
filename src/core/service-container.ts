@@ -149,7 +149,7 @@ export class ServiceContainer {
         this.register(SERVICE_TOKENS.AIServiceCoordinator, (c) =>
             new AIServiceCoordinator(
                 c.get(SERVICE_TOKENS.Logger),
-                c.get(SERVICE_TOKENS.ConfigurationService)
+                c.context
             )
         );
 

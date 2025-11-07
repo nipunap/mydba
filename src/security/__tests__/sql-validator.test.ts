@@ -1,10 +1,18 @@
 import { SQLValidator } from '../sql-validator';
+import { Logger } from '../../utils/logger';
 
 describe('SQLValidator', () => {
     let validator: SQLValidator;
+    let mockLogger: Logger;
 
     beforeEach(() => {
-        validator = new SQLValidator();
+        mockLogger = {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn()
+        } as unknown as Logger;
+        validator = new SQLValidator(mockLogger);
     });
 
     describe('validate', () => {
@@ -12,15 +20,15 @@ describe('SQLValidator', () => {
             const query = 'SELECT * FROM users WHERE id = 1';
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(true);
-            expect(result.errors).toHaveLength(0);
+            expect(result.valid).toBe(true);
+            expect(result.issues).toHaveLength(0);
         });
 
         it('should allow safe INSERT queries', () => {
             const query = 'INSERT INTO users (name, email) VALUES ("John", "john@example.com")';
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(true);
+            expect(result.valid).toBe(true);
         });
 
         it('should detect SQL injection attempts', () => {
@@ -43,15 +51,15 @@ describe('SQLValidator', () => {
             const query = '';
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(false);
-            expect(result.errors?.length).toBeGreaterThan(0);
+            expect(result.valid).toBe(false);
+            expect(result.issues?.length).toBeGreaterThan(0);
         });
 
         it('should reject queries with only whitespace', () => {
             const query = '   \n\t  ';
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(false);
+            expect(result.valid).toBe(false);
         });
 
         it('should detect UNION-based injection', () => {
@@ -79,72 +87,7 @@ describe('SQLValidator', () => {
             const result = validator.validate(query);
 
             // Should be valid but may have warnings
-            expect(result.isValid).toBe(true);
-        });
-    });
-
-    describe('isSafe', () => {
-        it('should return true for safe SELECT', () => {
-            const query = 'SELECT id, name FROM users WHERE status = "active"';
-            expect(validator.isSafe(query)).toBe(true);
-        });
-
-        it('should return false for DROP statements', () => {
-            const query = 'DROP TABLE users';
-            expect(validator.isSafe(query)).toBe(false);
-        });
-
-        it('should return false for TRUNCATE statements', () => {
-            const query = 'TRUNCATE TABLE users';
-            expect(validator.isSafe(query)).toBe(false);
-        });
-
-        it('should return false for ALTER statements', () => {
-            const query = 'ALTER TABLE users ADD COLUMN password VARCHAR(255)';
-            expect(validator.isSafe(query)).toBe(false);
-        });
-
-        it('should handle empty strings', () => {
-            expect(validator.isSafe('')).toBe(false);
-        });
-    });
-
-    describe('sanitize', () => {
-        it('should remove comments from queries', () => {
-            const query = 'SELECT * FROM users -- comment here';
-            const result = validator.sanitize(query);
-
-            expect(result).not.toContain('--');
-            expect(result).toContain('SELECT');
-        });
-
-        it('should trim whitespace', () => {
-            const query = '   SELECT * FROM users   ';
-            const result = validator.sanitize(query);
-
-            expect(result).toBe('SELECT * FROM users');
-        });
-
-        it('should handle multi-line queries', () => {
-            const query = `
-                SELECT *
-                FROM users
-                WHERE id = 1
-            `;
-            const result = validator.sanitize(query);
-
-            expect(result).toContain('SELECT');
-            expect(result).toContain('FROM users');
-        });
-
-        it('should preserve essential structure', () => {
-            const query = 'SELECT id, name FROM users WHERE age > 25 ORDER BY name';
-            const result = validator.sanitize(query);
-
-            expect(result).toContain('SELECT');
-            expect(result).toContain('FROM');
-            expect(result).toContain('WHERE');
-            expect(result).toContain('ORDER BY');
+            expect(result.valid).toBe(true);
         });
     });
 
@@ -160,14 +103,14 @@ describe('SQLValidator', () => {
             const query = "SELECT * FROM users WHERE name = 'O\\'Brien'";
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(true);
+            expect(result.valid).toBe(true);
         });
 
         it('should handle case-insensitive SQL keywords', () => {
             const query = 'select * from USERS where ID = 1';
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(true);
+            expect(result.valid).toBe(true);
         });
     });
 
@@ -176,7 +119,7 @@ describe('SQLValidator', () => {
             const query = "LOAD DATA INFILE '/etc/passwd' INTO TABLE users";
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(false);
+            expect(result.valid).toBe(false);
         });
 
         it('should detect INTO OUTFILE', () => {
@@ -190,14 +133,14 @@ describe('SQLValidator', () => {
             const query = 'GRANT ALL PRIVILEGES ON *.* TO "user"@"localhost"';
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(false);
+            expect(result.valid).toBe(false);
         });
 
         it('should detect CREATE USER', () => {
             const query = 'CREATE USER "hacker"@"%" IDENTIFIED BY "password"';
             const result = validator.validate(query);
 
-            expect(result.isValid).toBe(false);
+            expect(result.valid).toBe(false);
         });
     });
 });

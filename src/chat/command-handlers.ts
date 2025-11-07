@@ -69,7 +69,7 @@ export class ChatCommandHandlers {
 
             const aiService = this.serviceContainer.get(SERVICE_TOKENS.AIServiceCoordinator);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const analysisResult = await aiService.analyzeQuery({ query, connectionId: activeConnectionId }) as any;
+            const analysisResult = await aiService.analyzeQuery(query) as any;
 
             // Stream the response
             await this.renderAnalysisResults(stream, analysisResult, query, activeConnectionId);
@@ -287,7 +287,7 @@ export class ChatCommandHandlers {
             // Get optimization suggestions
             stream.progress('Analyzing query for optimization opportunities...');
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const analysis = await aiService.analyzeQuery({ query, connectionId: activeConnectionId }) as any;
+            const analysis = await aiService.analyzeQuery(query) as any;
 
             // Render optimization-focused response
             if (analysis.optimizationSuggestions && analysis.optimizationSuggestions.length > 0) {

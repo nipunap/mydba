@@ -196,7 +196,7 @@ export class MyDBAChatParticipant implements IChatContextProvider {
      * Handle data retrieval queries with SQL generation
      */
     private async handleDataRetrievalQuery(
-        parsedQuery: { intent: QueryIntent; parameters: { tableName?: string; condition?: string; limit?: number }; requiresConfirmation: boolean },
+        parsedQuery: { originalPrompt: string; intent: QueryIntent; parameters: { tableName?: string; condition?: string; limit?: number }; requiresConfirmation: boolean },
         context: ChatCommandContext,
         builder: ChatResponseBuilder
     ): Promise<void> {
@@ -261,12 +261,12 @@ export class MyDBAChatParticipant implements IChatContextProvider {
                     .text('Please review the query carefully before executing.')
                     .buttons([
                         {
-                            label: '✅ Execute Query',
+                            title: '✅ Execute Query',
                             command: 'mydba.executeQuery',
                             args: [{ query: generatedSQL, connectionId: activeConnectionId }]
                         },
                         {
-                            label: '📋 Copy to Editor',
+                            title: '📋 Copy to Editor',
                             command: 'mydba.copyToEditor',
                             args: [generatedSQL]
                         }

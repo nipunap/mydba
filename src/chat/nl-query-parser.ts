@@ -297,7 +297,7 @@ export class NaturalLanguageQueryParser {
             return null;
         }
 
-        if (timeRange.type === 'relative') {
+        if (timeRange.type === 'relative' && timeRange.unit) {
             return `${dateColumn} >= NOW() - INTERVAL ${timeRange.value} ${timeRange.unit.toUpperCase()}`;
         }
 

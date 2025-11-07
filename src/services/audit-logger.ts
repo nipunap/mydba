@@ -127,7 +127,8 @@ export class AuditLogger {
             key,
             oldValue: JSON.stringify(oldValue),
             newValue: JSON.stringify(newValue),
-            user
+            user,
+            success: true
         };
 
         await this.writeEntry(entry);

@@ -161,12 +161,7 @@ export class CommandRegistry {
 
         try {
             this.logger.info('Analyzing query with AI...');
-            await this.aiServiceCoordinator.analyzeQuery({
-                query: text,
-                connectionId: 'current', // TODO: Get active connection
-                context: {},
-                options: { anonymize: true, includeSchema: true, includeDocs: true }
-            });
+            await this.aiServiceCoordinator.analyzeQuery(text);
 
             // TODO: Show analysis results in webview
             vscode.window.showInformationMessage('Query analysis completed');
@@ -270,10 +265,12 @@ export class CommandRegistry {
     }
 
     private async toggleAI(): Promise<void> {
-        const isEnabled = this.aiServiceCoordinator.isEnabled();
+        // TODO: Implement isEnabled check in AIServiceCoordinator or use configuration
+        const config = vscode.workspace.getConfiguration('mydba');
+        const isEnabled = config.get<boolean>('ai.enabled', true);
         const newState = !isEnabled;
 
-        // TODO: Update configuration
+        await config.update('ai.enabled', newState, vscode.ConfigurationTarget.Global);
         vscode.window.showInformationMessage(`AI features ${newState ? 'enabled' : 'disabled'}`);
     }
 

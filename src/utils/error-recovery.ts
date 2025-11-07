@@ -270,7 +270,7 @@ export async function safeInitialize<T>(
         const action = await errorRecovery.showErrorDialog(component, error as Error);
 
         if (action === 'RETRY') {
-            const recovered = await errorRecovery.attemptRecovery(component, initFn);
+            const recovered = await errorRecovery.attemptRecovery(component, async () => { await initFn(); });
             if (recovered) {
                 // Try one more time after successful recovery
                 try {

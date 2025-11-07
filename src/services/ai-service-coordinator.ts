@@ -222,14 +222,15 @@ export class AIServiceCoordinator {
             if (!node) return;
 
             // Check for full table scans
-            if (node.access_type === 'ALL' && node.rows_examined_per_scan > 10000) {
+            const rowsExamined = typeof node.rows_examined_per_scan === 'number' ? node.rows_examined_per_scan : 0;
+            if (node.access_type === 'ALL' && rowsExamined > 10000) {
                 painPoints.push({
                     type: 'full_table_scan',
                     severity: 'CRITICAL',
-                    description: `Full table scan on ${node.table_name} (${node.rows_examined_per_scan} rows)`,
-                    table: node.table_name,
-                    rowsAffected: node.rows_examined_per_scan,
-                    suggestion: `Add index on ${node.table_name} to avoid full scan`
+                    description: `Full table scan on ${String(node.table_name || 'table')} (${rowsExamined} rows)`,
+                    table: String(node.table_name || 'table'),
+                    rowsAffected: rowsExamined,
+                    suggestion: `Add index on ${String(node.table_name || 'table')} to avoid full scan`
                 });
             }
 
@@ -255,12 +256,13 @@ export class AIServiceCoordinator {
 
             // Check for missing indexes
             if (node.possible_keys === null && node.access_type === 'ALL') {
+                const tableName = String(node.table_name || 'table');
                 painPoints.push({
                     type: 'missing_index',
                     severity: 'CRITICAL',
-                    description: `No possible indexes for ${node.table_name}`,
-                    table: node.table_name,
-                    suggestion: `Create appropriate index on ${node.table_name}`
+                    description: `No possible indexes for ${tableName}`,
+                    table: tableName,
+                    suggestion: `Create appropriate index on ${tableName}`
                 });
             }
 
@@ -301,10 +303,10 @@ export class AIServiceCoordinator {
     private calculateStagePercentages(profilingData: unknown): ProfilingStage[] {
         const data = profilingData as { stages?: unknown[] };
         const stages: unknown[] = Array.isArray(profilingData) ? profilingData : data.stages || [];
-        const totalDuration = stages.reduce((sum, stage: unknown) => {
+        const totalDuration = stages.reduce((sum: number, stage: unknown) => {
             const s = stage as { duration?: number; Duration?: number };
             return sum + (s.duration || s.Duration || 0);
-        }, 0);
+        }, 0 as number);
 
         return stages.map(stage => {
             const s = stage as { name?: string; Stage?: string; event_name?: string; duration?: number; Duration?: number };
@@ -312,7 +314,7 @@ export class AIServiceCoordinator {
             return {
                 name: s.name || s.Stage || s.event_name || 'unknown',
                 duration,
-                percentage: totalDuration > 0 ? (duration / totalDuration) * 100 : 0
+                percentage: (totalDuration as number) > 0 ? (duration / (totalDuration as number)) * 100 : 0
             };
         });
     }
@@ -350,7 +352,7 @@ export class AIServiceCoordinator {
         _query: string,
         _painPoints: PainPoint[],
         _dbType: string
-    ): Promise<{ summary: string; suggestions: string[]; performancePrediction: null; citations: unknown[] }> {
+    ): Promise<{ summary: string; suggestions: string[]; performancePrediction: null; citations: Array<{ source: string; url: string; excerpt: string }> }> {
         // This would call the AI service with appropriate prompting
         // For now, returning a placeholder structure
         return {
@@ -366,7 +368,7 @@ export class AIServiceCoordinator {
         _bottlenecks: ProfilingStage[],
         _query: string,
         _dbType: string
-    ): Promise<{ insights: string[]; suggestions: string[]; citations: unknown[] }> {
+    ): Promise<{ insights: string[]; suggestions: string[]; citations: Array<{ source: string; url: string; excerpt: string }> }> {
         // This would call the AI service with appropriate prompting
         // For now, returning a placeholder structure
         return {

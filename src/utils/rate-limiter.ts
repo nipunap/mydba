@@ -189,8 +189,8 @@ export class RateLimiterManager {
     /**
      * Get status for all providers
      */
-    getStatus(): Record<string, { tokens: number; queueSize: number; maxTokens: number; refillRate: number }> {
-        const status: Record<string, { tokens: number; queueSize: number; maxTokens: number; refillRate: number }> = {};
+    getStatus(): Record<string, { available: number; capacity: number; queueSize: number; utilizationPercent: number }> {
+        const status: Record<string, { available: number; capacity: number; queueSize: number; utilizationPercent: number }> = {};
 
         this.limiters.forEach((limiter, provider) => {
             status[provider] = limiter.getStatus();

@@ -33,7 +33,7 @@ export class LiveDocService {
         options?: LiveDocServiceOptions
     ) {
         this.docCache = new DocCache(logger, {
-            cacheDir: options?.cacheDir || '.doc-cache',
+            cachedir: options?.cacheDir || '.doc-cache',
             ttl: options?.cacheTTL || 7 * 24 * 60 * 60 * 1000, // 7 days
         });
     }
