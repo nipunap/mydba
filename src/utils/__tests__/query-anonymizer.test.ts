@@ -11,7 +11,7 @@ describe('QueryAnonymizer', () => {
         it('should anonymize string literals', () => {
             const query = "SELECT * FROM users WHERE name = 'John Doe' AND email = 'john@example.com'";
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).not.toContain('John Doe');
             expect(result).not.toContain('john@example.com');
             expect(result).toContain('?');
@@ -20,7 +20,7 @@ describe('QueryAnonymizer', () => {
         it('should anonymize numeric literals', () => {
             const query = 'SELECT * FROM orders WHERE amount > 1000 AND user_id = 12345';
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).not.toContain('1000');
             expect(result).not.toContain('12345');
             expect(result).toContain('?');
@@ -29,7 +29,7 @@ describe('QueryAnonymizer', () => {
         it('should preserve SQL keywords and structure', () => {
             const query = "SELECT * FROM users WHERE age > 25 AND status = 'active'";
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).toContain('SELECT');
             expect(result).toContain('FROM');
             expect(result).toContain('WHERE');
@@ -40,7 +40,7 @@ describe('QueryAnonymizer', () => {
         it('should handle queries with no sensitive data', () => {
             const query = 'SELECT * FROM users';
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).toBe(query);
         });
 
@@ -52,7 +52,7 @@ describe('QueryAnonymizer', () => {
         it('should anonymize IN clauses', () => {
             const query = "SELECT * FROM users WHERE id IN (1, 2, 3, 4, 5)";
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).toContain('IN (?)');
             expect(result).not.toContain('1, 2, 3');
         });
@@ -94,7 +94,7 @@ describe('QueryAnonymizer', () => {
             const original = "SELECT * FROM users WHERE name = 'John Doe'";
             const anonymized = anonymizer.anonymize(original);
             const restored = anonymizer.deanonymize(anonymized);
-            
+
             // Should have mapping information
             expect(restored).toBeDefined();
         });
@@ -102,7 +102,7 @@ describe('QueryAnonymizer', () => {
         it('should handle queries without anonymization', () => {
             const query = 'SELECT * FROM users';
             const result = anonymizer.deanonymize(query);
-            
+
             expect(result).toBe(query);
         });
     });
@@ -111,7 +111,7 @@ describe('QueryAnonymizer', () => {
         it('should handle queries with escaped quotes', () => {
             const query = "SELECT * FROM users WHERE name = 'John\\'s Computer'";
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).toBeDefined();
             expect(result.length).toBeGreaterThan(0);
         });
@@ -119,7 +119,7 @@ describe('QueryAnonymizer', () => {
         it('should handle queries with comments', () => {
             const query = "SELECT * FROM users -- This is a comment\nWHERE name = 'John'";
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).toBeDefined();
         });
 
@@ -131,7 +131,7 @@ describe('QueryAnonymizer', () => {
                   AND age > 25
             `;
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).not.toContain('test@example.com');
             expect(result).not.toContain('25');
         });
@@ -139,9 +139,8 @@ describe('QueryAnonymizer', () => {
         it('should handle queries with special characters', () => {
             const query = "SELECT * FROM users WHERE name LIKE '%test%'";
             const result = anonymizer.anonymize(query);
-            
+
             expect(result).toBeDefined();
         });
     });
 });
-
