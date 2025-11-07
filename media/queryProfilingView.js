@@ -62,7 +62,7 @@
   function render(profile, query) {
     hideLoading(); hideError(); content.style.display = 'block';
     currentProfile = profile;
-    
+
     totalDuration.textContent = `${Number(profile.totalDuration || 0).toFixed(2)} µs`;
     rowsExamined.textContent = `${Number(profile.summary.totalRowsExamined || 0)}`;
     rowsSent.textContent = `${Number(profile.summary.totalRowsSent || 0)}`;
@@ -92,7 +92,7 @@
     // Transform stages into waterfall format
     const stages = profile.stages || [];
     const totalDuration = profile.totalDuration || 0;
-    
+
     // Calculate cumulative start times
     let cumulativeTime = 0;
     const waterfallData = stages.map((stage, idx) => {
@@ -100,10 +100,10 @@
       const duration = Number(stage.duration || 0);
       const endTime = startTime + duration;
       cumulativeTime = endTime;
-      
+
       const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
       const color = getStageColor(percentage, stage.eventName);
-      
+
       return {
         label: stage.eventName || `Stage ${idx + 1}`,
         start: startTime,
@@ -118,7 +118,7 @@
     waterfallData.sort((a, b) => b.duration - a.duration);
 
     const ctx = waterfallCanvas.getContext('2d');
-    
+
     chartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -171,10 +171,18 @@
             title: {
               display: true,
               text: 'Duration (µs)',
-              color: 'var(--vscode-foreground)'
+              color: 'var(--vscode-foreground)',
+              font: {
+                size: 13,
+                weight: 'bold'
+              }
             },
             ticks: {
-              color: 'var(--vscode-foreground)'
+              color: 'var(--vscode-foreground)',
+              font: {
+                size: 12,
+                weight: '500'
+              }
             },
             grid: {
               color: 'var(--vscode-widget-border)'
@@ -184,8 +192,11 @@
             ticks: {
               color: 'var(--vscode-foreground)',
               font: {
-                size: 11
-              }
+                size: 12,
+                weight: '500'
+              },
+              autoSkip: false,
+              padding: 5
             },
             grid: {
               display: false
@@ -211,23 +222,23 @@
 
   function renderStagesTable(profile) {
     if (!stagesBody) return;
-    
+
     stagesBody.innerHTML = '';
     const stages = profile.stages || [];
     const totalDuration = profile.totalDuration || 0;
-    
+
     stages.forEach((s) => {
       const tr = document.createElement('tr');
-      const td1 = document.createElement('td'); 
+      const td1 = document.createElement('td');
       td1.textContent = s.eventName;
-      
-      const td2 = document.createElement('td'); 
+
+      const td2 = document.createElement('td');
       td2.textContent = Number(s.duration || 0).toFixed(2);
-      
+
       const td3 = document.createElement('td');
       const percentage = totalDuration > 0 ? (s.duration / totalDuration) * 100 : 0;
       td3.textContent = `${percentage.toFixed(1)}%`;
-      
+
       // Color code by percentage
       if (percentage > 50) {
         td3.style.color = 'var(--vscode-errorForeground)';
@@ -235,8 +246,8 @@
       } else if (percentage > 20) {
         td3.style.color = 'var(--vscode-notificationsWarningIcon-foreground)';
       }
-      
-      tr.appendChild(td1); 
+
+      tr.appendChild(td1);
       tr.appendChild(td2);
       tr.appendChild(td3);
       stagesBody.appendChild(tr);
@@ -272,13 +283,13 @@
     try {
       // Get chart as PNG
       const url = waterfallCanvas.toDataURL('image/png');
-      
+
       // Create download link
       const link = document.createElement('a');
       link.download = `query-profile-${Date.now()}.png`;
       link.href = url;
       link.click();
-      
+
       vscode.postMessage({ type: 'log', message: 'Chart exported successfully' });
     } catch (error) {
       vscode.postMessage({ type: 'log', message: `Export failed: ${error.message}` });

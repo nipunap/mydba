@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 import { ServiceContainer, SERVICE_TOKENS } from '../core/service-container';
 import { ChatCommand, ChatCommandContext, IChatContextProvider } from './types';
 import { ChatCommandHandlers } from './command-handlers';
-import { NaturalLanguageQueryParser, QueryIntent } from './nl-query-parser';
+import { NaturalLanguageQueryParser, QueryIntent, ParsedQuery } from './nl-query-parser';
 import { ChatResponseBuilder } from './response-builder';
 
 /**

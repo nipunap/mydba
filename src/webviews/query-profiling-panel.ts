@@ -112,21 +112,22 @@ export class QueryProfilingPanel {
 
             this.logger.info('AI profiling interpretation completed successfully');
 
+            // Format insights for webview rendering
+            const formattedInsights: any = {
+                summary: interpretation.insights.length > 0 ? interpretation.insights[0] : 'Performance analysis completed.',
+                metadata: {
+                    complexity: this.estimateComplexity(interpretation),
+                    estimatedImpact: this.estimateImpact(interpretation.bottlenecks)
+                },
+                antiPatterns: this.extractAntiPatterns(interpretation.insights),
+                optimizations: this.formatOptimizations(interpretation.suggestions, interpretation.bottlenecks),
+                citations: interpretation.citations
+            };
+
             // Send enhanced insights to webview
             this.panel.webview.postMessage({
                 type: 'aiInsights',
-                insights: {
-                    // Core profiling interpretation
-                    stages: interpretation.stages,
-                    bottlenecks: interpretation.bottlenecks,
-                    totalDuration: interpretation.totalDuration,
-                    insights: interpretation.insights,
-                    suggestions: interpretation.suggestions,
-                    citations: interpretation.citations,
-                    // Include summary for backward compatibility
-                    summary: interpretation.insights.join('\n\n'),
-                    optimizationSuggestions: interpretation.suggestions
-                }
+                insights: formattedInsights
             });
         } catch (error) {
             this.logger.error('AI analysis failed:', error as Error);
@@ -135,6 +136,116 @@ export class QueryProfilingPanel {
                 error: (error as Error).message
             });
         }
+    }
+
+    private estimateComplexity(interpretation: any): string {
+        const bottleneckCount = interpretation.bottlenecks?.length || 0;
+        const totalStages = interpretation.stages?.length || 1;
+        const bottleneckRatio = bottleneckCount / totalStages;
+
+        if (bottleneckRatio > 0.3 || bottleneckCount > 3) {
+            return 'High';
+        } else if (bottleneckRatio > 0.15 || bottleneckCount > 1) {
+            return 'Medium';
+        }
+        return 'Low';
+    }
+
+    private estimateImpact(bottlenecks: any[]): string {
+        if (!bottlenecks || bottlenecks.length === 0) {
+            return 'Low';
+        }
+
+        const maxPercentage = Math.max(...bottlenecks.map(b => b.percentage || 0));
+        if (maxPercentage > 50) {
+            return 'High';
+        } else if (maxPercentage > 30) {
+            return 'Medium';
+        }
+        return 'Low';
+    }
+
+    private extractAntiPatterns(insights: string[]): any[] {
+        const antiPatterns: any[] = [];
+
+        // Parse insights looking for anti-pattern indicators
+        insights.forEach(insight => {
+            if (insight.includes('⚠️')) {
+                const parts = insight.split(':');
+                if (parts.length >= 2) {
+                    const pattern = parts[0].replace('⚠️', '').trim();
+                    const message = parts.slice(1).join(':').trim();
+
+                    antiPatterns.push({
+                        pattern,
+                        severity: this.determineSeverity(insight),
+                        message,
+                        suggestion: this.extractSuggestion(insight)
+                    });
+                }
+            }
+        });
+
+        return antiPatterns;
+    }
+
+    private determineSeverity(text: string): string {
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('critical') || lowerText.includes('full table scan') || lowerText.includes('missing index')) {
+            return 'critical';
+        } else if (lowerText.includes('warning') || lowerText.includes('slow') || lowerText.includes('inefficient')) {
+            return 'warning';
+        }
+        return 'info';
+    }
+
+    private extractSuggestion(text: string): string | undefined {
+        // Try to extract suggestion hints from the text
+        const suggestionMarkers = ['consider', 'try', 'should', 'add', 'use', 'optimize'];
+        for (const marker of suggestionMarkers) {
+            const index = text.toLowerCase().indexOf(marker);
+            if (index !== -1) {
+                return text.substring(index);
+            }
+        }
+        return undefined;
+    }
+
+    private formatOptimizations(suggestions: string[], bottlenecks: any[]): any[] {
+        const optimizations: any[] = [];
+
+        suggestions.forEach((suggestion, index) => {
+            const parts = suggestion.split(':');
+            const title = parts[0]?.trim() || `Optimization ${index + 1}`;
+            const reasoning = parts.length > 1 ? parts.slice(1).join(':').trim() : suggestion;
+
+            // Determine priority based on bottleneck severity
+            let priority = 'medium';
+            let estimatedImprovement = '';
+
+            if (bottlenecks.length > 0) {
+                const maxBottleneck = Math.max(...bottlenecks.map(b => b.percentage || 0));
+                if (maxBottleneck > 50) {
+                    priority = 'high';
+                    estimatedImprovement = '40-60% faster';
+                } else if (maxBottleneck > 30) {
+                    priority = 'medium';
+                    estimatedImprovement = '20-40% faster';
+                } else {
+                    priority = 'low';
+                    estimatedImprovement = '10-20% faster';
+                }
+            }
+
+            optimizations.push({
+                suggestion: title,
+                reasoning,
+                priority,
+                estimatedImprovement
+            });
+        });
+
+        return optimizations;
     }
 
     private extractTablesFromQuery(query: string): string[] {

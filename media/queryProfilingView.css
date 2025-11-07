@@ -60,54 +60,59 @@
 
 /* Waterfall Chart Styles */
 .waterfall-section { margin: 20px 0; }
-.waterfall-header { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  margin-bottom: 16px; 
+.waterfall-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
 }
-.waterfall-header h3 { 
-  margin: 0; 
-  display: flex; 
-  align-items: center; 
-  gap: 8px; 
+.waterfall-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.waterfall-controls { 
-  display: flex; 
-  gap: 8px; 
+.waterfall-controls {
+  display: flex;
+  gap: 8px;
 }
 
-.toggle-btn, .export-btn { 
-  display: inline-flex; 
-  align-items: center; 
+.toggle-btn, .export-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  padding: 6px 12px; 
+  padding: 6px 12px;
   border: 1px solid var(--vscode-button-border);
-  background: var(--vscode-button-secondaryBackground); 
+  background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
-  border-radius: 4px; 
-  cursor: pointer; 
+  border-radius: 4px;
+  cursor: pointer;
   font-size: 12px;
   transition: all 0.2s ease;
 }
 
-.toggle-btn:hover, .export-btn:hover { 
-  background: var(--vscode-button-secondaryHoverBackground); 
+.toggle-btn:hover, .export-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .toggle-btn:active, .export-btn:active {
   transform: translateY(1px);
 }
 
-.chart-container { 
+.chart-container {
   position: relative;
-  width: 100%; 
+  width: 100%;
   height: 500px;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--vscode-widget-border);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
+}
+
+/* Ensure canvas text is visible */
+.chart-container canvas {
+  background: transparent;
 }
 
 .stages-table-container {
@@ -161,20 +166,20 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .summary { 
-    grid-template-columns: repeat(2, 1fr); 
+  .summary {
+    grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .waterfall-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-  
+
   .chart-container {
     height: 400px;
   }
-  
+
   .optimization-code {
     grid-template-columns: 1fr;
   }

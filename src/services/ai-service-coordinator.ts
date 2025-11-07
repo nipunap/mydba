@@ -365,18 +365,92 @@ export class AIServiceCoordinator {
     }
 
     private async getAIProfilingInsights(
-        _stages: ProfilingStage[],
-        _bottlenecks: ProfilingStage[],
-        _query: string,
-        _dbType: string
+        stages: ProfilingStage[],
+        bottlenecks: ProfilingStage[],
+        query: string,
+        dbType: string
     ): Promise<{ insights: string[]; suggestions: string[]; citations: Array<{ source: string; url: string; excerpt: string }> }> {
-        // This would call the AI service with appropriate prompting
-        // For now, returning a placeholder structure
-        return {
-            insights: [],
-            suggestions: [],
-            citations: []
-        };
+        this.logger.info('Getting AI profiling insights');
+
+        try {
+            // Build a schema context with performance data
+            const totalDuration = this.calculateTotalDuration(stages);
+            const efficiency = stages.length > 0 ? (stages.reduce((sum, s) => sum + s.duration, 0) / totalDuration) * 100 : 0;
+
+            const schemaContext = {
+                tables: {},
+                performance: {
+                    totalDuration,
+                    efficiency,
+                    stages: stages.map(s => ({
+                        name: s.name,
+                        duration: s.duration,
+                        percentage: s.percentage
+                    })),
+                    bottlenecks: bottlenecks.map(b => ({
+                        name: b.name,
+                        duration: b.duration,
+                        percentage: b.percentage
+                    }))
+                }
+            };
+
+            // Use AI service to analyze the query with profiling context
+            const aiResult = await this.aiService.analyzeQuery(query, schemaContext as Record<string, unknown>, dbType as 'mysql' | 'mariadb');
+
+            // Extract insights and suggestions from AI result
+            const insights: string[] = [];
+            const suggestions: string[] = [];
+
+            // Add summary as primary insight
+            if (aiResult.summary) {
+                insights.push(aiResult.summary);
+            }
+
+            // Add anti-patterns as insights
+            if (aiResult.antiPatterns && aiResult.antiPatterns.length > 0) {
+                aiResult.antiPatterns.forEach((ap: Record<string, unknown>) => {
+                    insights.push(`⚠️ ${ap.type || 'Issue'}: ${ap.message}`);
+                    if (ap.suggestion) {
+                        suggestions.push(String(ap.suggestion));
+                    }
+                });
+            }
+
+            // Add optimization suggestions
+            if (aiResult.optimizationSuggestions && aiResult.optimizationSuggestions.length > 0) {
+                aiResult.optimizationSuggestions.forEach((opt: Record<string, unknown>) => {
+                    suggestions.push(`${opt.title}: ${opt.description}`);
+                });
+            }
+
+            // Extract citations if available
+            const citations: Array<{ source: string; url: string; excerpt: string }> = [];
+            if (aiResult.citations && Array.isArray(aiResult.citations)) {
+                aiResult.citations.forEach((citation: Record<string, unknown>) => {
+                    citations.push({
+                        source: String(citation.title || citation.source || 'Unknown'),
+                        url: String(citation.url || ''),
+                        excerpt: String(citation.relevance || citation.excerpt || '')
+                    });
+                });
+            }
+
+            return {
+                insights: insights.length > 0 ? insights : ['AI analysis completed. Review the performance metrics above.'],
+                suggestions: suggestions.length > 0 ? suggestions : [],
+                citations
+            };
+
+        } catch (error) {
+            this.logger.error('Failed to get AI profiling insights:', error as Error);
+            // Return empty results instead of throwing to allow profiling to continue
+            return {
+                insights: [`Unable to generate AI insights: ${(error as Error).message}`],
+                suggestions: [],
+                citations: []
+            };
+        }
     }
 }
 
