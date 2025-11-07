@@ -237,7 +237,8 @@ export class ConnectionManager {
             try {
                 const versionResult = await adapter.query('SELECT VERSION() as version');
                 if (versionResult?.rows && versionResult.rows.length > 0) {
-                    version = (versionResult.rows[0] as any).version;
+                    const row = versionResult.rows[0] as Record<string, unknown>;
+                    version = row.version as string;
                 }
             } catch (versionError) {
                 // Version query failed, but connection was successful
@@ -338,7 +339,7 @@ export class ConnectionManager {
     private async saveAllConnections(): Promise<void> {
         const connectionsJson = Array.from(this.connectionConfigs.values()).map(config => {
             // Remove password before saving (stored separately in secret storage)
-            const { password: _password, ...configWithoutPassword } = config as any;
+            const { password: _password, ...configWithoutPassword } = config as ConnectionConfig & { password?: string };
             return JSON.stringify(configWithoutPassword);
         });
 
