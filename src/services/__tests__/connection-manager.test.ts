@@ -22,7 +22,7 @@ describe('ConnectionManager', () => {
     beforeEach(() => {
         // Setup mock workspace state
         mockWorkspaceState = new Map();
-        
+
         // Mock ExtensionContext
         mockContext = {
             workspaceState: {
@@ -360,7 +360,7 @@ describe('ConnectionManager', () => {
                 config.id,
                 { password: 'password' }
             );
-            
+
             // Connection should be added
             const connection = connectionManager.getConnection(config.id);
             expect(connection).toBeDefined();
@@ -544,4 +544,3 @@ describe('ConnectionManager', () => {
         });
     });
 });
-
