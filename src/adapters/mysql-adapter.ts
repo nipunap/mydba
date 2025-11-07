@@ -339,6 +339,13 @@ export class MySQLAdapter {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             connection = await this.pool!.getConnection();
             this.logger.debug('Acquired dedicated connection from pool');
+
+            // Ensure database is selected if configured
+            if (this.config.database) {
+                await connection.query(`USE \`${this.config.database}\``);
+                this.logger.debug(`Selected database: ${this.config.database}`);
+            }
+
             const result = await fn(connection);
             return result;
         } catch (error) {

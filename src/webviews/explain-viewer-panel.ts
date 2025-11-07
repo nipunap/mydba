@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
-import { AIService } from '../services/ai-service';
+import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 
 interface ExplainNode {
     id: string;
@@ -58,7 +58,7 @@ export class ExplainViewerPanel {
         private connectionId: string,
         private query: string,
         private explainData: unknown,
-        private aiService?: AIService
+        private aiServiceCoordinator?: AIServiceCoordinator
     ) {
         this.panel = panel;
         this.panel.webview.html = this.getHtml();
@@ -74,7 +74,7 @@ export class ExplainViewerPanel {
         connectionId: string,
         query: string,
         explainData: unknown,
-        aiService?: AIService
+        aiServiceCoordinator?: AIServiceCoordinator
     ): void {
         const panelKey = `explainViewer-${connectionId}-${Date.now()}`;
         const connection = connectionManager.getConnection(connectionId);
@@ -107,7 +107,7 @@ export class ExplainViewerPanel {
             connectionId,
             query,
             explainData,
-            aiService
+            aiServiceCoordinator
         );
         ExplainViewerPanel.panelRegistry.set(panelKey, explainViewerPanel);
     }
@@ -169,8 +169,8 @@ export class ExplainViewerPanel {
     }
 
     private async getAIInsights(explainJson: unknown, treeData: ExplainNode): Promise<void> {
-        if (!this.aiService) {
-            this.logger.debug('AI service not available, skipping AI insights');
+        if (!this.aiServiceCoordinator) {
+            this.logger.debug('AI service coordinator not available, skipping AI insights');
             return;
         }
 
@@ -182,33 +182,38 @@ export class ExplainViewerPanel {
                 type: 'aiInsightsLoading'
             });
 
-            // Build a comprehensive context for AI
-            const issues = this.collectAllIssues(treeData);
+            // Get connection to determine DB type
+            const connection = this.connectionManager.getConnection(this.connectionId);
+            const dbType = connection?.type === 'mariadb' ? 'mariadb' : 'mysql';
+
+            // Use AIServiceCoordinator's interpretExplain for specialized EXPLAIN analysis
+            const interpretation = await this.aiServiceCoordinator.interpretExplain(
+                explainJson,
+                this.query,
+                dbType
+            );
+
+            // Collect additional metadata
             const tables = this.extractTableNames(explainJson);
             const totalCost = treeData.cost || 0;
             const estimatedRows = this.getTotalRowCount(treeData);
 
-            // Create a detailed prompt context
-            const explainSummary = this.buildExplainSummary(explainJson, treeData, issues);
-            const analysisPrompt = `${this.query}\n\n--- EXECUTION PLAN ANALYSIS ---\n${explainSummary}`;
-
-            // Get AI analysis
-            const aiResult = await this.aiService.analyzeQuery(analysisPrompt);
-
-            // Send AI insights to webview
+            // Send enhanced AI insights to webview
             this.panel.webview.postMessage({
                 type: 'aiInsights',
                 data: {
-                    summary: aiResult.summary,
-                    antiPatterns: aiResult.antiPatterns,
-                    optimizationSuggestions: aiResult.optimizationSuggestions,
-                    estimatedComplexity: aiResult.estimatedComplexity,
-                    citations: aiResult.citations,
+                    // Core interpretation from AI
+                    summary: interpretation.summary,
+                    painPoints: interpretation.painPoints,
+                    suggestions: interpretation.suggestions,
+                    performancePrediction: interpretation.performancePrediction,
+                    citations: interpretation.citations,
+                    // Additional metadata
                     metadata: {
                         totalCost,
                         estimatedRows,
                         tablesCount: tables.size,
-                        issuesCount: issues.length
+                        painPointsCount: interpretation.painPoints.length
                     }
                 }
             });
@@ -805,11 +810,199 @@ export class ExplainViewerPanel {
                     case 'log':
                         this.logger.debug(message.message as string);
                         break;
+
+                    case 'applyOptimization':
+                        await this.handleApplyOptimization(message.suggestion);
+                        break;
+
+                    case 'compareOptimization':
+                        await this.handleCompareOptimization(message.suggestion);
+                        break;
+
+                    case 'copyToClipboard':
+                        await this.handleCopyToClipboard(message.text);
+                        break;
                 }
             },
             null,
             this.disposables
         );
+    }
+
+    /**
+     * Handle applying an optimization with Safe Mode confirmation
+     */
+    private async handleApplyOptimization(suggestion: any): Promise<void> {
+        this.logger.info(`Applying optimization: ${suggestion.title}`);
+
+        try {
+            const ddl = suggestion.ddl || suggestion.after;
+            if (!ddl) {
+                vscode.window.showErrorMessage('No executable code found in this optimization suggestion');
+                return;
+            }
+
+            // Safe Mode confirmation
+            const impactWarning = suggestion.impact === 'high'
+                ? '⚠️  HIGH IMPACT - This change could significantly affect performance or behavior.'
+                : suggestion.impact === 'medium'
+                ? '⚠️  MEDIUM IMPACT - Review this change carefully before applying.'
+                : 'ℹ️  LOW IMPACT - This is a relatively safe change.';
+
+            const difficultyWarning = suggestion.difficulty === 'hard'
+                ? '⚠️  COMPLEX - This change may require additional adjustments.'
+                : suggestion.difficulty === 'medium'
+                ? 'ℹ️  MODERATE - Standard complexity change.'
+                : '✓  SIMPLE - Straightforward change.';
+
+            const message = `**Apply Optimization: ${suggestion.title}**\n\n` +
+                `${impactWarning}\n` +
+                `${difficultyWarning}\n\n` +
+                `**SQL to execute:**\n\`\`\`sql\n${ddl}\n\`\`\`\n\n` +
+                `⚠️ **Warning:** DDL operations (CREATE INDEX, ALTER TABLE) auto-commit in MySQL/MariaDB and cannot be rolled back.\n` +
+                `[Learn more](https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html)\n\n` +
+                `Do you want to proceed?`;
+
+            const choice = await vscode.window.showWarningMessage(
+                message,
+                { modal: true },
+                'Apply (Auto-Commit)',
+                'Copy to Clipboard',
+                'Cancel'
+            );
+
+            if (choice === 'Apply (Auto-Commit)') {
+                await this.executeOptimizationDDL(ddl, suggestion);
+            } else if (choice === 'Copy to Clipboard') {
+                await vscode.env.clipboard.writeText(ddl);
+                vscode.window.showInformationMessage('Optimization DDL copied to clipboard');
+            }
+        } catch (error) {
+            this.logger.error('Failed to apply optimization:', error as Error);
+            vscode.window.showErrorMessage(`Failed to apply optimization: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Execute optimization DDL (auto-commits in MySQL/MariaDB)
+     *
+     * NOTE: DDL statements (CREATE INDEX, ALTER TABLE, etc.) cause an implicit
+     * commit in MySQL/MariaDB and cannot be rolled back. This is a database limitation.
+     * See: https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html
+     */
+    private async executeOptimizationDDL(ddl: string, suggestion: any): Promise<void> {
+        const adapter = this.connectionManager.getAdapter(this.connectionId);
+        if (!adapter) {
+            throw new Error('Database connection not found');
+        }
+
+        try {
+            // Show progress
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Applying optimization: ${suggestion.title}`,
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: 'Executing DDL...' });
+
+                // Execute the DDL
+                await adapter.query(ddl);
+
+                progress.report({ message: 'Verifying changes...' });
+
+                // Wait a moment for changes to propagate
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                return Promise.resolve();
+            });
+
+            // Success notification with action to re-analyze
+            const choice = await vscode.window.showInformationMessage(
+                `✓ Optimization applied successfully: ${suggestion.title}`,
+                'Re-analyze Query',
+                'OK'
+            );
+
+            if (choice === 'Re-analyze Query') {
+                // Re-run EXPLAIN to capture the new execution plan
+                const explainQuery = `EXPLAIN FORMAT=JSON ${this.query}`;
+                const result = await adapter.query<unknown>(explainQuery);
+
+                // Update with fresh EXPLAIN data
+                if (result.rows && result.rows.length > 0) {
+                    this.explainData = result.rows[0];
+                    this.logger.info('EXPLAIN data updated after optimization');
+                }
+
+                // Reload the panel with new data
+                await this.processAndSendExplainData();
+            }
+
+        } catch (error) {
+            this.logger.error('DDL execution failed:', error as Error);
+            vscode.window.showErrorMessage(
+                `Failed to apply optimization: ${(error as Error).message}\n\n` +
+                `The database state has not been changed.`
+            );
+            throw error;
+        }
+    }
+
+    /**
+     * Handle comparing before/after code
+     */
+    private async handleCompareOptimization(suggestion: any): Promise<void> {
+        this.logger.info(`Opening diff for optimization: ${suggestion.title}`);
+
+        try {
+            // Create temporary documents for comparison
+            const beforeUri = vscode.Uri.parse(`untitled:before-${suggestion.title.replace(/\s+/g, '-')}.sql`);
+            const afterUri = vscode.Uri.parse(`untitled:after-${suggestion.title.replace(/\s+/g, '-')}.sql`);
+
+            // Open diff editor
+            await vscode.commands.executeCommand(
+                'vscode.diff',
+                beforeUri.with({ scheme: 'vscode-userdata', path: `/before-${Date.now()}.sql` }),
+                afterUri.with({ scheme: 'vscode-userdata', path: `/after-${Date.now()}.sql` }),
+                `${suggestion.title} - Before ↔ After`,
+                { preview: true }
+            );
+
+            // Create temporary files with the content
+            const beforeDoc = await vscode.workspace.openTextDocument({
+                content: suggestion.before,
+                language: 'sql'
+            });
+            const afterDoc = await vscode.workspace.openTextDocument({
+                content: suggestion.after,
+                language: 'sql'
+            });
+
+            // Show diff
+            await vscode.commands.executeCommand(
+                'vscode.diff',
+                beforeDoc.uri,
+                afterDoc.uri,
+                `Optimization: ${suggestion.title}`
+            );
+
+        } catch (error) {
+            this.logger.error('Failed to open diff:', error as Error);
+            vscode.window.showErrorMessage(`Failed to show comparison: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Handle copying text to clipboard
+     */
+    private async handleCopyToClipboard(text: string): Promise<void> {
+        try {
+            await vscode.env.clipboard.writeText(text);
+            vscode.window.showInformationMessage('Copied to clipboard');
+        } catch (error) {
+            this.logger.error('Failed to copy to clipboard:', error as Error);
+            vscode.window.showErrorMessage('Failed to copy to clipboard');
+        }
     }
 
     dispose(): void {

@@ -35,6 +35,15 @@ export class QueryProfilingService {
         this.logger.info(`Profiling query: ${query.substring(0, 100)}`);
 
         try {
+            // Replace parameter placeholders with sample values for profiling
+            const { QueryDeanonymizer } = await import('../utils/query-deanonymizer');
+            let executableQuery = query;
+            if (QueryDeanonymizer.hasParameters(query)) {
+                this.logger.info(`Query has ${QueryDeanonymizer.countParameters(query)} parameters, replacing with sample values for profiling`);
+                executableQuery = QueryDeanonymizer.replaceParametersForExplain(query);
+                this.logger.debug(`Deanonymized query: ${executableQuery}`);
+            }
+
             // Check if adapter supports withConnection (MySQLAdapter)
             const mysqlAdapter = adapter as any;
             if (typeof mysqlAdapter.withConnection !== 'function') {
@@ -77,7 +86,7 @@ export class QueryProfilingService {
 
                 // Execute the query to profile ON THE SAME CONNECTION
                 const startTime = Date.now();
-                await conn.query(query);
+                await conn.query(executableQuery);
                 const endTime = Date.now();
                 totalDuration = (endTime - startTime) * 1000; // Convert to microseconds
 

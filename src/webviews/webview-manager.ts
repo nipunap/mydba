@@ -13,6 +13,7 @@ import { MetricsDashboardPanel } from './metrics-dashboard-panel';
 import { QueriesWithoutIndexesPanel } from './queries-without-indexes-panel';
 import { SlowQueriesPanel } from './slow-queries-panel';
 import { QueryProfilingPanel } from './query-profiling-panel';
+import { QueryHistoryPanel } from './query-history-panel';
 
 export class WebviewManager {
     private explainProvider?: ExplainViewerProvider;
@@ -141,16 +142,24 @@ export class WebviewManager {
     }
 
     async showQueryProfiling(connectionId: string, query: string): Promise<void> {
-        const { AIService } = await import('../services/ai-service');
-        const aiService = new AIService(this.logger, this.context);
-        await aiService.initialize();
+        const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
+        const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+        await aiServiceCoordinator.initialize();
         QueryProfilingPanel.show(
             this.context,
             this.logger,
             this.connectionManager,
             connectionId,
             query,
-            aiService
+            aiServiceCoordinator
+        );
+    }
+
+    async showQueryHistory(historyService: any): Promise<void> {
+        QueryHistoryPanel.show(
+            this.context,
+            this.logger,
+            historyService
         );
     }
 

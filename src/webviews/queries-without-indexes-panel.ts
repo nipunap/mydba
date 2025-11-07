@@ -248,15 +248,23 @@ export class QueriesWithoutIndexesPanel {
             const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
             cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
 
+            // Replace parameter placeholders with sample values for EXPLAIN
+            const { QueryDeanonymizer } = await import('../utils/query-deanonymizer');
+            if (QueryDeanonymizer.hasParameters(cleanQuery)) {
+                this.logger.info(`Query has ${QueryDeanonymizer.countParameters(cleanQuery)} parameters, replacing with sample values for EXPLAIN`);
+                cleanQuery = QueryDeanonymizer.replaceParametersForExplain(cleanQuery);
+                this.logger.debug(`Deanonymized query: ${cleanQuery}`);
+            }
+
             const explainResult = await adapter.query<unknown>(`EXPLAIN FORMAT=JSON ${cleanQuery}`);
 
-            // Import ExplainViewerPanel and AIService
+            // Import ExplainViewerPanel and AIServiceCoordinator
             const { ExplainViewerPanel } = await import('./explain-viewer-panel');
-            const { AIService } = await import('../services/ai-service');
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
 
-            // Create AI service for enhanced analysis
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
+            // Create AI service coordinator for enhanced EXPLAIN analysis
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
 
             // Show EXPLAIN viewer with AI insights
             ExplainViewerPanel.show(
@@ -266,7 +274,7 @@ export class QueriesWithoutIndexesPanel {
                 this.connectionId,
                 cleanQuery,
                 Array.isArray(explainResult) ? explainResult[0] : (explainResult.rows?.[0] || {}),
-                aiService
+                aiServiceCoordinator
             );
 
         } catch (error) {
@@ -282,16 +290,16 @@ export class QueriesWithoutIndexesPanel {
                 throw new Error('Connection not found');
             }
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
-            const { AIService } = await import('../services/ai-service');
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
             QueryProfilingPanel.show(
                 this.context,
                 this.logger,
                 this.connectionManager,
                 this.connectionId,
                 queryText,
-                aiService
+                aiServiceCoordinator
             );
         } catch (error) {
             this.logger.error('Failed to profile query:', error as Error);

@@ -23,8 +23,18 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
-    '!src/test/**/*'
+    '!src/test/**/*',
+    '!src/webviews/**/*', // Webviews are hard to test with Jest
+    '!src/types/**/*' // Type definitions don't need tests
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html']
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
+  coverageThreshold: {
+    global: {
+      branches: 60,
+      functions: 65,
+      lines: 70,
+      statements: 70
+    }
+  }
 };

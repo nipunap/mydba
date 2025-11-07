@@ -3,6 +3,14 @@ import { Logger } from '../../../utils/logger';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
+ * Temperature constants for different types of AI requests
+ */
+const TEMPERATURE = {
+    QUERY_ANALYSIS: 0.3,      // Lower temperature for structured analysis
+    TEXT_COMPLETION: 0.7       // Higher temperature for natural language
+} as const;
+
+/**
  * Anthropic Claude Provider
  *
  * Uses Anthropic's Claude API for query analysis
@@ -57,7 +65,7 @@ export class AnthropicProvider implements AIProvider {
             const response = await this.client.messages.create({
                 model: this.model,
                 max_tokens: 4096,
-                temperature: 0.3,
+                temperature: TEMPERATURE.QUERY_ANALYSIS,
                 system: 'You are a MySQL/MariaDB database optimization expert. Analyze queries and provide structured optimization advice in JSON format.',
                 messages: [{
                     role: 'user',
@@ -133,14 +141,15 @@ Tables:
             }
         }
 
-        // Add RAG documentation if available (for AI context, not shown to user)
+        // Add RAG documentation if available (for AI context WITH citations)
         if (context.ragDocs && context.ragDocs.length > 0) {
             prompt += `
-**Reference Documentation (use this to inform your recommendations, but don't cite sources):**
+**Reference Documentation (cite these sources when relevant to your recommendations):**
 `;
-            for (const doc of context.ragDocs) {
+            for (let i = 0; i < context.ragDocs.length; i++) {
+                const doc = context.ragDocs[i];
                 prompt += `
-${doc.title}:
+[Citation ${i + 1}] ${doc.title}:
 ${doc.content}
 
 `;
@@ -151,29 +160,39 @@ ${doc.content}
 **As a Senior DBA, provide:**
 IMPORTANT: If "Query Performance Analysis" section is present above, your summary MUST analyze the performance metrics including execution time, efficiency (rows examined vs sent), and execution stage bottlenecks.
 
+When providing recommendations, cite the reference documentation using [Citation X] format where applicable.
+
 Provide your analysis as a JSON object with the following structure:
 \`\`\`json
 {
-  "summary": "Your DBA assessment and performance analysis",
+  "summary": "Your DBA assessment and performance analysis (include citations like [Citation 1] where relevant)",
   "antiPatterns": [
     {
-      "type": "descriptive_type",
+      "type": "descriptive_type (e.g., Full Table Scan, Missing Index, N+1 Query Pattern)",
       "severity": "critical|warning|info",
       "message": "clear description of the issue",
-      "suggestion": "specific recommendation to fix"
+      "suggestion": "specific recommendation to fix (include citations if applicable)"
     }
   ],
   "optimizationSuggestions": [
     {
       "title": "suggestion title",
-      "description": "detailed explanation",
+      "description": "detailed explanation with citations if applicable (e.g., According to [Citation 1]...)",
       "impact": "high|medium|low",
       "difficulty": "easy|medium|hard",
       "before": "original query/code (if applicable)",
       "after": "optimized query/code (if applicable)"
     }
   ],
-  "estimatedComplexity": 5
+  "estimatedComplexity": 5,
+  "citations": [
+    {
+      "id": "citation-1",
+      "title": "string (from reference documentation)",
+      "url": "optional URL if known",
+      "relevance": "brief explanation of why this citation is relevant"
+    }
+  ]
 }
 \`\`\`
 
@@ -224,5 +243,41 @@ Only return the JSON object, no additional text.`;
             }],
             citations: []
         };
+    }
+
+    /**
+     * Get a simple text completion from Anthropic Claude
+     *
+     * Uses a higher temperature for natural language generation suitable for
+     * explanations, descriptions, and conversational responses.
+     *
+     * @param prompt The prompt to send to Claude
+     * @returns The generated text response
+     * @throws Error if the API call fails
+     */
+    async getCompletion(prompt: string): Promise<string> {
+        try {
+            this.logger.debug(`Getting Anthropic completion (${this.model})`);
+
+            const response = await this.client.messages.create({
+                model: this.model,
+                max_tokens: 4096,
+                temperature: TEMPERATURE.TEXT_COMPLETION,
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }]
+            });
+
+            const content = response.content[0];
+            if (content.type !== 'text') {
+                throw new Error('Unexpected response type from Anthropic');
+            }
+
+            return content.text.trim();
+        } catch (error) {
+            this.logger.error('Anthropic completion failed:', error as Error);
+            throw new Error(`Anthropic completion failed: ${(error as Error).message}`);
+        }
     }
 }

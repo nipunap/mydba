@@ -4,14 +4,14 @@ import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
 import { QueryProfilingService } from '../services/query-profiling-service';
-import { AIService } from '../services/ai-service';
+import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 
 export class QueryProfilingPanel {
     private static panelRegistry: Map<string, QueryProfilingPanel> = new Map();
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
     private service: QueryProfilingService;
-    private aiService?: AIService;
+    private aiServiceCoordinator?: AIServiceCoordinator;
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -20,11 +20,11 @@ export class QueryProfilingPanel {
         private connectionManager: ConnectionManager,
         private connectionId: string,
         private query: string,
-        aiService?: AIService
+        aiServiceCoordinator?: AIServiceCoordinator
     ) {
         this.panel = panel;
         this.service = new QueryProfilingService(logger);
-        this.aiService = aiService;
+        this.aiServiceCoordinator = aiServiceCoordinator;
         this.panel.webview.html = this.getHtml();
         this.setupMessageHandling();
         this.profile();
@@ -37,7 +37,7 @@ export class QueryProfilingPanel {
         connectionManager: ConnectionManager,
         connectionId: string,
         query: string,
-        aiService?: AIService
+        aiServiceCoordinator?: AIServiceCoordinator
     ): void {
         const key = `profile-${connectionId}-${query.substring(0, 64)}`;
         const existing = QueryProfilingPanel.panelRegistry.get(key);
@@ -54,7 +54,7 @@ export class QueryProfilingPanel {
                 vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode/webview-ui-toolkit')
             ] }
         );
-        const p = new QueryProfilingPanel(panel, context, logger, connectionManager, connectionId, query, aiService);
+        const p = new QueryProfilingPanel(panel, context, logger, connectionManager, connectionId, query, aiServiceCoordinator);
         QueryProfilingPanel.panelRegistry.set(key, p);
     }
 
@@ -83,8 +83,8 @@ export class QueryProfilingPanel {
     }
 
     private async getAIInsights(profile: any): Promise<void> {
-        if (!this.aiService) {
-            this.logger.warn('AI service not available');
+        if (!this.aiServiceCoordinator) {
+            this.logger.warn('AI service coordinator not available');
             return;
         }
 
@@ -97,47 +97,37 @@ export class QueryProfilingPanel {
                 return;
             }
 
-            // Extract tables from the query
-            const tables = this.extractTablesFromQuery(this.query);
-            this.logger.info(`Extracted tables from query: ${tables.join(', ')}`);
+            // Get connection to determine DB type
+            const connection = this.connectionManager.getConnection(this.connectionId);
+            const dbType = connection?.type === 'mariadb' ? 'mariadb' : 'mysql';
 
-            // Fetch schema context for all tables in the query
-            const schemaContext = await this.buildSchemaContext(adapter, tables);
+            this.logger.info(`Requesting AI profiling interpretation for ${dbType.toUpperCase()} database...`);
 
-            // Add profiling performance data to schema context
-            if (schemaContext) {
-                schemaContext.performance = {
-                    totalDuration: profile.totalDuration,
-                    rowsExamined: profile.summary.totalRowsExamined,
-                    rowsSent: profile.summary.totalRowsSent,
-                    efficiency: profile.summary.efficiency,
-                    lockTime: profile.summary.totalLockTime,
-                    stages: profile.stages?.map((s: any) => ({
-                        name: s.eventName,
-                        duration: s.duration
-                    }))
-                };
-
-                this.logger.info(`Schema context built with ${Object.keys(schemaContext.tables || {}).length} tables and performance data`);
-                this.logger.debug(`Performance context: Duration=${profile.totalDuration}µs, Rows Examined=${profile.summary.totalRowsExamined}, Efficiency=${profile.summary.efficiency}`);
-            }
-
-            // Get AI analysis with full context
-            const dbType = adapter.isMariaDB ? 'mariadb' : 'mysql';
-            this.logger.info(`Requesting AI analysis for ${dbType.toUpperCase()} database...`);
-            this.logger.debug(`AI request details: query="${this.query.substring(0, 100)}...", tables=${tables.join(',')}, dbType=${dbType}`);
-            this.logger.debug(`Adapter info: isMariaDB=${adapter.isMariaDB}, version=${adapter.version}`);
-
-            const analysis = await this.aiService.analyzeQuery(
+            // Use AIServiceCoordinator's interpretProfiling for specialized profiling analysis
+            const interpretation = await this.aiServiceCoordinator.interpretProfiling(
+                profile,
                 this.query,
-                schemaContext,
                 dbType
             );
 
-            this.logger.info('AI analysis completed successfully');
+            this.logger.info('AI profiling interpretation completed successfully');
+
+            // Format insights for webview rendering
+            const formattedInsights: any = {
+                summary: interpretation.insights.length > 0 ? interpretation.insights[0] : 'Performance analysis completed.',
+                metadata: {
+                    complexity: this.estimateComplexity(interpretation),
+                    estimatedImpact: this.estimateImpact(interpretation.bottlenecks)
+                },
+                antiPatterns: this.extractAntiPatterns(interpretation.insights),
+                optimizations: this.formatOptimizations(interpretation.suggestions, interpretation.bottlenecks),
+                citations: interpretation.citations
+            };
+
+            // Send enhanced insights to webview
             this.panel.webview.postMessage({
                 type: 'aiInsights',
-                insights: analysis
+                insights: formattedInsights
             });
         } catch (error) {
             this.logger.error('AI analysis failed:', error as Error);
@@ -146,6 +136,116 @@ export class QueryProfilingPanel {
                 error: (error as Error).message
             });
         }
+    }
+
+    private estimateComplexity(interpretation: any): string {
+        const bottleneckCount = interpretation.bottlenecks?.length || 0;
+        const totalStages = interpretation.stages?.length || 1;
+        const bottleneckRatio = bottleneckCount / totalStages;
+
+        if (bottleneckRatio > 0.3 || bottleneckCount > 3) {
+            return 'High';
+        } else if (bottleneckRatio > 0.15 || bottleneckCount > 1) {
+            return 'Medium';
+        }
+        return 'Low';
+    }
+
+    private estimateImpact(bottlenecks: any[]): string {
+        if (!bottlenecks || bottlenecks.length === 0) {
+            return 'Low';
+        }
+
+        const maxPercentage = Math.max(...bottlenecks.map(b => b.percentage || 0));
+        if (maxPercentage > 50) {
+            return 'High';
+        } else if (maxPercentage > 30) {
+            return 'Medium';
+        }
+        return 'Low';
+    }
+
+    private extractAntiPatterns(insights: string[]): any[] {
+        const antiPatterns: any[] = [];
+
+        // Parse insights looking for anti-pattern indicators
+        insights.forEach(insight => {
+            if (insight.includes('⚠️')) {
+                const parts = insight.split(':');
+                if (parts.length >= 2) {
+                    const pattern = parts[0].replace('⚠️', '').trim();
+                    const message = parts.slice(1).join(':').trim();
+
+                    antiPatterns.push({
+                        pattern,
+                        severity: this.determineSeverity(insight),
+                        message,
+                        suggestion: this.extractSuggestion(insight)
+                    });
+                }
+            }
+        });
+
+        return antiPatterns;
+    }
+
+    private determineSeverity(text: string): string {
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('critical') || lowerText.includes('full table scan') || lowerText.includes('missing index')) {
+            return 'critical';
+        } else if (lowerText.includes('warning') || lowerText.includes('slow') || lowerText.includes('inefficient')) {
+            return 'warning';
+        }
+        return 'info';
+    }
+
+    private extractSuggestion(text: string): string | undefined {
+        // Try to extract suggestion hints from the text
+        const suggestionMarkers = ['consider', 'try', 'should', 'add', 'use', 'optimize'];
+        for (const marker of suggestionMarkers) {
+            const index = text.toLowerCase().indexOf(marker);
+            if (index !== -1) {
+                return text.substring(index);
+            }
+        }
+        return undefined;
+    }
+
+    private formatOptimizations(suggestions: string[], bottlenecks: any[]): any[] {
+        const optimizations: any[] = [];
+
+        suggestions.forEach((suggestion, index) => {
+            const parts = suggestion.split(':');
+            const title = parts[0]?.trim() || `Optimization ${index + 1}`;
+            const reasoning = parts.length > 1 ? parts.slice(1).join(':').trim() : suggestion;
+
+            // Determine priority based on bottleneck severity
+            let priority = 'medium';
+            let estimatedImprovement = '';
+
+            if (bottlenecks.length > 0) {
+                const maxBottleneck = Math.max(...bottlenecks.map(b => b.percentage || 0));
+                if (maxBottleneck > 50) {
+                    priority = 'high';
+                    estimatedImprovement = '40-60% faster';
+                } else if (maxBottleneck > 30) {
+                    priority = 'medium';
+                    estimatedImprovement = '20-40% faster';
+                } else {
+                    priority = 'low';
+                    estimatedImprovement = '10-20% faster';
+                }
+            }
+
+            optimizations.push({
+                suggestion: title,
+                reasoning,
+                priority,
+                estimatedImprovement
+            });
+        });
+
+        return optimizations;
     }
 
     private extractTablesFromQuery(query: string): string[] {
@@ -328,7 +428,7 @@ export class QueryProfilingPanel {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${this.panel.webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; font-src ${this.panel.webview.cspSource};">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="${styleUri}?v=${v}" rel="stylesheet">
   <title>Query Profiling</title>
@@ -350,12 +450,27 @@ export class QueryProfilingPanel {
         <div><strong>Rows Sent:</strong> <span id="rows-sent">-</span></div>
         <div><strong>Efficiency:</strong> <span id="efficiency">-</span></div>
       </div>
-      <div class="stages">
-        <h3>Stages</h3>
-        <table class="stages-table">
-          <thead><tr><th>Stage</th><th>Duration (µs)</th></tr></thead>
-          <tbody id="stages-body"></tbody>
-        </table>
+      <div class="waterfall-section">
+        <div class="waterfall-header">
+          <h3><span class="codicon codicon-graph"></span> Performance Waterfall</h3>
+          <div class="waterfall-controls">
+            <button id="toggle-view-btn" class="toggle-btn" title="Toggle between chart and table view">
+              <span class="codicon codicon-table"></span> Table View
+            </button>
+            <button id="export-chart-btn" class="export-btn" title="Export chart as PNG">
+              <span class="codicon codicon-export"></span> Export PNG
+            </button>
+          </div>
+        </div>
+        <div id="waterfall-chart-container" class="chart-container">
+          <canvas id="waterfall-chart"></canvas>
+        </div>
+        <div id="stages-table-container" class="stages-table-container" style="display:none;">
+          <table class="stages-table">
+            <thead><tr><th>Stage</th><th>Duration (µs)</th><th>% of Total</th></tr></thead>
+            <tbody id="stages-body"></tbody>
+          </table>
+        </div>
       </div>
       <div class="ai-insights-section">
         <h3 class="ai-insights-header"><span class="codicon codicon-sparkle"></span> AI Performance Insights</h3>
@@ -367,6 +482,7 @@ export class QueryProfilingPanel {
     </div>
   </div>
   <script type="module" nonce="${nonce}" src="${toolkitUri}"></script>
+  <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script nonce="${nonce}" src="${scriptUri}?v=${v}"></script>
 </body>
 </html>`;

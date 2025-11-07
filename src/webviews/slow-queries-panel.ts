@@ -115,6 +115,14 @@ export class SlowQueriesPanel {
             const explainPrefixRegex = /^EXPLAIN\s+(FORMAT\s*=\s*(JSON|TRADITIONAL|TREE)\s+)?/i;
             cleanQuery = cleanQuery.replace(explainPrefixRegex, '').trim();
 
+            // Replace parameter placeholders with sample values for EXPLAIN
+            const { QueryDeanonymizer } = await import('../utils/query-deanonymizer');
+            if (QueryDeanonymizer.hasParameters(cleanQuery)) {
+                this.logger.info(`Query has ${QueryDeanonymizer.countParameters(cleanQuery)} parameters, replacing with sample values for EXPLAIN`);
+                cleanQuery = QueryDeanonymizer.replaceParametersForExplain(cleanQuery);
+                this.logger.debug(`Deanonymized query: ${cleanQuery}`);
+            }
+
             // Execute EXPLAIN query with FORMAT=JSON
             const explainQuery = `EXPLAIN FORMAT=JSON ${cleanQuery}`;
             const result = await adapter.query<unknown>(explainQuery);
@@ -124,13 +132,13 @@ export class SlowQueriesPanel {
 
             // Show the EXPLAIN viewer with actual data and AI insights
             const { ExplainViewerPanel } = await import('./explain-viewer-panel');
-            const { AIService } = await import('../services/ai-service');
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
 
-            // Create AI service instance for analysis
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
+            // Create AI service coordinator for enhanced analysis
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
 
-            ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiService);
+            ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiServiceCoordinator);
         } catch (error) {
             this.logger.error('Failed to EXPLAIN query:', error as Error);
             vscode.window.showErrorMessage(`Failed to EXPLAIN query: ${(error as Error).message}`);
@@ -153,10 +161,10 @@ export class SlowQueriesPanel {
             }
 
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
-            const { AIService } = await import('../services/ai-service');
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
-            QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiService);
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
+            QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiServiceCoordinator);
         } catch (error) {
             this.logger.error('Failed to open Profiling:', error as Error);
             vscode.window.showErrorMessage(`Failed to open Profiling: ${(error as Error).message}`);

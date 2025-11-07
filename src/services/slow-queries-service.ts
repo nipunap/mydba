@@ -42,6 +42,13 @@ export class SlowQueriesService {
                 LAST_SEEN AS last_seen
             FROM performance_schema.events_statements_summary_by_digest
             WHERE SCHEMA_NAME IS NOT NULL
+                AND SCHEMA_NAME NOT IN ('performance_schema', 'information_schema', 'mysql', 'sys')
+                AND DIGEST_TEXT NOT LIKE '%performance_schema%'
+                AND DIGEST_TEXT NOT LIKE '%information_schema%'
+                AND DIGEST_TEXT NOT LIKE '%mysql.%'
+                AND DIGEST_TEXT NOT LIKE '%\`mysql\`%'
+                AND DIGEST_TEXT NOT LIKE '%sys.%'
+                AND DIGEST_TEXT NOT LIKE '%\`sys\`%'
             LIMIT ${limit * 2}
         `;
 

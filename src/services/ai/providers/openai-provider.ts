@@ -5,6 +5,14 @@ import { Logger } from '../../../utils/logger';
 import OpenAI from 'openai';
 
 /**
+ * Temperature constants for different types of AI requests
+ */
+const TEMPERATURE = {
+    QUERY_ANALYSIS: 0.3,      // Lower temperature for structured analysis
+    TEXT_COMPLETION: 0.7       // Higher temperature for natural language
+} as const;
+
+/**
  * OpenAI Provider
  *
  * Uses OpenAI's API for query analysis
@@ -62,7 +70,7 @@ export class OpenAIProvider implements AIProvider {
                         content: prompt
                     }
                 ],
-                temperature: 0.3, // Lower temperature for more focused, technical responses
+                temperature: TEMPERATURE.QUERY_ANALYSIS,
                 response_format: { type: 'json_object' }
             });
 
@@ -127,14 +135,15 @@ Tables: ${tables.map((t: any) => `${t.name || ''} (${t.columns?.map((c: any) => 
             }
         }
 
-        // Add RAG documentation if available (for AI context, not shown to user)
+        // Add RAG documentation if available (for AI context WITH citations)
         if (context.ragDocs && context.ragDocs.length > 0) {
             prompt += `
-**Reference Documentation (use this to inform your recommendations, but don't cite sources):**
+**Reference Documentation (cite these sources when relevant to your recommendations):**
 `;
-            for (const doc of context.ragDocs) {
+            for (let i = 0; i < context.ragDocs.length; i++) {
+                const doc = context.ragDocs[i];
                 prompt += `
-${doc.title}:
+[Citation ${i + 1}] ${doc.title}:
 ${doc.content}
 
 `;
@@ -145,28 +154,38 @@ ${doc.content}
 **As a Senior DBA, provide:**
 IMPORTANT: If "Query Performance Analysis" section is present above, your summary MUST analyze the performance metrics including execution time, efficiency (rows examined vs sent), and execution stage bottlenecks.
 
+When providing recommendations, cite the reference documentation using [Citation X] format where applicable.
+
 Provide your response as a JSON object with this exact structure:
 {
-  "summary": "Your DBA assessment and performance analysis",
+  "summary": "Your DBA assessment and performance analysis (include citations like [Citation 1] where relevant)",
   "antiPatterns": [
     {
-      "type": "string",
+      "type": "string (e.g., Full Table Scan, Missing Index, N+1 Query Pattern)",
       "severity": "critical|warning|info",
-      "message": "description",
-      "suggestion": "how to fix"
+      "message": "description of the anti-pattern",
+      "suggestion": "how to fix it (include citations if applicable)"
     }
   ],
   "optimizationSuggestions": [
     {
-      "title": "string",
-      "description": "detailed description",
+      "title": "string (concise title)",
+      "description": "detailed description with citations if applicable (e.g., According to [Citation 1]...)",
       "impact": "high|medium|low",
       "difficulty": "easy|medium|hard",
       "before": "optional: original code",
       "after": "optional: optimized code"
     }
   ],
-  "estimatedComplexity": 5
+  "estimatedComplexity": 5,
+  "citations": [
+    {
+      "id": "citation-1",
+      "title": "string (from reference documentation)",
+      "url": "optional URL if known",
+      "relevance": "brief explanation of why this citation is relevant"
+    }
+  ]
 }
 `;
 
@@ -200,6 +219,43 @@ Provide your response as a JSON object with this exact structure:
                 }],
                 citations: []
             };
+        }
+    }
+
+    /**
+     * Get a simple text completion from OpenAI
+     *
+     * Uses a higher temperature for natural language generation suitable for
+     * explanations, descriptions, and conversational responses.
+     *
+     * @param prompt The prompt to send to OpenAI
+     * @returns The generated text response
+     * @throws Error if the API call fails
+     */
+    async getCompletion(prompt: string): Promise<string> {
+        try {
+            this.logger.debug(`Getting OpenAI completion (${this.model})`);
+
+            const response = await this.client.chat.completions.create({
+                model: this.model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: TEMPERATURE.TEXT_COMPLETION
+            });
+
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error('Empty response from OpenAI');
+            }
+
+            return content.trim();
+        } catch (error) {
+            this.logger.error('OpenAI completion failed:', error as Error);
+            throw new Error(`OpenAI completion failed: ${(error as Error).message}`);
         }
     }
 }

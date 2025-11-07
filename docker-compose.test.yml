@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # MySQL 8.0 for testing
   mysql-8.0:
     image: mysql:8.0
     container_name: mydba-mysql-8.0
@@ -12,46 +13,63 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./test/sql:/docker-entrypoint-initdb.d:ro
+      - ./test/sql/init-mysql.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./test/sql/sample-data.sql:/docker-entrypoint-initdb.d/02-sample-data.sql
     command: >
       --default-authentication-plugin=mysql_native_password
       --performance-schema=ON
       --performance-schema-instrument='%=ON'
       --performance-schema-consumer-events-statements-current=ON
       --performance-schema-consumer-events-statements-history=ON
-      --performance-schema-consumer-events-transactions-current=ON
-      --performance-schema-consumer-events-transactions-history=ON
+      --performance-schema-consumer-events-statements-history-long=ON
       --performance-schema-consumer-events-stages-current=ON
       --performance-schema-consumer-events-stages-history=ON
+      --max-connections=200
+      --slow-query-log=ON
+      --slow-query-log-file=/var/log/mysql/slow-query.log
+      --long-query-time=1
+      --log-queries-not-using-indexes=ON
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 15
-      interval: 5s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
+  # MariaDB 10.11 LTS for testing
   mariadb-10.11:
     image: mariadb:10.11
     container_name: mydba-mariadb-10.11
     environment:
-      MYSQL_ROOT_PASSWORD: test_password
-      MYSQL_DATABASE: test_db
-      MYSQL_USER: test_user
-      MYSQL_PASSWORD: test_password
+      MARIADB_ROOT_PASSWORD: test_password
+      MARIADB_DATABASE: test_db
+      MARIADB_USER: test_user
+      MARIADB_PASSWORD: test_password
     ports:
       - "3307:3306"
     volumes:
-      - ./test/sql:/docker-entrypoint-initdb.d:ro
+      - ./test/sql/init-mariadb.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./test/sql/sample-data.sql:/docker-entrypoint-initdb.d/02-sample-data.sql
     command: >
       --performance-schema=ON
       --performance-schema-instrument='%=ON'
       --performance-schema-consumer-events-statements-current=ON
       --performance-schema-consumer-events-statements-history=ON
+      --performance-schema-consumer-events-statements-history-long=ON
+      --performance-schema-consumer-events-stages-current=ON
+      --performance-schema-consumer-events-stages-history=ON
+      --max-connections=200
+      --slow-query-log=ON
+      --slow-query-log-file=/var/log/mysql/slow-query.log
+      --long-query-time=1
+      --log-queries-not-using-indexes=ON
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 15
-      interval: 5s
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  # Note: Test data initialization is now handled by docker-entrypoint-initdb.d volumes
-  # SQL files in ./test/sql/ will be automatically executed on container startup
-  # Order: sample-data.sql, then performance-schema-setup.sql (alphabetical order)
+networks:
+  default:
+    name: mydba-test-network

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
+import type { IDatabaseAdapter } from '../adapters/database-adapter';
 
 export interface ServiceToken<_T> {
     readonly name: string;
@@ -84,6 +85,43 @@ export class ServiceContainer {
         this.register(SERVICE_TOKENS.EventBus, (c) =>
             new EventBus(c.get(SERVICE_TOKENS.Logger))
         );
+
+        // Performance monitor
+        this.register(SERVICE_TOKENS.PerformanceMonitor, (c) =>
+            new PerformanceMonitor(c.get(SERVICE_TOKENS.Logger))
+        );
+
+        // Cache manager
+        this.register(SERVICE_TOKENS.CacheManager, (c) =>
+            new CacheManager(c.get(SERVICE_TOKENS.Logger))
+        );
+
+        // Transaction manager
+        this.register(SERVICE_TOKENS.TransactionManager, (c) => {
+            const connectionManager = c.get(SERVICE_TOKENS.ConnectionManager);
+            return new TransactionManager(
+                c.get(SERVICE_TOKENS.Logger),
+                async (connId) => {
+                    const adapter = connectionManager.getAdapter(connId);
+                    return adapter as unknown as IDatabaseAdapter | undefined;
+                }
+            );
+        });
+
+        // Prompt sanitizer
+        this.register(SERVICE_TOKENS.PromptSanitizer, (c) =>
+            new PromptSanitizer(c.get(SERVICE_TOKENS.Logger))
+        );
+
+        // SQL validator
+        this.register(SERVICE_TOKENS.SQLValidator, (c) =>
+            new SQLValidator(c.get(SERVICE_TOKENS.Logger))
+        );
+
+        // Query history service
+        this.register(SERVICE_TOKENS.QueryHistoryService, (c) =>
+            new QueryHistoryService(c.context, c.get(SERVICE_TOKENS.Logger))
+        );
     }
 
     private registerBusinessServices(): void {
@@ -111,7 +149,7 @@ export class ServiceContainer {
         this.register(SERVICE_TOKENS.AIServiceCoordinator, (c) =>
             new AIServiceCoordinator(
                 c.get(SERVICE_TOKENS.Logger),
-                c.get(SERVICE_TOKENS.ConfigurationService)
+                c.context
             )
         );
 
@@ -150,7 +188,8 @@ export class ServiceContainer {
                 c.get(SERVICE_TOKENS.ConnectionManager),
                 c.get(SERVICE_TOKENS.AIServiceCoordinator),
                 c.get(SERVICE_TOKENS.WebviewManager),
-                c.get(SERVICE_TOKENS.Logger)
+                c.get(SERVICE_TOKENS.Logger),
+                c // Pass the service container itself
             )
         );
     }
@@ -194,7 +233,13 @@ export const SERVICE_TOKENS = {
     MetricsCollector: { name: 'MetricsCollector' } as ServiceToken<MetricsCollector>,
     TreeViewProvider: { name: 'TreeViewProvider' } as ServiceToken<TreeViewProvider>,
     CommandRegistry: { name: 'CommandRegistry' } as ServiceToken<CommandRegistry>,
-    WebviewManager: { name: 'WebviewManager' } as ServiceToken<WebviewManager>
+    WebviewManager: { name: 'WebviewManager' } as ServiceToken<WebviewManager>,
+    PerformanceMonitor: { name: 'PerformanceMonitor' } as ServiceToken<PerformanceMonitor>,
+    CacheManager: { name: 'CacheManager' } as ServiceToken<CacheManager>,
+    TransactionManager: { name: 'TransactionManager' } as ServiceToken<TransactionManager>,
+    PromptSanitizer: { name: 'PromptSanitizer' } as ServiceToken<PromptSanitizer>,
+    SQLValidator: { name: 'SQLValidator' } as ServiceToken<SQLValidator>,
+    QueryHistoryService: { name: 'QueryHistoryService' } as ServiceToken<QueryHistoryService>
 };
 
 // Import service classes (will be implemented)
@@ -209,3 +254,9 @@ import { MetricsCollector } from '../services/metrics-collector';
 import { TreeViewProvider } from '../providers/tree-view-provider';
 import { CommandRegistry } from '../commands/command-registry';
 import { WebviewManager } from '../webviews/webview-manager';
+import { PerformanceMonitor } from './performance-monitor';
+import { CacheManager } from './cache-manager';
+import { TransactionManager } from './transaction-manager';
+import { PromptSanitizer } from '../security/prompt-sanitizer';
+import { SQLValidator } from '../security/sql-validator';
+import { QueryHistoryService } from '../services/query-history-service';

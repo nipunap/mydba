@@ -175,8 +175,28 @@
                 case 'host':
                     key = process.host || '(unknown)';
                     break;
+                case 'db':
+                    key = process.db || '(no database)';
+                    break;
+                case 'command':
+                    key = process.command || '(unknown)';
+                    break;
+                case 'state':
+                    key = process.state || '(no state)';
+                    break;
                 case 'query':
                     key = process.queryFingerprint || '(no query)';
+                    break;
+                case 'locks':
+                    if (process.isBlocked) {
+                        key = '🔒 Blocked';
+                    } else if (process.isBlocking) {
+                        key = '⛔ Blocking Others';
+                    } else if (process.hasLocks) {
+                        key = '🔐 Has Locks';
+                    } else {
+                        key = '✅ No Locks';
+                    }
                     break;
                 default:
                     key = 'all';
@@ -263,7 +283,7 @@
         const inTransaction = group.processes.filter(p => p.inTransaction).length;
 
         const cell = document.createElement('td');
-        cell.colSpan = 10; // FIX: 10 columns (ID, User, Host, DB, Command, Time, State, Transaction, Info, Actions)
+        cell.colSpan = 11; // FIX: 11 columns (ID, User, Host, DB, Command, Time, State, Transaction, Locks, Info, Actions)
         cell.innerHTML = `
             <div class="group-header-content">
                 <span class="group-expand-icon" aria-hidden="true">${isExpanded ? '▼' : '▶'}</span>
@@ -357,6 +377,24 @@
             transactionCell.innerHTML = '-';
         }
         row.appendChild(transactionCell);
+
+        // Locks (NEW)
+        const locksCell = createCell('', 'td');
+        locksCell.classList.add('locks-cell');
+        if (process.isBlocked) {
+            const badge = `<span class="lock-badge lock-blocked" title="Blocked by process ${escapeHtml(process.locks?.[0]?.blockingProcessId || 'N/A')}" aria-label="Process is blocked">🔒 Blocked</span>`;
+            locksCell.innerHTML = badge;
+        } else if (process.isBlocking) {
+            const badge = `<span class="lock-badge lock-blocking" title="Blocking other processes" aria-label="Process is blocking others">⛔ Blocking</span>`;
+            locksCell.innerHTML = badge;
+        } else if (process.hasLocks) {
+            const lockCount = process.locks?.length || 0;
+            const badge = `<span class="lock-badge lock-active" title="${lockCount} lock(s) held" aria-label="${lockCount} locks held">🔐 ${lockCount} lock${lockCount !== 1 ? 's' : ''}</span>`;
+            locksCell.innerHTML = badge;
+        } else {
+            locksCell.innerHTML = '-';
+        }
+        row.appendChild(locksCell);
 
         // Info (query)
         const infoCell = createCell('', 'td');
