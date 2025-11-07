@@ -270,12 +270,19 @@ export class QueryHistoryService {
                 }
             });
 
-            // Merge with existing history (avoid duplicates by ID)
-            const existingIds = new Set(this.history.map(e => e.id));
-            const newEntries = imported.filter(e => !existingIds.has(e.id));
+        // Merge with existing history (avoid duplicates by ID)
+        const existingIds = new Set(this.history.map(e => e.id));
+        const newEntries = imported.filter(e => !existingIds.has(e.id));
 
-            this.history = [...this.history, ...newEntries];
-            this.saveHistory();
+        this.history = [...this.history, ...newEntries];
+
+        // Trim history if too large (enforce MAX_HISTORY_SIZE limit)
+        if (this.history.length > QueryHistoryService.MAX_HISTORY_SIZE) {
+            this.history = this.history.slice(0, QueryHistoryService.MAX_HISTORY_SIZE);
+            this.logger.info(`Trimmed history to ${QueryHistoryService.MAX_HISTORY_SIZE} entries after import`);
+        }
+
+        this.saveHistory();
 
             this.logger.info(`Imported ${newEntries.length} history entries`);
             return newEntries.length;

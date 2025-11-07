@@ -141,7 +141,7 @@ export class VariablesPanel {
 
             // Execute SET command
             const scopeKeyword = scope === 'global' ? 'GLOBAL' : 'SESSION';
-            const setQuery = `SET ${scopeKeyword} ${name} = ${this.escapeValue(value)}`;
+            const setQuery = `SET ${scopeKeyword} ${name} = ${this.escapeValue(value, variableInfo.type)}`;
 
             await adapter.query(setQuery);
 
@@ -182,18 +182,39 @@ export class VariablesPanel {
         }
     }
 
-    private escapeValue(value: string): string {
-        // Handle different value types
+    private escapeValue(value: string, variableType: string): string {
+        // Handle different value types based on variable metadata
         const upperValue = value.toUpperCase();
-        if (upperValue === 'ON' || upperValue === 'OFF' || upperValue === 'TRUE' || upperValue === 'FALSE') {
+
+        // Boolean keywords should only be unquoted for boolean/enum types
+        if ((variableType === 'boolean' || variableType === 'enum') &&
+            (upperValue === 'ON' || upperValue === 'OFF' || upperValue === 'TRUE' || upperValue === 'FALSE')) {
             // Return uppercase version for MySQL/MariaDB compatibility
             return upperValue;
         }
-        // Numeric values
-        if (/^-?\d+(\.\d+)?$/.test(value)) {
-            return value;
+
+        // Numeric values (integers and sizes)
+        if (variableType === 'integer' || variableType === 'size') {
+            // For size types, allow K/M/G suffixes
+            if (variableType === 'size' && /^\d+[KMG]?$/i.test(value)) {
+                return value;
+            }
+            // For integers and plain numbers
+            if (/^-?\d+(\.\d+)?$/.test(value)) {
+                return value;
+            }
         }
-        // String values - escape and quote
+
+        // Enum values (other than boolean keywords handled above) - leave unquoted
+        if (variableType === 'enum') {
+            // MySQL system variable enum values can be unquoted
+            // e.g., innodb_flush_log_at_trx_commit = 0, 1, or 2
+            return upperValue;
+        }
+
+        // String values and everything else - escape and quote
+        // This ensures that if a user wants to set a string variable to "on" or "off",
+        // it will be properly quoted as 'on' or 'off' instead of treated as a boolean keyword
         return `'${value.replace(/'/g, "''")}'`;
     }
 

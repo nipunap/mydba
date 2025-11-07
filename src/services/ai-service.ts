@@ -72,27 +72,40 @@ export class AIService {
         this.provider = null;
         this.fallbackProviders = [];
 
-        // If provider is explicitly set (not 'auto'), initialize it
-        if (config.provider !== 'auto' && config.provider !== 'none') {
+        // Initialize primary provider (explicit or auto-detected)
+        if (config.provider !== 'none') {
             this.provider = await this.providerFactory.createProvider(config);
 
-            // Build fallback chain (try other providers)
-            const fallbackOrder = this.getFallbackOrder(config.provider);
-            for (const fallbackProviderName of fallbackOrder) {
-                try {
-                    const fallbackConfig = { ...config, provider: fallbackProviderName as 'auto' | 'vscode-lm' | 'openai' | 'anthropic' | 'ollama' | 'none' };
-                    const fallbackProvider = await this.providerFactory.createProvider(fallbackConfig);
-                    if (fallbackProvider) {
-                        this.fallbackProviders.push(fallbackProvider);
-                        this.logger.debug(`Initialized fallback provider: ${fallbackProvider.name}`);
+            // Build fallback chain for all providers (explicit or auto-detected)
+            if (this.provider) {
+                // Determine the primary provider name (map display name to config value)
+                let primaryProviderName: 'auto' | 'vscode-lm' | 'openai' | 'anthropic' | 'ollama' = config.provider;
+                if (config.provider === 'auto') {
+                    // Map auto-detected provider name to config value
+                    const providerNameMap: Record<string, 'vscode-lm' | 'openai' | 'anthropic' | 'ollama'> = {
+                        'VS Code Language Models': 'vscode-lm',
+                        'OpenAI': 'openai',
+                        'Anthropic': 'anthropic',
+                        'Ollama': 'ollama'
+                    };
+                    primaryProviderName = providerNameMap[this.provider.name] || 'auto';
+                }
+
+                // Build fallback chain (try other providers)
+                const fallbackOrder = this.getFallbackOrder(primaryProviderName);
+                for (const fallbackProviderName of fallbackOrder) {
+                    try {
+                        const fallbackConfig = { ...config, provider: fallbackProviderName as 'auto' | 'vscode-lm' | 'openai' | 'anthropic' | 'ollama' | 'none' };
+                        const fallbackProvider = await this.providerFactory.createProvider(fallbackConfig);
+                        if (fallbackProvider) {
+                            this.fallbackProviders.push(fallbackProvider);
+                            this.logger.debug(`Initialized fallback provider: ${fallbackProvider.name}`);
+                        }
+                    } catch (error) {
+                        this.logger.debug(`Fallback provider ${fallbackProviderName} not available:`, error as Error);
                     }
-                } catch (error) {
-                    this.logger.debug(`Fallback provider ${fallbackProviderName} not available:`, error as Error);
                 }
             }
-        } else {
-            // Auto mode - just use factory's auto-detection
-            this.provider = await this.providerFactory.createProvider(config);
         }
     }
 

@@ -56,7 +56,7 @@ export class TransactionManager implements ITransactionManager {
         if (options.timeout) {
             state.timeout = setTimeout(() => {
                 this.logger.warn(`Transaction ${transactionId} timed out after ${options.timeout}ms`);
-                this.rollback(connectionId).catch(error => {
+                this.rollbackByTransactionId(transactionId).catch(error => {
                     this.logger.error('Error during timeout rollback:', error as Error);
                 });
             }, options.timeout);
@@ -193,7 +193,43 @@ export class TransactionManager implements ITransactionManager {
     }
 
     /**
-     * Rollback a transaction
+     * Rollback a specific transaction by transactionId
+     * This is the preferred method as it targets the exact transaction
+     */
+    async rollbackByTransactionId(transactionId: string): Promise<void> {
+        const transaction = this.activeTransactions.get(transactionId);
+
+        if (!transaction) {
+            this.logger.warn(`No active transaction found with id ${transactionId}`);
+            return;
+        }
+
+        // Check if rollback is already in progress or completed
+        if (transaction.rollingBack) {
+            this.logger.warn(`Rollback already in progress for transaction ${transactionId}, skipping duplicate`);
+            return;
+        }
+
+        // Mark rollback as in progress to prevent duplicate execution
+        transaction.rollingBack = true;
+
+        this.logger.info(`Rolling back transaction ${transactionId}`);
+
+        const adapter = await this.getAdapter(transaction.connectionId);
+        if (!adapter) {
+            throw new Error(`No adapter found for connection ${transaction.connectionId}`);
+        }
+
+        await this.rollbackOperations(adapter, transaction.operations);
+    }
+
+    /**
+     * Rollback a transaction by connectionId
+     * WARNING: If multiple transactions exist for the same connection,
+     * only the first one found will be rolled back.
+     * Use rollbackByTransactionId() for precise transaction targeting.
+     *
+     * @deprecated Use rollbackByTransactionId() instead for precise control
      */
     async rollback(connectionId: string): Promise<void> {
         const adapter = await this.getAdapter(connectionId);

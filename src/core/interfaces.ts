@@ -264,6 +264,7 @@ export interface ITransactionManager extends IService {
         operations: Array<() => Promise<unknown>>,
         options?: ITransactionOptions
     ): Promise<ITransactionResult>;
+    rollbackByTransactionId(transactionId: string): Promise<void>;
     rollback(connectionId: string): Promise<void>;
     checkIdempotency(connectionId: string, operation: string): Promise<boolean>;
 }
