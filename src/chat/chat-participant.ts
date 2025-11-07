@@ -345,30 +345,30 @@ export class MyDBAChatParticipant implements IChatContextProvider {
         builder.header('What I Can Do', '✨');
 
         const commands = [
-            { 
-                icon: '📊', 
-                cmd: '/analyze', 
-                desc: 'Analyze SQL queries with AI-powered insights and anti-pattern detection' 
+            {
+                icon: '📊',
+                cmd: '/analyze',
+                desc: 'Analyze SQL queries with AI-powered insights and anti-pattern detection'
             },
-            { 
-                icon: '🔍', 
-                cmd: '/explain', 
-                desc: 'Visualize query execution plans with interactive tree diagrams' 
+            {
+                icon: '🔍',
+                cmd: '/explain',
+                desc: 'Visualize query execution plans with interactive tree diagrams'
             },
-            { 
-                icon: '⚡', 
-                cmd: '/profile', 
-                desc: 'Profile query performance with detailed timing and resource metrics' 
+            {
+                icon: '⚡',
+                cmd: '/profile',
+                desc: 'Profile query performance with detailed timing and resource metrics'
             },
-            { 
-                icon: '🚀', 
-                cmd: '/optimize', 
-                desc: 'Get AI-powered optimization suggestions with before/after comparisons' 
+            {
+                icon: '🚀',
+                cmd: '/optimize',
+                desc: 'Get AI-powered optimization suggestions with before/after comparisons'
             },
-            { 
-                icon: '🗄️', 
-                cmd: '/schema', 
-                desc: 'Explore database schema, tables, columns, and indexes' 
+            {
+                icon: '🗄️',
+                cmd: '/schema',
+                desc: 'Explore database schema, tables, columns, and indexes'
             }
         ];
 

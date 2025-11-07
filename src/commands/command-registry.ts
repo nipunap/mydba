@@ -31,7 +31,7 @@ export class CommandRegistry {
             vscode.commands.registerCommand('mydba.analyzeQuery', () => this.analyzeQuery()),
             vscode.commands.registerCommand('mydba.explainQuery', () => this.explainQuery()),
             vscode.commands.registerCommand('mydba.profileQuery', () => this.profileQuery()),
-            vscode.commands.registerCommand('mydba.executeQuery', (args: { query: string; connectionId: string }) => 
+            vscode.commands.registerCommand('mydba.executeQuery', (args: { query: string; connectionId: string }) =>
                 this.executeQuery(args)),
             vscode.commands.registerCommand('mydba.copyToEditor', (sql: string) => this.copyToEditor(sql))
         );
@@ -424,7 +424,7 @@ export class CommandRegistry {
                 // Has rows - show in a webview or output
                 const rowCount = result.length;
                 const message = `Query executed successfully. ${rowCount} row(s) returned.`;
-                
+
                 vscode.window.showInformationMessage(message, 'View Results').then(selection => {
                     if (selection === 'View Results') {
                         // TODO: Open results in a webview panel
