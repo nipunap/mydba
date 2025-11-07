@@ -204,7 +204,7 @@ describe('SQLValidator', () => {
     describe('production environment rules', () => {
         it('should block destructive operations in prod', () => {
             const query = 'DELETE FROM users WHERE id = 1';
-            const result = validator.validate(query, { 
+            const result = validator.validate(query, {
                 environment: 'prod',
                 allowDestructive: false
             });
