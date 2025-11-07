@@ -1,6 +1,6 @@
 /**
  * Embedding Provider Interface
- * 
+ *
  * Supports multiple embedding providers:
  * - OpenAI embeddings (text-embedding-3-small)
  * - Transformers.js (local, in-browser)
@@ -83,6 +83,11 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         const data = await response.json() as {
             data: Array<{ embedding: number[] }>;
         };
+
+        if (!data.data || data.data.length === 0) {
+            throw new Error('OpenAI API returned empty embedding data');
+        }
+
         const vector = data.data[0].embedding;
 
         return {
@@ -115,7 +120,11 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         const data = await response.json() as {
             data: Array<{ embedding: number[] }>;
         };
-        
+
+        if (!data.data || data.data.length === 0) {
+            throw new Error('OpenAI API returned empty embedding data for batch');
+        }
+
         return data.data.map((item: { embedding: number[] }) => ({
             vector: item.embedding,
             dimension: item.embedding.length,
@@ -143,7 +152,7 @@ export class MockEmbeddingProvider implements EmbeddingProvider {
         // Simple hash-based pseudo-embedding
         // This is NOT a real embedding, just for fallback/testing
         const vector = this.hashToVector(text);
-        
+
         return {
             vector,
             dimension: this.dimension,
@@ -156,7 +165,7 @@ export class MockEmbeddingProvider implements EmbeddingProvider {
 
     private hashToVector(text: string): number[] {
         const vector = new Array(this.dimension).fill(0);
-        
+
         // Use character codes and positions to generate pseudo-random values
         for (let i = 0; i < text.length; i++) {
             const char = text.charCodeAt(i);
@@ -201,4 +210,3 @@ export class EmbeddingProviderFactory {
         return new MockEmbeddingProvider();
     }
 }
-

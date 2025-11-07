@@ -139,7 +139,8 @@ export class AuditLogger {
      */
     private async writeEntry(entry: AuditLogEntry): Promise<void> {
         // Queue writes to prevent concurrent writes
-        this.writeQueue = this.writeQueue.then(async () => {
+        // Store the promise locally to ensure proper serialization
+        const writePromise = this.writeQueue.then(async () => {
             try {
                 // Check file size and rotate if necessary
                 await this.rotateIfNeeded();
@@ -153,7 +154,11 @@ export class AuditLogger {
             }
         });
 
-        await this.writeQueue;
+        // Update queue reference for next write
+        this.writeQueue = writePromise;
+
+        // Wait for this write to complete
+        await writePromise;
     }
 
     /**

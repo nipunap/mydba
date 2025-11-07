@@ -859,18 +859,19 @@ export class ExplainViewerPanel {
                 `${impactWarning}\n` +
                 `${difficultyWarning}\n\n` +
                 `**SQL to execute:**\n\`\`\`sql\n${ddl}\n\`\`\`\n\n` +
-                `This operation will be executed in a transaction and can be rolled back if needed.\n\n` +
+                `⚠️ **Warning:** DDL operations (CREATE INDEX, ALTER TABLE) auto-commit in MySQL/MariaDB and cannot be rolled back.\n` +
+                `[Learn more](https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html)\n\n` +
                 `Do you want to proceed?`;
 
             const choice = await vscode.window.showWarningMessage(
                 message,
                 { modal: true },
-                'Apply with Transaction',
+                'Apply (Auto-Commit)',
                 'Copy to Clipboard',
                 'Cancel'
             );
 
-            if (choice === 'Apply with Transaction') {
+            if (choice === 'Apply (Auto-Commit)') {
                 await this.executeOptimizationDDL(ddl, suggestion);
             } else if (choice === 'Copy to Clipboard') {
                 await vscode.env.clipboard.writeText(ddl);
@@ -883,7 +884,11 @@ export class ExplainViewerPanel {
     }
 
     /**
-     * Execute optimization DDL in a transaction
+     * Execute optimization DDL (auto-commits in MySQL/MariaDB)
+     *
+     * NOTE: DDL statements (CREATE INDEX, ALTER TABLE, etc.) cause an implicit
+     * commit in MySQL/MariaDB and cannot be rolled back. This is a database limitation.
+     * See: https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html
      */
     private async executeOptimizationDDL(ddl: string, suggestion: any): Promise<void> {
         const adapter = this.connectionManager.getAdapter(this.connectionId);
@@ -919,9 +924,15 @@ export class ExplainViewerPanel {
             );
 
             if (choice === 'Re-analyze Query') {
-                // Re-run EXPLAIN to show the new plan
+                // Re-run EXPLAIN to capture the new execution plan
                 const explainQuery = `EXPLAIN FORMAT=JSON ${this.query}`;
-                await adapter.query<unknown>(explainQuery);
+                const result = await adapter.query<unknown>(explainQuery);
+
+                // Update with fresh EXPLAIN data
+                if (result.rows && result.rows.length > 0) {
+                    this.explainData = result.rows[0];
+                    this.logger.info('EXPLAIN data updated after optimization');
+                }
 
                 // Reload the panel with new data
                 await this.processAndSendExplainData();

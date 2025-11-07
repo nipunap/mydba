@@ -244,15 +244,26 @@ export class NaturalLanguageQueryParser {
     /**
      * Generate SQL from natural language (simple version)
      * In production, this would call an AI service
+     *
+     * NOTE: This generates SQL for DISPLAY purposes only. The generated SQL
+     * must be reviewed by the user and validated by SQLValidator before execution.
+     * User confirmation is required before any execution.
      */
     async generateSQL(parsedQuery: ParsedQuery, schemaContext?: SchemaContext): Promise<string | null> {
         const { intent, parameters } = parsedQuery;
 
         // Simple SQL generation for common patterns
         if (intent === QueryIntent.RETRIEVE_DATA && parameters.tableName) {
-            let sql = `SELECT *\nFROM ${parameters.tableName}`;
+            // Validate table name to prevent basic injection
+            if (!/^[a-zA-Z0-9_]+$/.test(parameters.tableName)) {
+                throw new Error('Invalid table name');
+            }
+
+            let sql = `SELECT *\nFROM \`${parameters.tableName}\``;
 
             if (parameters.condition) {
+                // NOTE: User-provided conditions are inserted here for DISPLAY only.
+                // SQL must be validated before execution. User confirmation required.
                 sql += `\nWHERE ${parameters.condition}`;
             }
 
@@ -264,20 +275,40 @@ export class NaturalLanguageQueryParser {
             }
 
             if (parameters.orderBy) {
-                sql += `\nORDER BY ${parameters.orderBy} ${parameters.orderDirection || 'ASC'}`;
+                // Validate orderBy to prevent injection
+                if (!/^[a-zA-Z0-9_.,\s]+$/.test(parameters.orderBy)) {
+                    throw new Error('Invalid ORDER BY clause');
+                }
+                const direction = parameters.orderDirection?.toUpperCase();
+                if (direction && direction !== 'ASC' && direction !== 'DESC') {
+                    throw new Error('Invalid sort direction');
+                }
+                sql += `\nORDER BY ${parameters.orderBy} ${direction || 'ASC'}`;
             }
 
             if (parameters.limit) {
-                sql += `\nLIMIT ${parameters.limit}`;
+                // Validate limit is a number
+                const limitNum = parseInt(String(parameters.limit), 10);
+                if (isNaN(limitNum) || limitNum < 1) {
+                    throw new Error('Invalid LIMIT value');
+                }
+                sql += `\nLIMIT ${limitNum}`;
             }
 
             return sql;
         }
 
         if (intent === QueryIntent.COUNT && parameters.tableName) {
-            let sql = `SELECT COUNT(*) as total\nFROM ${parameters.tableName}`;
+            // Validate table name to prevent basic injection
+            if (!/^[a-zA-Z0-9_]+$/.test(parameters.tableName)) {
+                throw new Error('Invalid table name');
+            }
+
+            let sql = `SELECT COUNT(*) as total\nFROM \`${parameters.tableName}\``;
 
             if (parameters.condition) {
+                // NOTE: User-provided conditions are inserted here for DISPLAY only.
+                // SQL must be validated before execution. User confirmation required.
                 sql += `\nWHERE ${parameters.condition}`;
             }
 

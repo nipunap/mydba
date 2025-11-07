@@ -196,7 +196,7 @@ export class MyDBAChatParticipant implements IChatContextProvider {
      * Handle data retrieval queries with SQL generation
      */
     private async handleDataRetrievalQuery(
-        parsedQuery: { originalPrompt: string; intent: QueryIntent; parameters: { tableName?: string; condition?: string; limit?: number }; requiresConfirmation: boolean },
+        parsedQuery: ParsedQuery,
         context: ChatCommandContext,
         builder: ChatResponseBuilder
     ): Promise<void> {

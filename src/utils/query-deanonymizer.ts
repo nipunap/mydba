@@ -12,14 +12,37 @@ export class QueryDeanonymizer {
      * @returns Query with sample values
      */
     static replaceParametersForExplain(query: string): string {
-        let result = query;
+        let result = '';
         let placeholderIndex = 0;
+        let inSingleQuote = false;
+        let inDoubleQuote = false;
+        let i = 0;
 
-        // Replace each ? with a sample value
-        result = result.replace(/\?/g, () => {
-            placeholderIndex++;
-            return this.getSampleValue(placeholderIndex, query);
-        });
+        // Parse character by character to avoid replacing ? inside string literals
+        while (i < query.length) {
+            const char = query[i];
+            const prevChar = i > 0 ? query[i - 1] : '';
+
+            // Track if we're inside a string literal
+            if (char === "'" && prevChar !== '\\') {
+                inSingleQuote = !inSingleQuote;
+                result += char;
+            } else if (char === '"' && prevChar !== '\\') {
+                inDoubleQuote = !inDoubleQuote;
+                result += char;
+            } else if (char === '?' && !inSingleQuote && !inDoubleQuote) {
+                // This is a placeholder, not a literal question mark
+                placeholderIndex++;
+                // Get context around this specific placeholder
+                const contextStart = Math.max(0, i - 50);
+                const contextEnd = Math.min(query.length, i + 50);
+                const context = query.substring(contextStart, contextEnd);
+                result += this.getSampleValue(placeholderIndex, context);
+            } else {
+                result += char;
+            }
+            i++;
+        }
 
         return result;
     }
@@ -82,16 +105,49 @@ export class QueryDeanonymizer {
     }
 
     /**
-     * Check if a query has parameter placeholders
+     * Check if a query has parameter placeholders (outside string literals)
      */
     static hasParameters(query: string): boolean {
-        return query.includes('?');
+        let inSingleQuote = false;
+        let inDoubleQuote = false;
+
+        for (let i = 0; i < query.length; i++) {
+            const char = query[i];
+            const prevChar = i > 0 ? query[i - 1] : '';
+
+            if (char === "'" && prevChar !== '\\') {
+                inSingleQuote = !inSingleQuote;
+            } else if (char === '"' && prevChar !== '\\') {
+                inDoubleQuote = !inDoubleQuote;
+            } else if (char === '?' && !inSingleQuote && !inDoubleQuote) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
-     * Count the number of parameter placeholders in a query
+     * Count the number of parameter placeholders in a query (outside string literals)
      */
     static countParameters(query: string): number {
-        return (query.match(/\?/g) || []).length;
+        let count = 0;
+        let inSingleQuote = false;
+        let inDoubleQuote = false;
+
+        for (let i = 0; i < query.length; i++) {
+            const char = query[i];
+            const prevChar = i > 0 ? query[i - 1] : '';
+
+            if (char === "'" && prevChar !== '\\') {
+                inSingleQuote = !inSingleQuote;
+            } else if (char === '"' && prevChar !== '\\') {
+                inDoubleQuote = !inDoubleQuote;
+            } else if (char === '?' && !inSingleQuote && !inDoubleQuote) {
+                count++;
+            }
+        }
+
+        return count;
     }
 }

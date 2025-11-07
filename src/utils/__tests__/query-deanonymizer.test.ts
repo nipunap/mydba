@@ -213,14 +213,15 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
             expect(QueryDeanonymizer.countParameters(result)).toBe(0);
         });
 
-        test('should replace all question marks (including those in literals)', () => {
+        test('should NOT replace question marks inside string literals', () => {
             const query = "SELECT * FROM users WHERE comment = 'What? Really?' AND user_id = ?";
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
 
-            // The simple regex replacement replaces ALL question marks, even in literals
-            // This is a known limitation - in practice, parameterized queries don't have ? in strings
-            expect(result).not.toContain('?');
-            expect(result).toContain('user_id =');
+            // The improved implementation preserves ? inside string literals
+            // Only the actual placeholder (user_id = ?) should be replaced
+            expect(result).toContain("'What? Really?'"); // Literal ? preserved
+            expect(result).toContain('user_id = 1'); // Placeholder replaced
+            expect(result).not.toMatch(/user_id = \?/); // Verify placeholder was replaced
         });
 
         test('should handle very long queries', () => {

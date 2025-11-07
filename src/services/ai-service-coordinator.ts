@@ -255,7 +255,8 @@ export class AIServiceCoordinator {
             }
 
             // Check for missing indexes
-            if (node.possible_keys === null && node.access_type === 'ALL') {
+            // Use loose equality to catch both null and undefined
+            if (node.possible_keys == null && node.access_type === 'ALL') {
                 const tableName = String(node.table_name || 'table');
                 painPoints.push({
                     type: 'missing_index',

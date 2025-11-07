@@ -189,12 +189,23 @@ export class ChatResponseBuilder {
     }
 
     /**
-     * Add a file reference
+     * Add a file reference with optional line range
      */
-    fileReference(uri: vscode.Uri, _range?: vscode.Range): this {
-        this.stream.markdown(`📄 `);
+    fileReference(uri: vscode.Uri, range?: vscode.Range): this {
         // VSCode ChatResponseStream.reference expects (uri, iconPath?) not (uri, range?)
-        // Range information is not supported in the API
+        // Display line range information in markdown for user clarity
+        if (range) {
+            const startLine = range.start.line + 1; // Convert 0-based to 1-based
+            const endLine = range.end.line + 1;
+            if (startLine === endLine) {
+                this.stream.markdown(`📄 Line ${startLine}: `);
+            } else {
+                this.stream.markdown(`📄 Lines ${startLine}-${endLine}: `);
+            }
+        } else {
+            this.stream.markdown(`📄 `);
+        }
+
         this.stream.reference(uri);
         this.stream.markdown('\n\n');
         return this;
