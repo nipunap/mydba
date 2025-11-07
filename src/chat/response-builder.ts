@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 /**
  * Response Builder
- * 
+ *
  * Utility for building rich, interactive chat responses with consistent formatting.
  * Provides methods for headers, code blocks, tables, buttons, and more.
  */
@@ -129,15 +129,15 @@ export class ChatResponseBuilder {
     table(headers: string[], rows: string[][]): this {
         // Header
         this.stream.markdown(`| ${headers.join(' | ')} |\n`);
-        
+
         // Separator
         this.stream.markdown(`| ${headers.map(() => '---').join(' | ')} |\n`);
-        
+
         // Rows
         for (const row of rows) {
             this.stream.markdown(`| ${row.join(' | ')} |\n`);
         }
-        
+
         this.stream.markdown('\n');
         return this;
     }
@@ -244,10 +244,10 @@ export class ChatResponseBuilder {
 
         this.stream.markdown('**Before:**\n\n');
         this.stream.markdown(`\`\`\`sql\n${before}\n\`\`\`\n\n`);
-        
+
         this.stream.markdown('**After:**\n\n');
         this.stream.markdown(`\`\`\`sql\n${after}\n\`\`\`\n\n`);
-        
+
         return this;
     }
 
@@ -259,13 +259,13 @@ export class ChatResponseBuilder {
         const hasMore = totalRows > displayRows.length;
 
         this.stream.markdown('**Query Results:**\n\n');
-        
+
         // Build table
         const headers = columns;
-        const tableRows = displayRows.map(row => 
+        const tableRows = displayRows.map(row =>
             row.map(cell => String(cell ?? 'NULL'))
         );
-        
+
         this.table(headers, tableRows);
 
         if (hasMore) {
@@ -296,7 +296,7 @@ export class ChatResponseBuilder {
         suggestions?: number;
     }): this {
         this.stream.markdown('**Analysis Summary:**\n\n');
-        
+
         if (summary.queryType) {
             this.stream.markdown(`- **Query Type:** ${summary.queryType}\n`);
         }
@@ -317,7 +317,7 @@ export class ChatResponseBuilder {
         if (summary.suggestions !== undefined) {
             this.stream.markdown(`- **Suggestions:** ${summary.suggestions}\n`);
         }
-        
+
         this.stream.markdown('\n');
         return this;
     }
@@ -336,12 +336,12 @@ export class ChatResponseBuilder {
      * Add an execution time display
      */
     executionTime(milliseconds: number): this {
-        const formatted = milliseconds < 1000 
+        const formatted = milliseconds < 1000
             ? `${milliseconds.toFixed(2)}ms`
             : `${(milliseconds / 1000).toFixed(2)}s`;
-        
+
         const emoji = milliseconds < 100 ? '⚡' : milliseconds < 1000 ? '✅' : '⚠️';
-        
+
         this.stream.markdown(`${emoji} **Execution Time:** ${formatted}\n\n`);
         return this;
     }
@@ -358,4 +358,3 @@ export class ChatResponseBuilder {
         return this;
     }
 }
-

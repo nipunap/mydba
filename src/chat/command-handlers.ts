@@ -38,7 +38,7 @@ export class ChatCommandHandlers {
             if (!activeConnectionId) {
                 stream.markdown('⚠️  **No active database connection**\n\n');
                 stream.markdown('Please connect to a database first using the MyDBA sidebar.\n');
-                
+
                 // Provide button to connect
                 stream.button({
                     command: 'mydba.newConnection',
@@ -66,7 +66,7 @@ export class ChatCommandHandlers {
 
             // Perform AI analysis (using AIServiceCoordinator for now)
             stream.progress('Getting AI insights...');
-            
+
             const aiService = this.serviceContainer.get(SERVICE_TOKENS.AIServiceCoordinator);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const analysisResult = await aiService.analyzeQuery({ query, connectionId: activeConnectionId }) as any;
@@ -112,14 +112,14 @@ export class ChatCommandHandlers {
 
             // Open the EXPLAIN viewer panel
             stream.markdown('Opening EXPLAIN Viewer...\n\n');
-            
+
             await vscode.commands.executeCommand('mydba.explainQuery', {
                 query,
                 connectionId: activeConnectionId
             });
 
             stream.markdown('✅ **EXPLAIN Viewer opened** - View the interactive execution plan visualization in the panel.\n\n');
-            
+
             // Provide quick insights in chat
             const connectionManager = this.serviceContainer.get(SERVICE_TOKENS.ConnectionManager);
             const adapter = connectionManager.getAdapter(activeConnectionId);
@@ -131,7 +131,7 @@ export class ChatCommandHandlers {
                     const explainResult = await (adapter as any).explain(query);
 
                     stream.markdown('**Quick Insights:**\n\n');
-                    
+
                     if (explainResult) {
                         // Check for full table scans
                         if (explainResult.type === 'ALL') {
@@ -212,9 +212,9 @@ export class ChatCommandHandlers {
             // Show execution stages
             if (profile.stages.length > 0) {
                 stream.markdown('**Top Execution Stages:**\n\n');
-                
+
                 // Sort by duration (eventName and duration are camelCase, duration is in microseconds)
-                const sortedStages = [...profile.stages].sort((a, b) => 
+                const sortedStages = [...profile.stages].sort((a, b) =>
                     (b.duration || b.Duration || 0) - (a.duration || a.Duration || 0)
                 );
                 const topStages = sortedStages.slice(0, 10);
@@ -292,14 +292,14 @@ export class ChatCommandHandlers {
             // Render optimization-focused response
             if (analysis.optimizationSuggestions && analysis.optimizationSuggestions.length > 0) {
                 stream.markdown('**Optimization Suggestions:**\n\n');
-                
+
                 for (const suggestion of analysis.optimizationSuggestions) {
                     const impactEmoji = this.getImpactEmoji(suggestion.impact);
                     const difficultyEmoji = this.getDifficultyEmoji(suggestion.difficulty);
-                    
+
                     stream.markdown(`${impactEmoji} **${suggestion.title}** ${difficultyEmoji}\n\n`);
                     stream.markdown(`${suggestion.description}\n\n`);
-                    
+
                     if (suggestion.before && suggestion.after) {
                         stream.markdown('**Before:**\n');
                         stream.markdown('```sql\n' + suggestion.before + '\n```\n\n');
@@ -309,7 +309,7 @@ export class ChatCommandHandlers {
                         stream.markdown('**Optimized Code:**\n');
                         stream.markdown('```sql\n' + suggestion.after + '\n```\n\n');
                     }
-                    
+
                     stream.markdown('---\n\n');
                 }
             } else {
@@ -320,7 +320,7 @@ export class ChatCommandHandlers {
             // Anti-patterns
             if (analysis.antiPatterns && analysis.antiPatterns.length > 0) {
                 stream.markdown('**Anti-Patterns Detected:**\n\n');
-                
+
                 for (const pattern of analysis.antiPatterns) {
                     const icon = pattern.severity === 'critical' ? '🔴' : pattern.severity === 'warning' ? '🟡' : '🔵';
                     stream.markdown(`${icon} **${pattern.type}**\n`);
@@ -392,15 +392,15 @@ export class ChatCommandHandlers {
         // Look for inline SQL keywords
         const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH', 'CREATE', 'ALTER'];
         const upperPrompt = prompt.toUpperCase();
-        
+
         for (const keyword of sqlKeywords) {
             if (upperPrompt.includes(keyword)) {
                 // Extract from keyword to end or semicolon
                 const startIndex = upperPrompt.indexOf(keyword);
                 const queryPart = prompt.substring(startIndex);
                 const endIndex = queryPart.indexOf(';');
-                
-                return endIndex > -1 
+
+                return endIndex > -1
                     ? queryPart.substring(0, endIndex + 1).trim()
                     : queryPart.trim();
             }
@@ -462,12 +462,12 @@ export class ChatCommandHandlers {
         // Anti-patterns
         if (analysis.antiPatterns && analysis.antiPatterns.length > 0) {
             builder.header('Issues & Anti-Patterns', '⚠️');
-            
+
             for (const pattern of analysis.antiPatterns) {
                 const icon = pattern.severity === 'critical' ? '🔴' : pattern.severity === 'warning' ? '🟡' : 'ℹ️';
                 builder.subheader(`${icon} ${pattern.type}`)
                     .text(pattern.message);
-                
+
                 if (pattern.suggestion) {
                     builder.tip(pattern.suggestion);
                 }
@@ -478,14 +478,14 @@ export class ChatCommandHandlers {
         // Optimizations
         if (analysis.optimizationSuggestions && analysis.optimizationSuggestions.length > 0) {
             builder.header('Optimization Opportunities', '🚀');
-            
+
             const topSuggestions = analysis.optimizationSuggestions.slice(0, 3);
-            
+
             for (const suggestion of topSuggestions) {
                 const impactEmoji = this.getImpactEmoji(suggestion.impact);
                 builder.subheader(`${impactEmoji} ${suggestion.title}`)
                     .text(suggestion.description);
-                
+
                 if (suggestion.before && suggestion.after) {
                     builder.comparison(suggestion.before, suggestion.after);
                 } else if (suggestion.after) {
@@ -506,7 +506,7 @@ export class ChatCommandHandlers {
         // Citations
         if (analysis.citations && analysis.citations.length > 0) {
             builder.header('References', '📚');
-            
+
             const citationLinks = analysis.citations.map((citation: { url?: string; title: string }) => {
                 if (citation.url) {
                     return `[${citation.title}](${citation.url})`;
@@ -555,7 +555,7 @@ export class ChatCommandHandlers {
 
         // Get all tables
         const tablesQuery = `
-            SELECT 
+            SELECT
                 TABLE_NAME as name,
                 TABLE_ROWS as rows,
                 ROUND(((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024), 2) as size_mb,
@@ -573,7 +573,7 @@ export class ChatCommandHandlers {
             stream.markdown('**Tables:**\n\n');
             stream.markdown('| Table | Rows | Size (MB) | Engine |\n');
             stream.markdown('|-------|------|-----------|--------|\n');
-            
+
             for (const table of tables) {
                 stream.markdown(`| ${table.name} | ${table.rows || 0} | ${table.size_mb || 0} | ${table.engine} |\n`);
             }
@@ -604,7 +604,7 @@ export class ChatCommandHandlers {
 
         // Get column information
         const columnsQuery = `
-            SELECT 
+            SELECT
                 COLUMN_NAME as name,
                 COLUMN_TYPE as type,
                 IS_NULLABLE as nullable,
@@ -624,13 +624,13 @@ export class ChatCommandHandlers {
             stream.markdown('**Columns:**\n\n');
             stream.markdown('| Name | Type | Nullable | Key | Default | Extra |\n');
             stream.markdown('|------|------|----------|-----|---------|-------|\n');
-            
+
             for (const col of columns) {
                 const nullable = col.nullable === 'YES' ? '✓' : '✗';
                 const key = col.key_type || '-';
                 const defaultVal = col.default_value || '-';
                 const extra = col.extra || '-';
-                
+
                 stream.markdown(`| ${col.name} | ${col.type} | ${nullable} | ${key} | ${defaultVal} | ${extra} |\n`);
             }
             stream.markdown('\n');
@@ -646,7 +646,7 @@ export class ChatCommandHandlers {
 
         if (indexes && Array.isArray(indexes) && indexes.length > 0) {
             stream.markdown('**Indexes:**\n\n');
-            
+
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const indexMap = new Map<string, any[]>();
             for (const idx of indexes) {
@@ -660,7 +660,7 @@ export class ChatCommandHandlers {
                 const columnNames = columns.map(c => c.Column_name).join(', ');
                 const indexType = columns[0].Index_type || 'BTREE';
                 const isUnique = columns[0].Non_unique === 0 ? '(Unique)' : '';
-                
+
                 stream.markdown(`- **${indexName}** ${isUnique}: ${columnNames} (${indexType})\n`);
             }
             stream.markdown('\n');
@@ -719,4 +719,3 @@ export class ChatCommandHandlers {
         stream.markdown('\nPlease try again or contact support if the issue persists.');
     }
 }
-

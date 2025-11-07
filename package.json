@@ -107,6 +107,16 @@
         "command": "mydba.previewTableData",
         "title": "Preview Data",
         "category": "MyDBA"
+      },
+      {
+        "command": "mydba.executeQuery",
+        "title": "Execute Query",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.copyToEditor",
+        "title": "Copy SQL to Editor",
+        "category": "MyDBA"
       }
     ],
     "views": {

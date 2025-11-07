@@ -2,7 +2,7 @@ import { Logger } from '../utils/logger';
 
 /**
  * Natural Language Query Parser
- * 
+ *
  * Understands natural language database questions and extracts intent/parameters.
  */
 export class NaturalLanguageQueryParser {
@@ -215,7 +215,7 @@ export class NaturalLanguageQueryParser {
     private extractExistingSQLQuery(prompt: string): string | undefined {
         // Look for SQL keywords
         const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER'];
-        
+
         for (const keyword of sqlKeywords) {
             const regex = new RegExp(`(${keyword}\\s+.+?)(?:;|$)`, 'is');
             const match = prompt.match(regex);
@@ -387,4 +387,3 @@ export interface SchemaContext {
         }>;
     }>;
 }
-

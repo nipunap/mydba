@@ -30,7 +30,10 @@ export class CommandRegistry {
         context.subscriptions.push(
             vscode.commands.registerCommand('mydba.analyzeQuery', () => this.analyzeQuery()),
             vscode.commands.registerCommand('mydba.explainQuery', () => this.explainQuery()),
-            vscode.commands.registerCommand('mydba.profileQuery', () => this.profileQuery())
+            vscode.commands.registerCommand('mydba.profileQuery', () => this.profileQuery()),
+            vscode.commands.registerCommand('mydba.executeQuery', (args: { query: string; connectionId: string }) => 
+                this.executeQuery(args)),
+            vscode.commands.registerCommand('mydba.copyToEditor', (sql: string) => this.copyToEditor(sql))
         );
 
         // AI commands
@@ -394,6 +397,72 @@ export class CommandRegistry {
         } catch (error) {
             this.logger.error('Failed to generate sample workload:', error as Error);
             vscode.window.showErrorMessage(`Failed to generate workload: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Execute a SQL query from chat or other sources
+     */
+    private async executeQuery(args: { query: string; connectionId: string }): Promise<void> {
+        try {
+            const { query, connectionId } = args;
+
+            this.logger.info(`Executing query from chat for connection: ${connectionId}`);
+
+            // Get the adapter
+            const adapter = this.connectionManager.getAdapter(connectionId);
+            if (!adapter) {
+                vscode.window.showErrorMessage('Database adapter not found for this connection');
+                return;
+            }
+
+            // Execute the query
+            const result = await adapter.query(query);
+
+            // Show results
+            if (Array.isArray(result) && result.length > 0) {
+                // Has rows - show in a webview or output
+                const rowCount = result.length;
+                const message = `Query executed successfully. ${rowCount} row(s) returned.`;
+                
+                vscode.window.showInformationMessage(message, 'View Results').then(selection => {
+                    if (selection === 'View Results') {
+                        // TODO: Open results in a webview panel
+                        this.logger.info('Opening query results in webview');
+                    }
+                });
+            } else {
+                // No rows (UPDATE, DELETE, etc.)
+                vscode.window.showInformationMessage('Query executed successfully');
+            }
+
+        } catch (error) {
+            this.logger.error('Failed to execute query:', error as Error);
+            vscode.window.showErrorMessage(`Query execution failed: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Copy SQL to the editor
+     */
+    private async copyToEditor(sql: string): Promise<void> {
+        try {
+            this.logger.info('Copying SQL to editor');
+
+            // Create a new untitled document with SQL language
+            const document = await vscode.workspace.openTextDocument({
+                language: 'sql',
+                content: sql
+            });
+
+            // Show the document in the editor
+            await vscode.window.showTextDocument(document);
+
+            vscode.window.showInformationMessage('SQL copied to editor');
+
+        } catch (error) {
+            this.logger.error('Failed to copy SQL to editor:', error as Error);
+            vscode.window.showErrorMessage(`Failed to copy to editor: ${(error as Error).message}`);
         }
     }
 }
