@@ -110,7 +110,7 @@ export class QueryAnonymizer {
     hasSensitiveData(query: string): boolean {
         const sensitivePatterns = [
             /password/i,
-            /credit[_\s]?card|card/i,
+            /credit[_\s]?card|\bcard\b/i, // Use word boundaries to avoid matching "discard", "cardboard"
             /ssn|social[_\s]?security/i,
             /api[_\s]?key/i,
             /token/i,

@@ -264,6 +264,7 @@ export class QueriesWithoutIndexesPanel {
 
             // Create AI service coordinator for enhanced EXPLAIN analysis
             const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
 
             // Show EXPLAIN viewer with AI insights
             ExplainViewerPanel.show(
@@ -291,6 +292,7 @@ export class QueriesWithoutIndexesPanel {
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
             const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
             const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
             QueryProfilingPanel.show(
                 this.context,
                 this.logger,

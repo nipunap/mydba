@@ -182,9 +182,9 @@ async function reloadConfiguration(
             logger.info('AI configuration changed, reloading AI services...');
 
             const aiServiceCoordinator = serviceContainer.get(SERVICE_TOKENS.AIServiceCoordinator);
-            if (aiServiceCoordinator && 'reloadConfiguration' in aiServiceCoordinator &&
-                typeof aiServiceCoordinator.reloadConfiguration === 'function') {
-                await aiServiceCoordinator.reloadConfiguration();
+            if (aiServiceCoordinator && 'reinitialize' in aiServiceCoordinator &&
+                typeof aiServiceCoordinator.reinitialize === 'function') {
+                await aiServiceCoordinator.reinitialize();
                 logger.info('AI services reloaded successfully');
             }
 
@@ -216,9 +216,9 @@ async function reloadConfiguration(
             logger.info('Cache configuration changed, clearing caches...');
 
             const cacheManager = serviceContainer.get(SERVICE_TOKENS.CacheManager);
-            if (cacheManager && 'clearAll' in cacheManager &&
-                typeof cacheManager.clearAll === 'function') {
-                cacheManager.clearAll();
+            if (cacheManager && 'clear' in cacheManager &&
+                typeof cacheManager.clear === 'function') {
+                cacheManager.clear();
                 logger.info('Caches cleared successfully');
             }
 

@@ -199,6 +199,7 @@ export class QueryEditorPanel {
             // Create AI service coordinator for enhanced EXPLAIN analysis
             const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
             const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
 
             // Open the enhanced EXPLAIN viewer panel with AI insights
             ExplainViewerPanel.show(

@@ -136,6 +136,7 @@ export class SlowQueriesPanel {
 
             // Create AI service coordinator for enhanced analysis
             const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
 
             ExplainViewerPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, cleanQuery, explainData, aiServiceCoordinator);
         } catch (error) {
@@ -162,6 +163,7 @@ export class SlowQueriesPanel {
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
             const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
             const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            await aiServiceCoordinator.initialize();
             QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiServiceCoordinator);
         } catch (error) {
             this.logger.error('Failed to open Profiling:', error as Error);

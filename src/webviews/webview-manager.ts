@@ -144,6 +144,7 @@ export class WebviewManager {
     async showQueryProfiling(connectionId: string, query: string): Promise<void> {
         const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
         const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+        await aiServiceCoordinator.initialize();
         QueryProfilingPanel.show(
             this.context,
             this.logger,
