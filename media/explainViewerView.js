@@ -444,8 +444,23 @@
         // Clear existing content
         treeDiagram.innerHTML = '';
 
-        const width = treeDiagram.clientWidth || CONFIG.DIAGRAM.WIDTH;
-        const height = CONFIG.DIAGRAM.HEIGHT;
+        // Calculate dimensions with proper padding
+        const containerWidth = treeDiagram.clientWidth || CONFIG.DIAGRAM.WIDTH;
+        const containerHeight = CONFIG.DIAGRAM.HEIGHT;
+        
+        // Count total nodes to determine SVG size
+        function countNodes(node) {
+            let count = 1;
+            if (node.children) {
+                node.children.forEach(child => count += countNodes(child));
+            }
+            return count;
+        }
+        const nodeCount = countNodes(data);
+        
+        // Dynamic sizing based on node count
+        const width = Math.max(containerWidth, nodeCount * 180); // 180px per level
+        const height = Math.max(containerHeight, nodeCount * 60); // 60px per node vertically
 
         // Create container for controls and legend
         const controlsContainer = d3.select(treeDiagram)
@@ -524,28 +539,25 @@
                 </div>
             `);
 
-        // Create SVG with relative container
-        const svgContainer = d3.select(treeDiagram)
-            .append('div')
-            .style('position', 'relative')
-            .style('width', '100%')
-            .style('height', height + 'px');
-
-        const svg = svgContainer
+        // Create SVG directly in the scrollable container
+        const svg = d3.select(treeDiagram)
             .append('svg')
             .attr('width', width)
             .attr('height', height)
+            .attr('viewBox', `0 0 ${width} ${height}`)
+            .attr('preserveAspectRatio', 'xMidYMid meet')
             .attr('role', 'img')
             .attr('aria-label', 'Query execution plan tree diagram')
-            .style('background', 'var(--vscode-editor-background)');
+            .style('background', 'var(--vscode-editor-background)')
+            .style('display', 'block');
 
         const g = svg.append('g')
             .attr('transform', `translate(${CONFIG.DIAGRAM.MARGIN},${CONFIG.DIAGRAM.MARGIN})`);
 
-        // Create tree layout
+        // Create tree layout - use size() only for proper containment
         const treeLayout = d3.tree()
-            .size([height - (CONFIG.DIAGRAM.MARGIN * 2), width - 200])
-            .nodeSize([60, 180]); // Better spacing
+            .size([height - (CONFIG.DIAGRAM.MARGIN * 2), width - (CONFIG.DIAGRAM.MARGIN * 2)])
+            .separation((a, b) => (a.parent === b.parent ? 1 : 1.2)); // Better spacing control
 
         // Convert data to hierarchy and add collapse state
         const root = d3.hierarchy(data, d => d.children);
