@@ -242,24 +242,21 @@
 ### **Milestone 5: Visual Query Analysis** (20-25 hours)
 
 #### 5.1 EXPLAIN Plan Visualization
-- [ ] **D3.js Tree Diagram** (12-16 hours)
-  - [ ] Hierarchical tree layout for EXPLAIN output
-  - [ ] Color-coded nodes (🟢 good, 🟡 warning, 🔴 critical)
-  - [ ] Pain point highlighting (full scans, filesort, temp tables)
-  - [ ] Interactive node exploration with tooltips
-  - [ ] Expand/collapse subtrees
-  - [ ] Export to PNG/SVG
-  - [ ] Search within EXPLAIN plan
-- [ ] **AI EXPLAIN Interpretation** (4-6 hours)
-  - [ ] Natural language summary of execution plan
-  - [ ] Step-by-step walkthrough
-  - [ ] Performance prediction (current vs. optimized)
-  - [ ] RAG citations for optimization recommendations
-- [ ] **One-Click Fixes** (4-6 hours)
-  - [ ] Generate index DDL
-  - [ ] "Apply Index" button with Safe Mode confirmation
-  - [ ] Alternative query rewrites
-  - [ ] Before/after EXPLAIN comparison
+- [x] **D3.js Tree Diagram** (12-16 hours) ✅ COMPLETE
+  - [x] Hierarchical tree layout for EXPLAIN output
+  - [x] Color-coded nodes (🟢 good, 🟡 warning, 🔴 critical)
+  - [x] Pain point highlighting (full scans, filesort, temp tables)
+  - [x] Interactive node exploration with tooltips
+  - [x] Expand/collapse subtrees
+  - [x] Export to PNG/SVG
+  - [x] Search within EXPLAIN plan
+- [x] **AI EXPLAIN Interpretation** (4-6 hours) ✅ COMPLETE
+  - [x] Natural language summary of execution plan
+  - [x] Step-by-step walkthrough
+  - [x] Performance prediction (current vs. optimized)
+  - [x] RAG citations for optimization recommendations
+  - [x] Pain point detection (full scans, filesort, temp tables, missing indexes)
+  - [x] Specialized interpretExplain method with severity levels
 
 #### 5.2 Query Profiling Waterfall
 - [ ] **Performance Schema Timeline** (8-10 hours)
@@ -273,7 +270,8 @@
   - [ ] Show optimizer decisions (join order, index selection)
   - [ ] Cost calculations display
 
-**Estimated Time:** 20-25 hours
+**Estimated Time:** 8-10 hours remaining (12-16h completed)
+**Status:** 60% Complete - D3 visualization & AI interpretation done, profiling waterfall pending
 
 ---
 
@@ -406,6 +404,29 @@
   - [ ] Version-specific doc retrieval
 
 **Estimated Time:** 20-30 hours
+
+---
+
+## 🎨 **Phase 3: Polish & User Experience** (FUTURE)
+
+### **Milestone 11: One-Click Query Fixes** (4-6 hours)
+
+#### 11.1 Fix Generation & Application
+- [ ] **Index DDL Generation** (2-3 hours)
+  - [ ] Generate `CREATE INDEX` statements from pain points
+  - [ ] Column analysis for optimal index ordering
+  - [ ] Covering index suggestions
+  - [ ] Safe Mode confirmation dialogs
+- [ ] **Query Rewrites** (2-3 hours)
+  - [ ] Alternative query suggestions (EXISTS vs IN)
+  - [ ] JOIN order optimization
+  - [ ] Subquery elimination
+  - [ ] Before/after EXPLAIN comparison side-by-side
+
+**Note:** Deferred to Phase 3 as D3 visualization + AI interpretation provide sufficient value for Phase 2.  
+One-click fixes require more UX polish and extensive testing to ensure safety.
+
+**Estimated Time:** 4-6 hours
 
 ---
 

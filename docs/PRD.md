@@ -433,12 +433,13 @@ MyDBA brings AI-powered database intelligence directly into VSCode, providing:
     - "85% of time spent in 'Sending data' stage due to full table scan."
     - "Optimizer rejected index `idx_status` (selectivity too low: 90% of rows match)."
     - "Temporary table created (256KB) for filesort. Consider covering index to avoid."
-- [ ] **One-Click Fixes**:
+- [ ] **One-Click Fixes** (MOVED TO PHASE 3):
   - Generate index DDL: `CREATE INDEX idx_user_id ON orders(user_id);`
   - Show "Apply Index" button (with Safe Mode confirmation)
   - Alternative query rewrites: "Rewrite using EXISTS instead of IN?"
   - Before/after EXPLAIN comparison side-by-side
   - Before/after profiling comparison: Show time reduction in each stage
+  - **Note:** Deferred to Phase 3 as D3 visualization + AI interpretation provide sufficient value for Phase 2
 - [ ] Auto-complete for database objects
 - [ ] Inline optimization suggestions (like code linting)
 - [ ] Before/after performance comparison
