@@ -292,6 +292,32 @@ export class SQLValidator {
                     }
                     break;
                 }
+
+                case SQLStatementType.GRANT: {
+                    // Match GRANT privileges ON object TO user
+                    const onMatch = sql.match(/GRANT\s+[\w\s,]+\s+ON\s+(?:TABLE\s+)?`?(\w+)`?/i);
+                    const toMatch = sql.match(/TO\s+'?(\w+)'?@?/i);
+                    if (onMatch) {
+                        objects.push(`GRANT ON: ${onMatch[1]}`);
+                    }
+                    if (toMatch) {
+                        objects.push(`USER: ${toMatch[1]}`);
+                    }
+                    break;
+                }
+
+                case SQLStatementType.REVOKE: {
+                    // Match REVOKE privileges ON object FROM user
+                    const onMatch = sql.match(/REVOKE\s+[\w\s,]+\s+ON\s+(?:TABLE\s+)?`?(\w+)`?/i);
+                    const fromMatch = sql.match(/FROM\s+'?(\w+)'?@?/i);
+                    if (onMatch) {
+                        objects.push(`REVOKE ON: ${onMatch[1]}`);
+                    }
+                    if (fromMatch) {
+                        objects.push(`USER: ${fromMatch[1]}`);
+                    }
+                    break;
+                }
             }
         } catch (error) {
             this.logger.warn('Error extracting affected objects:', error as Error);
