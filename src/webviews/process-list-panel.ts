@@ -171,59 +171,72 @@ export class ProcessListPanel {
     private async getLockInformation(adapter: any): Promise<any[]> {
         try {
             // Try to get lock information from performance_schema (MySQL 5.7+)
+            // Map ENGINE_TRANSACTION_ID to PROCESSLIST_ID via INNODB_TRX
             const lockQuery = `
-                SELECT 
-                    l.ENGINE_TRANSACTION_ID as processId,
+                SELECT
+                    t.trx_mysql_thread_id as processId,
                     l.OBJECT_NAME as lockObject,
                     l.LOCK_TYPE as lockType,
                     l.LOCK_MODE as lockMode,
                     l.LOCK_STATUS as lockStatus,
-                    w.REQUESTING_ENGINE_TRANSACTION_ID as blockingProcessId
+                    t2.trx_mysql_thread_id as blockingProcessId
                 FROM performance_schema.data_locks l
-                LEFT JOIN performance_schema.data_lock_waits w ON l.ENGINE_LOCK_ID = w.REQUESTED_LOCK_ID
-                WHERE l.ENGINE_TRANSACTION_ID IS NOT NULL
+                INNER JOIN information_schema.INNODB_TRX t
+                    ON t.trx_id = l.ENGINE_TRANSACTION_ID
+                LEFT JOIN performance_schema.data_lock_waits w
+                    ON l.ENGINE_LOCK_ID = w.REQUESTED_LOCK_ID
+                LEFT JOIN information_schema.INNODB_TRX t2
+                    ON t2.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+                WHERE t.trx_mysql_thread_id IS NOT NULL
             `;
 
             const locks = await adapter.query(lockQuery);
-            
+
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return locks.map((lock: any) => ({
-                processId: lock.processId,
-                lockObject: lock.lockObject,
-                lockType: lock.lockType,
-                lockMode: lock.lockMode,
-                lockStatus: lock.lockStatus,
-                isBlocked: lock.lockStatus === 'WAITING',
-                isBlocking: !!lock.blockingProcessId,
-                blockingProcessId: lock.blockingProcessId
+                processId: lock.processId || lock.PROCESSID,
+                lockObject: lock.lockObject || lock.LOCKOBJECT,
+                lockType: lock.lockType || lock.LOCKTYPE,
+                lockMode: lock.lockMode || lock.LOCKMODE,
+                lockStatus: lock.lockStatus || lock.LOCKSTATUS,
+                isBlocked: (lock.lockStatus || lock.LOCKSTATUS) === 'WAITING',
+                isBlocking: !!(lock.blockingProcessId || lock.BLOCKINGPROCESSID),
+                blockingProcessId: lock.blockingProcessId || lock.BLOCKINGPROCESSID
             }));
         } catch {
             // If performance_schema is not available, try INFORMATION_SCHEMA (MySQL 5.5/5.6)
             try {
+                // In legacy versions, we need to map lock_trx_id to processlist_id via INNODB_TRX
                 const legacyLockQuery = `
-                    SELECT 
-                        l.lock_trx_id as processId,
+                    SELECT
+                        t.trx_mysql_thread_id as processId,
                         l.lock_table as lockObject,
                         l.lock_type as lockType,
                         l.lock_mode as lockMode,
                         'GRANTED' as lockStatus,
-                        w.blocking_trx_id as blockingProcessId
+                        t2.trx_mysql_thread_id as blockingProcessId
                     FROM INFORMATION_SCHEMA.INNODB_LOCKS l
-                    LEFT JOIN INFORMATION_SCHEMA.INNODB_LOCK_WAITS w ON l.lock_id = w.requested_lock_id
+                    INNER JOIN INFORMATION_SCHEMA.INNODB_TRX t
+                        ON t.trx_id = l.lock_trx_id
+                    LEFT JOIN INFORMATION_SCHEMA.INNODB_LOCK_WAITS w
+                        ON l.lock_id = w.requested_lock_id
+                    LEFT JOIN INFORMATION_SCHEMA.INNODB_TRX t2
+                        ON t2.trx_id = w.blocking_trx_id
+                    WHERE t.trx_mysql_thread_id IS NOT NULL
                 `;
-                
+
                 const locks = await adapter.query(legacyLockQuery);
-                
+
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 return locks.map((lock: any) => ({
-                    processId: lock.processId,
-                    lockObject: lock.lockObject,
-                    lockType: lock.lockType,
-                    lockMode: lock.lockMode,
-                    lockStatus: lock.lockStatus,
+                    processId: lock.processId || lock.PROCESSID,
+                    lockObject: lock.lockObject || lock.LOCKOBJECT,
+                    lockType: lock.lockType || lock.LOCKTYPE,
+                    lockMode: lock.lockMode || lock.LOCKMODE,
+                    lockStatus: lock.lockStatus || lock.LOCKSTATUS,
                     isBlocked: false, // Will be determined by lock_waits
-                    isBlocking: !!lock.blockingProcessId,
-                    blockingProcessId: lock.blockingProcessId
+                    isBlocking: !!(lock.blockingProcessId || lock.BLOCKINGPROCESSID),
+                    blockingProcessId: lock.blockingProcessId || lock.BLOCKINGPROCESSID
                 }));
             } catch (legacyError) {
                 this.logger.warn('Could not fetch lock information:', legacyError as Error);

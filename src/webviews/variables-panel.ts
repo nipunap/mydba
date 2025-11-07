@@ -139,12 +139,12 @@ export class VariablesPanel {
             // Execute SET command
             const scopeKeyword = scope === 'global' ? 'GLOBAL' : 'SESSION';
             const setQuery = `SET ${scopeKeyword} ${name} = ${this.escapeValue(value)}`;
-            
+
             await adapter.query(setQuery);
 
             // Success - reload variables
             await this.loadVariables();
-            
+
             this.panel.webview.postMessage({
                 type: 'editSuccess',
                 name: name,
@@ -167,7 +167,7 @@ export class VariablesPanel {
         try {
             const variableInfo = this.getVariableMetadata(name);
             const validation = this.validateValue(variableInfo, value);
-            
+
             this.panel.webview.postMessage({
                 type: 'validationResult',
                 name: name,
@@ -181,8 +181,10 @@ export class VariablesPanel {
 
     private escapeValue(value: string): string {
         // Handle different value types
-        if (value === 'ON' || value === 'OFF' || value === 'TRUE' || value === 'FALSE') {
-            return value;
+        const upperValue = value.toUpperCase();
+        if (upperValue === 'ON' || upperValue === 'OFF' || upperValue === 'TRUE' || upperValue === 'FALSE') {
+            // Return uppercase version for MySQL/MariaDB compatibility
+            return upperValue;
         }
         // Numeric values
         if (/^-?\d+(\.\d+)?$/.test(value)) {

@@ -203,20 +203,28 @@ export class ChatCommandHandlers {
 
             // Display profiling results
             stream.markdown('**Execution Summary:**\n\n');
-            stream.markdown(`- **Total Time:** ${(profile.totalDuration || 0).toFixed(4)}s\n`);
+            // Convert totalDuration from microseconds to seconds
+            const totalDurationSeconds = (profile.totalDuration || 0) / 1000000;
+            stream.markdown(`- **Total Time:** ${totalDurationSeconds.toFixed(4)}s\n`);
             stream.markdown(`- **Stages:** ${profile.stages.length}\n\n`);
 
             // Show execution stages
             if (profile.stages.length > 0) {
                 stream.markdown('**Top Execution Stages:**\n\n');
                 
-                // Sort by duration
-                const sortedStages = [...profile.stages].sort((a, b) => b.Duration - a.Duration);
+                // Sort by duration (eventName and duration are camelCase, duration is in microseconds)
+                const sortedStages = [...profile.stages].sort((a, b) => 
+                    (b.duration || b.Duration || 0) - (a.duration || a.Duration || 0)
+                );
                 const topStages = sortedStages.slice(0, 10);
 
                 for (const stage of topStages) {
-                    const percentage = ((stage.Duration / (profile.totalDuration || 1)) * 100).toFixed(1);
-                    stream.markdown(`- **${stage.Stage}**: ${stage.Duration.toFixed(4)}s (${percentage}%)\n`);
+                    const stageDuration = stage.duration || stage.Duration || 0;
+                    const stageName = stage.eventName || stage.Stage || 'Unknown';
+                    // Convert duration from microseconds to seconds
+                    const durationSeconds = stageDuration / 1000000;
+                    const percentage = ((stageDuration / (profile.totalDuration || 1)) * 100).toFixed(1);
+                    stream.markdown(`- **${stageName}**: ${durationSeconds.toFixed(4)}s (${percentage}%)\n`);
                 }
 
                 if (sortedStages.length > 10) {
