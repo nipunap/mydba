@@ -254,7 +254,7 @@ export class VariablesPanel {
             }
 
             // Create a prompt for the AI to describe the variable
-            const prompt = `You are a senior database administrator expert. Provide a clear, concise description for the MySQL/MariaDB system variable '${name}' which currently has the value '${currentValue}'.
+            const prompt = `You are a senior database administrator expert. Provide a clear, concise description for the ${dbType === 'mariadb' ? 'MariaDB' : 'MySQL'} system variable '${name}' which currently has the value '${currentValue}'.
 
 Include:
 1. What this variable controls
@@ -264,15 +264,8 @@ Include:
 
 Be concise (2-3 sentences) and practical. Focus on actionable information for a DBA.`;
 
-            // Get AI response
-            const response = await aiCoordinator.analyzeQuery(
-                prompt,
-                { tables: {} },
-                dbType
-            );
-
-            // Extract description from summary
-            const description = response.summary || 'AI was unable to generate a description.';
+            // Get AI response using simple completion (not query analysis)
+            const description = await aiCoordinator.getSimpleCompletion(prompt, dbType);
 
             // Determine risk level based on variable name patterns
             let risk: 'safe' | 'caution' | 'dangerous' = 'safe';
@@ -283,12 +276,17 @@ Be concise (2-3 sentences) and practical. Focus on actionable information for a 
                 risk = 'caution';
             }
 
+            // Extract recommendation from description or provide default
+            const recommendation = description.includes('recommend') || description.includes('suggest')
+                ? description
+                : 'Review documentation and test changes in a non-production environment before applying';
+
             // Send the AI-generated description
             this.panel.webview.postMessage({
                 type: 'aiDescriptionReceived',
                 name,
                 description,
-                recommendation: response.optimizationSuggestions?.[0]?.description || 'Review documentation before changing',
+                recommendation,
                 risk
             });
 

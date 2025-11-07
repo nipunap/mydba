@@ -532,6 +532,42 @@ export class AIServiceCoordinator {
             };
         }
     }
+
+    /**
+     * Get a simple AI response for a prompt without query analysis
+     * Useful for variable descriptions, general questions, etc.
+     */
+    async getSimpleCompletion(
+        prompt: string,
+        dbType: 'mysql' | 'mariadb' = 'mysql'
+    ): Promise<string> {
+        this.logger.info('Getting simple AI completion');
+
+        try {
+            // Create a minimal context for the AI
+            const context = {
+                tables: {},
+                dbType
+            };
+
+            // Call the AI service directly
+            const result = await this.aiService.analyzeQuery(
+                `-- This is a general inquiry, not a SQL query to analyze
+-- Respond directly to the question below without treating it as SQL
+
+${prompt}`,
+                context,
+                dbType
+            );
+
+            // Return just the summary
+            return result.summary || 'No response generated';
+
+        } catch (error) {
+            this.logger.error('Failed to get AI completion:', error as Error);
+            throw error;
+        }
+    }
 }
 
 // Type definitions
