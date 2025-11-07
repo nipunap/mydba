@@ -9,6 +9,10 @@ import { MyDBAChatParticipant } from './chat/chat-participant';
 
 let serviceContainer: ServiceContainer;
 
+// Track activation retry attempts to prevent infinite recursion
+let activationRetryCount = 0;
+const MAX_ACTIVATION_RETRIES = 3;
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const startTime = Date.now();
 
@@ -140,6 +144,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // Show welcome message for first-time users
         await showWelcomeMessage(context, logger);
 
+        // Reset retry counter on successful activation
+        activationRetryCount = 0;
+
     } catch (error) {
         logger.error('Failed to activate MyDBA:', error as Error);
 
@@ -216,40 +223,93 @@ async function handleActivationError(
 }
 
 /**
- * Retry activation after a short delay
+ * Retry activation after a short delay with exponential backoff
+ * Prevents infinite recursion by limiting retry attempts
  */
 async function retryActivation(context: vscode.ExtensionContext, logger: Logger): Promise<void> {
-    logger.info('Retrying activation...');
+    // Check if we've exceeded max retries
+    if (activationRetryCount >= MAX_ACTIVATION_RETRIES) {
+        logger.error(`Maximum activation retry attempts (${MAX_ACTIVATION_RETRIES}) reached`);
+        vscode.window.showErrorMessage(
+            `MyDBA: Failed to activate after ${MAX_ACTIVATION_RETRIES} attempts. Please check logs and try reloading the window.`,
+            'View Logs',
+            'Reload Window',
+            'Continue (Limited Mode)'
+        ).then(async selection => {
+            if (selection === 'View Logs') {
+                await viewLogs(logger);
+            } else if (selection === 'Reload Window') {
+                // Reset counter before reload
+                activationRetryCount = 0;
+                await vscode.commands.executeCommand('workbench.action.reloadWindow');
+            } else if (selection === 'Continue (Limited Mode)') {
+                await continueInLimitedMode(context, logger);
+            }
+        });
+        return;
+    }
+
+    // Increment retry counter
+    activationRetryCount++;
+    const retryDelay = Math.min(1000 * Math.pow(2, activationRetryCount - 1), 5000); // Exponential backoff, max 5s
+
+    logger.info(`Retrying activation (attempt ${activationRetryCount}/${MAX_ACTIVATION_RETRIES}) with ${retryDelay}ms delay...`);
 
     await vscode.window.withProgress(
         {
             location: vscode.ProgressLocation.Notification,
-            title: 'MyDBA: Retrying activation...',
+            title: `MyDBA: Retrying activation (${activationRetryCount}/${MAX_ACTIVATION_RETRIES})...`,
             cancellable: false
         },
         async () => {
-            // Wait a moment before retry
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
 
             try {
                 // Dispose existing container if it exists
                 if (serviceContainer) {
+                    logger.debug('Disposing existing service container before retry');
                     await serviceContainer.dispose();
                 }
 
-                // Re-run activation
+                // Re-run activation (which will reset counter on success)
                 await activate(context);
-                vscode.window.showInformationMessage('MyDBA: Activation successful!');
+                vscode.window.showInformationMessage('✅ MyDBA: Activation successful!');
             } catch (retryError) {
-                logger.error('Retry activation failed:', retryError as Error);
-                vscode.window.showErrorMessage(
-                    `MyDBA: Retry failed. ${(retryError as Error).message}`,
-                    'View Logs'
-                ).then(selection => {
-                    if (selection === 'View Logs') {
-                        viewLogs(logger);
-                    }
-                });
+                logger.error(`Retry activation failed (attempt ${activationRetryCount}/${MAX_ACTIVATION_RETRIES}):`, retryError as Error);
+
+                // If we haven't hit max retries, show error with option to retry again
+                if (activationRetryCount < MAX_ACTIVATION_RETRIES) {
+                    const remainingAttempts = MAX_ACTIVATION_RETRIES - activationRetryCount;
+                    vscode.window.showErrorMessage(
+                        `MyDBA: Retry failed. ${remainingAttempts} attempt(s) remaining. ${(retryError as Error).message}`,
+                        'Retry Again',
+                        'View Logs',
+                        'Give Up'
+                    ).then(async selection => {
+                        if (selection === 'Retry Again') {
+                            await retryActivation(context, logger);
+                        } else if (selection === 'View Logs') {
+                            await viewLogs(logger);
+                        } else if (selection === 'Give Up') {
+                            await continueInLimitedMode(context, logger);
+                        }
+                    });
+                } else {
+                    // Max retries reached, handled by the check at the top on next call
+                    vscode.window.showErrorMessage(
+                        `MyDBA: All retry attempts exhausted. ${(retryError as Error).message}`,
+                        'View Logs',
+                        'Reload Window'
+                    ).then(async selection => {
+                        if (selection === 'View Logs') {
+                            await viewLogs(logger);
+                        } else if (selection === 'Reload Window') {
+                            activationRetryCount = 0; // Reset before reload
+                            await vscode.commands.executeCommand('workbench.action.reloadWindow');
+                        }
+                    });
+                }
             }
         }
     );
@@ -291,6 +351,9 @@ async function resetSettings(context: vscode.ExtensionContext, logger: Logger): 
 
         // Note: We cannot clear secrets programmatically for security reasons
         // User will need to reconnect to clear stored credentials
+
+        // Reset activation retry counter
+        activationRetryCount = 0;
 
         vscode.window.showInformationMessage(
             'MyDBA settings reset. Reloading window...',
