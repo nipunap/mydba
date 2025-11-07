@@ -178,6 +178,8 @@ MyDBA brings AI-powered database intelligence directly into VSCode, providing:
   ├── System Views
   │   ├── Process List
   │   ├── Queries Without Indexes
+  │   ├── InnoDB Status (Phase 2)
+  │   ├── Replication Status (Phase 2)
   │   ├── Session Variables
   │   ├── Global Variables
   │   └── Status Variables
@@ -884,19 +886,80 @@ CI Quality Gates
 - [ ] Integration with external notification systems
  - [ ] Acceptance criteria: prevent duplicate alerts within a debounce window; user can mute/unmute per rule
 
-#### 4.2.7 Replication Lag Monitor (Inspired by Percona `pt-heartbeat`) [Low]
+#### 4.2.7 Replication Status Monitor (Inspired by Percona `pt-heartbeat`) [Medium]
+
+**Feature**: Comprehensive Replication Monitoring with AI-Powered Diagnostics
 
 **Requirements**:
-- [ ] Query `SHOW REPLICA STATUS` (MySQL 8.0) or `SHOW SLAVE STATUS` (MariaDB)
-- [ ] Display `Seconds_Behind_Master` for each replica in dashboard
-- [ ] Visual indicators: Green (< 5s), Yellow (5-30s), Red (> 30s)
-- [ ] Alert when lag exceeds configurable threshold (default: 60s)
-- [ ] Historical lag chart (last 1 hour)
-- [ ] AI diagnosis: "Replica lag spike at 14:23. Check network, disk I/O, or `binlog_format`."
+- [ ] Query `SHOW REPLICA STATUS` (MySQL 8.0.22+) or `SHOW SLAVE STATUS` (MariaDB/MySQL 5.7)
+- [ ] **Replication Status Dashboard**:
+  - [ ] Display all key replication metrics:
+    - `Seconds_Behind_Master` / `Seconds_Behind_Source` (lag indicator)
+    - `Slave_IO_Running` / `Replica_IO_Running` (I/O thread status)
+    - `Slave_SQL_Running` / `Replica_SQL_Running` (SQL thread status)
+    - `Master_Log_File` / `Source_Log_File` and `Read_Master_Log_Pos` (binlog position)
+    - `Relay_Log_File` and `Relay_Log_Pos` (relay log position)
+    - `Last_IO_Error`, `Last_SQL_Error` (error messages)
+    - `Master_Server_Id` / `Source_Server_Id` (source server identification)
+    - `Master_UUID` / `Source_UUID` (source server UUID)
+    - `Auto_Position` (GTID auto-positioning status)
+    - `Retrieved_Gtid_Set`, `Executed_Gtid_Set` (GTID progress)
+  - [ ] Multi-replica support: Show all configured replicas in list/card view
+  - [ ] Visual status indicators:
+    - 🟢 Green: Healthy (lag < 5s, both threads running, no errors)
+    - 🟡 Yellow: Warning (lag 5-30s, or minor issues)
+    - 🔴 Red: Critical (lag > 30s, threads stopped, or errors present)
+    - ⚪ Gray: Unknown/Not configured
+- [ ] **Replication Lag Monitoring**:
+  - [ ] Real-time lag display with auto-refresh (configurable interval: 5s default)
+  - [ ] Historical lag chart (last 1 hour, 6 hours, 24 hours)
+  - [ ] Alert when lag exceeds configurable threshold (default: 60s)
+  - [ ] Lag trend indicator (increasing/decreasing/stable)
+- [ ] **Replication Health Checks**:
+  - [ ] Automated health status checks:
+    - Verify both I/O and SQL threads are running
+    - Check for replication errors
+    - Validate GTID consistency (if GTID enabled)
+    - Monitor binlog position progression
+    - Detect stalled replication (no position change)
+  - [ ] One-click "Test Replication Health" button
+- [ ] **AI-Powered Replication Diagnostics**:
+  - [ ] Automatic issue detection and analysis:
+    - "Replica lag spike detected at 14:23. Root cause: Network latency increased by 300ms. Check connection between source and replica."
+    - "SQL thread stopped with error 1062 (Duplicate entry). Likely cause: Write to replica or inconsistent data. Recommended: Check `sql_slave_skip_counter` or use GTID recovery."
+    - "I/O thread stopped. Error: 'Could not connect to source'. Recommended: Verify network connectivity, source server status, and replication user credentials."
+    - "GTID gap detected: Missing transactions in `Executed_Gtid_Set`. Recommended: Use `CHANGE MASTER TO MASTER_AUTO_POSITION=0` and manual recovery."
+    - "Replication lag increasing steadily. Possible causes: Slow queries on replica, insufficient resources, or single-threaded replication. Consider enabling parallel replication."
+  - [ ] AI explanations for replication concepts:
+    - What is `Seconds_Behind_Master` and its limitations
+    - GTID vs. traditional binlog replication
+    - Parallel replication configuration
+    - Common replication errors and recovery procedures
+  - [ ] RAG-grounded recommendations with MySQL/MariaDB documentation links
+- [ ] **Replication Control Actions** (with safety confirmations):
+  - [ ] Start/Stop I/O Thread: `START|STOP SLAVE IO_THREAD`
+  - [ ] Start/Stop SQL Thread: `START|STOP SLAVE SQL_THREAD`
+  - [ ] Reset Replica: `RESET SLAVE` (with warning)
+  - [ ] Skip Replication Error: `SET GLOBAL sql_slave_skip_counter = N` (with confirmation and explanation)
+  - [ ] Change Master Position: `CHANGE MASTER TO ...` (advanced users, with validation)
+  - [ ] All actions require confirmation in production environments
+- [ ] **Export and Reporting**:
+  - [ ] Export replication status to JSON/CSV
+  - [ ] Historical lag report with charts
+  - [ ] Replication health summary report
+
+**Version Compatibility**:
+- MySQL 8.0.22+: Use `SHOW REPLICA STATUS` (new terminology)
+- MySQL 5.7 / MariaDB: Use `SHOW SLAVE STATUS` (legacy terminology)
+- Auto-detect server version and use appropriate commands
+- GTID support: MySQL 5.6+ / MariaDB 10.0.2+
 
 **User Stories**:
-- As a DBA managing replicas, I want real-time lag visibility
-- As a DevOps engineer, I want alerts when replicas fall behind
+- As a DBA managing replicas, I want real-time lag visibility with historical trends
+- As a DevOps engineer, I want alerts when replicas fall behind or encounter errors
+- As a database administrator, I want AI to explain why replication stopped and how to fix it
+- As a developer, I want to understand replication lag without reading complex documentation
+- As a DBA, I want quick actions to start/stop replication threads without opening a terminal
 
 #### 4.2.8 Configuration Diff Tool (Inspired by Percona `pt-config-diff`) [Low]
 
@@ -923,6 +986,190 @@ CI Quality Gates
 **User Stories**:
 - As a developer, I want guidance on safe schema changes
 - As a DBA, I want to prevent accidental table locks in production
+
+#### 4.2.10 InnoDB Status Monitor (Inspired by Percona `pt-mext`) [High]
+
+**Feature**: Comprehensive InnoDB Engine Status Viewer with AI-Powered Diagnostics
+
+**Objective**: Provide deep visibility into InnoDB internals, including transactions, locks, buffer pool, I/O operations, and semaphores, with intelligent AI analysis to diagnose complex InnoDB-related issues.
+
+**Requirements**:
+- [ ] **InnoDB Status Dashboard**:
+  - [ ] Query `SHOW ENGINE INNODB STATUS` and parse output into structured sections
+  - [ ] Display key InnoDB metrics in organized panels:
+    - **Transactions Section**:
+      - Active transactions count
+      - Transaction history list length (indicator of load)
+      - Oldest active transaction age
+      - Purge lag (unpurged undo records)
+      - Transaction states: `ACTIVE`, `PREPARED`, `COMMITTED`, `ROLLED BACK`
+      - Lock wait information (waiting transactions)
+    - **Deadlocks Section**:
+      - Latest deadlock information (full text)
+      - Deadlock timestamp
+      - Involved transactions and queries
+      - Deadlock graph/visualization
+      - Historical deadlock count (if available)
+    - **Buffer Pool and Memory**:
+      - Buffer pool size and usage
+      - Free pages and database pages
+      - Modified (dirty) pages
+      - Buffer pool hit rate (pages read vs. pages read from disk)
+      - Pending reads/writes
+      - LRU list length
+      - Flush list length
+    - **I/O Operations**:
+      - Pending I/O operations (reads, writes, fsyncs)
+      - I/O thread states
+      - Read/Write requests per second
+      - Average I/O wait time
+      - Log I/O (log writes, fsyncs)
+    - **Insert Buffer (Change Buffer)**:
+      - Insert buffer size and usage
+      - Merged records
+      - Merge operations
+    - **Adaptive Hash Index**:
+      - Hash index size
+      - Hash searches/s and hits/s
+      - Hit rate percentage
+    - **Log (Redo Log)**:
+      - Log sequence number (LSN)
+      - Last checkpoint LSN
+      - Checkpoint age (LSN diff)
+      - Log buffer usage
+      - Log writes and fsyncs per second
+      - Pending log writes
+    - **Row Operations**:
+      - Rows inserted, updated, deleted, read per second
+      - Queries inside InnoDB
+      - Queries queued
+    - **Semaphores and Waits**:
+      - Mutex/RW-lock waits
+      - Spin rounds and OS waits
+      - Long semaphore waits (potential bottlenecks)
+  - [ ] Auto-refresh capability (configurable interval: 10s default)
+  - [ ] Visual indicators for problematic metrics (color-coded warnings)
+- [ ] **Transaction History List Viewer**:
+  - [ ] Parse and display transaction history list details
+  - [ ] Show active transactions with:
+    - Transaction ID
+    - Transaction state
+    - Time since started
+    - Query being executed
+    - Locks held
+    - Tables being accessed
+  - [ ] Highlight long-running transactions (> 30s configurable)
+  - [ ] Filter transactions by state, duration, database
+  - [ ] Link to Process List for full query context
+- [ ] **Deadlock Analyzer**:
+  - [ ] Parse latest deadlock information from InnoDB status
+  - [ ] Visual deadlock graph showing:
+    - Transactions involved (T1, T2, etc.)
+    - Resources (rows/tables) being locked
+    - Wait-for relationships (arrows showing who waits for whom)
+  - [ ] Timeline view of deadlock sequence
+  - [ ] Show queries that caused deadlock
+  - [ ] Historical deadlock log (store last 10 deadlocks per session)
+  - [ ] One-click export deadlock details for analysis
+- [ ] **InnoDB Health Checks**:
+  - [ ] Automated health assessments:
+    - High transaction history length (> 100K = warning, > 1M = critical)
+    - Large checkpoint age (> 70% of log file size = warning)
+    - Low buffer pool hit rate (< 95% = warning)
+    - High pending I/O operations (> 100 reads/writes = warning)
+    - Long semaphore waits (> 240s = critical)
+    - Excessive purge lag (> 1M undo records = warning)
+    - Dirty pages ratio (> 75% = warning, indicates slow flushing)
+  - [ ] Overall InnoDB health score (0-100)
+  - [ ] Real-time alerts for critical issues
+- [ ] **AI-Powered InnoDB Diagnostics**:
+  - [ ] Intelligent analysis of InnoDB issues:
+    - **Transaction History Buildup**: "Transaction history list length is 1.2M (critical). This indicates slow purge operations. Possible causes: Long-running transactions preventing purge, high write load, or undersized buffer pool. Recommendation: Identify and commit/rollback long transactions, consider increasing `innodb_purge_threads` to 4+, check `innodb_max_purge_lag`."
+    - **Buffer Pool Issues**: "Buffer pool hit rate is 87% (below optimal 99%). This means frequent disk I/O. Recommendation: Increase `innodb_buffer_pool_size` to 70-80% of available RAM (currently 2GB, suggest 8GB). Monitor `Innodb_buffer_pool_reads` vs `Innodb_buffer_pool_read_requests`."
+    - **Checkpoint Age Warning**: "Checkpoint age is 85% of log file size. InnoDB is struggling to flush dirty pages. Risk: Write stalls if age reaches 100%. Recommendation: Increase `innodb_log_file_size` from 512MB to 2GB (requires restart), or tune `innodb_io_capacity` to 2000+ for faster flushing on SSDs."
+    - **Deadlock Patterns**: "Detected 15 deadlocks in last hour. Pattern: Transactions on `orders` and `order_items` tables. Root cause: Inconsistent lock order (some transactions lock orders first, others lock order_items first). Recommendation: Standardize lock acquisition order in application code. Always lock parent (`orders`) before child (`order_items`) tables."
+    - **Semaphore Wait Issues**: "Long semaphore wait detected (600s). Thread 12345 waiting on mutex at buf0buf.cc:1234. This indicates severe contention. Possible causes: Buffer pool contention, adaptive hash index contention, or disk I/O bottleneck. Recommendation: Check disk I/O performance, consider disabling adaptive hash index (`innodb_adaptive_hash_index=OFF`), or increase `innodb_buffer_pool_instances`."
+    - **Slow Purge Operations**: "Purge lag is 2.5M undo records. Purge threads can't keep up with write rate. Recommendation: Increase `innodb_purge_threads` from 4 to 8, ensure no extremely long-running transactions (check PROCESSLIST), verify `innodb_undo_tablespaces` configuration."
+    - **Log I/O Bottleneck**: "Log writes are slow (avg 50ms/fsync). This can cause query stalls. Recommendation: Enable `innodb_flush_log_at_trx_commit=2` (slightly relaxed durability, major performance gain), or move redo logs to faster storage (dedicated SSD/NVMe). Check `innodb_log_write_ahead_size` tuning."
+  - [ ] AI explanations for InnoDB concepts:
+    - What is transaction history list and why it matters
+    - Understanding checkpoint age and log file sizing
+    - Buffer pool architecture and tuning strategies
+    - Deadlock causes and prevention techniques
+    - InnoDB locking mechanisms (row locks, gap locks, next-key locks)
+    - Purge operations and undo log management
+    - Adaptive hash index trade-offs
+  - [ ] RAG-grounded recommendations with official MySQL/MariaDB InnoDB documentation
+  - [ ] Contextual help: Click on any metric → Get AI explanation of what it means
+- [ ] **InnoDB Metrics Comparison**:
+  - [ ] Snapshot current InnoDB status
+  - [ ] Compare two snapshots (e.g., before/after query, or different time points)
+  - [ ] Highlight deltas: Changes in transactions, buffer pool, I/O rates
+  - [ ] AI diff analysis: "Buffer pool dirty pages increased from 10% to 65% in 5 minutes. Indicates burst of write activity."
+- [ ] **Historical Trending**:
+  - [ ] Store key InnoDB metrics over time (optional, in-memory or file-based)
+  - [ ] Charts for:
+    - Transaction history length over time
+    - Buffer pool hit rate trend
+    - Checkpoint age progression
+    - Deadlock frequency
+    - Purge lag trend
+  - [ ] Time ranges: Last 1 hour, 6 hours, 24 hours
+- [ ] **Export and Reporting**:
+  - [ ] Export raw `SHOW ENGINE INNODB STATUS` output to text file
+  - [ ] Export parsed metrics to JSON/CSV
+  - [ ] Generate InnoDB health report (PDF/HTML) with AI insights
+  - [ ] Copy individual sections to clipboard (e.g., deadlock info)
+- [ ] **Integration with Other Views**:
+  - [ ] Link transaction IDs to Process List (show query for transaction)
+  - [ ] Link locked tables to Schema Explorer
+  - [ ] Correlate deadlocks with Query History
+  - [ ] Cross-reference buffer pool metrics with slow queries (table scans)
+
+**Version Compatibility**:
+- MySQL 5.5+ / MariaDB 5.5+: Basic `SHOW ENGINE INNODB STATUS` support
+- MySQL 5.6+ / MariaDB 10.0+: Enhanced with Performance Schema integration
+- MySQL 8.0+ / MariaDB 10.5+: Full support with latest InnoDB features
+- Auto-parse output format differences across versions
+
+**Implementation Details**:
+- [ ] **Parsing Engine**:
+  - Robust regex-based parser for `SHOW ENGINE INNODB STATUS` output
+  - Handle variations across MySQL/MariaDB versions
+  - Graceful degradation if certain sections missing
+- [ ] **Visualization**:
+  - D3.js or similar for deadlock graphs
+  - Chart.js for time-series metrics
+  - Responsive layout for different screen sizes
+- [ ] **Performance**:
+  - Parse InnoDB status in < 100ms for typical output (< 50KB)
+  - Render dashboard in < 500ms
+  - Background auto-refresh without blocking UI
+- [ ] **Safety**:
+  - Read-only view (no modification actions in Phase 2)
+  - No performance impact: `SHOW ENGINE INNODB STATUS` is lightweight (< 5ms)
+
+**Acceptance Criteria**:
+- [ ] Dashboard displays all 9 key InnoDB sections with parsed metrics
+- [ ] Transaction history list viewer shows all active transactions with details
+- [ ] Deadlock analyzer renders visual graph for latest deadlock
+- [ ] AI generates at least one actionable recommendation per detected issue
+- [ ] Health checks correctly flag critical thresholds (transaction history > 1M, checkpoint age > 70%)
+- [ ] Metrics comparison shows deltas between two snapshots with ±% changes
+- [ ] Export to JSON includes all parsed metrics in structured format
+- [ ] Auto-refresh updates dashboard without UI flicker
+- [ ] Links to Process List correctly match transaction IDs to queries
+- [ ] Performance: Initial load < 500ms, auto-refresh < 300ms, parsing < 100ms
+
+**User Stories**:
+- As a DBA, I want to monitor InnoDB transaction history length to prevent purge lag issues
+- As a database administrator, I want to understand why my buffer pool hit rate is low and how to improve it
+- As a developer, I want to analyze deadlocks with a visual graph instead of parsing text output
+- As a DBA on-call, I want AI to explain why checkpoint age is critical and what to do immediately
+- As a performance engineer, I want to compare InnoDB metrics before and after a configuration change
+- As a DBA, I want to see if long-running transactions are blocking purge operations
+- As a database administrator, I want alerts when transaction history exceeds safe thresholds
+- As a developer debugging production issues, I want to understand InnoDB locking behavior with AI explanations
 
 ---
 
@@ -2933,12 +3180,27 @@ Major features completed in the last development cycle (Nov 7, 2025):
   - Requires external metrics (Prometheus)
   - Estimated: 15-20 hours
 
+- [ ] **InnoDB Status Monitor** [HIGH PRIORITY]
+  - Comprehensive `SHOW ENGINE INNODB STATUS` viewer
+  - Transaction history list viewer with AI diagnostics
+  - Deadlock analyzer with visual graphs
+  - Buffer pool, I/O operations, and semaphore monitoring
+  - Health checks and trending
+  - Estimated: 25-30 hours
+
+- [ ] **Replication Status Monitor** [HIGH PRIORITY]
+  - Comprehensive `SHOW REPLICA STATUS` dashboard
+  - AI-powered replication diagnostics
+  - GTID tracking and health checks
+  - Multi-replica support with control actions
+  - Historical lag charts
+  - Estimated: 20-25 hours
+
 - [ ] **Percona Toolkit Features**
   - Duplicate/Unused Index Detector
   - Variable Advisor
-  - Replication Lag Monitor
   - Config Diff Tool
-  - Estimated: 20-25 hours
+  - Estimated: 15-20 hours
 
 - [ ] **@mydba Chat Participant**
   - VSCode Chat API integration
@@ -3157,6 +3419,7 @@ Phase 3 (Expansion) - Target: Week 36
 | 1.10 | 2025-10-25 | AI Assistant | Version Support Policy: Restricted support to MySQL 8.0+ and MariaDB 10.6+ (GA versions only). Added Section 5.0 "Supported Database Versions" with version detection, EOL warnings for MySQL 5.7/5.6 and MariaDB 10.4/10.5, and feature compatibility checks. Removed legacy `SHOW PROFILE` fallback for MySQL 5.7. Updated tech stack to specify `mysql2` driver for MySQL 8.0+ and MariaDB 10.6+. |
 | 1.11 | 2025-10-26 | AI Assistant | **Major Implementation Update**: Added comprehensive Section 7 "Implementation Status & Progress" documenting 75% completion of Phase 1 MVP. Completed: Foundation (100%), Core UI (95%), Monitoring (60% with Chart.js dashboard). Documented all resolved technical debt (11 issues fixed), performance metrics (all targets exceeded), and security audit status. Updated roadmap showing Week 6/12 position with 6 weeks remaining to MVP. Added detailed feature completion lists, testing status, and next immediate actions. |
 | 1.12 | 2025-11-07 | AI Assistant | **Phase 1 MVP Complete**: Updated PRD to reflect 100% completion of Phase 1. Added 11 new completed features: Process List lock status badges (🔒 Blocked, ⛔ Blocking, 🔐 Active), Query History Panel, Enhanced AI Citations ([Citation X] format), Docker test environment, macOS testing support, Query Deanonymizer, and code quality improvements. Updated Section 7.3 "Recently Completed" with detailed feature descriptions. Updated Section 4.1.3 (Process List) and 4.2.3 (Query Execution) with completion status. Updated Section 7.3.1 (RAG) to reflect citation format implementation. Updated Milestone 4 AI Integration status to 100% complete. |
+| 1.13 | 2025-11-07 | Product Owner + AI Assistant | **Phase 2 Feature Additions**: Added two new high-priority Phase 2 features: (1) **InnoDB Status Monitor** (Section 4.2.10) - Comprehensive `SHOW ENGINE INNODB STATUS` viewer with AI-powered diagnostics for transactions, history list, deadlocks, buffer pool, I/O operations, and semaphores. Includes transaction history viewer, deadlock analyzer with visual graphs, health checks, and trending. (2) **Enhanced Replication Status Monitor** (Section 4.2.7) - Expanded from basic lag monitoring to comprehensive `SHOW REPLICA STATUS` dashboard with AI diagnostics for replication issues, GTID tracking, thread control actions, and multi-replica support. Updated Database Explorer tree structure (Section 4.1.2) to include both new system views. |
 
 ---
 

@@ -3,6 +3,14 @@ import { Logger } from '../../../utils/logger';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
+ * Temperature constants for different types of AI requests
+ */
+const TEMPERATURE = {
+    QUERY_ANALYSIS: 0.3,      // Lower temperature for structured analysis
+    TEXT_COMPLETION: 0.7       // Higher temperature for natural language
+} as const;
+
+/**
  * Anthropic Claude Provider
  *
  * Uses Anthropic's Claude API for query analysis
@@ -57,7 +65,7 @@ export class AnthropicProvider implements AIProvider {
             const response = await this.client.messages.create({
                 model: this.model,
                 max_tokens: 4096,
-                temperature: 0.3,
+                temperature: TEMPERATURE.QUERY_ANALYSIS,
                 system: 'You are a MySQL/MariaDB database optimization expert. Analyze queries and provide structured optimization advice in JSON format.',
                 messages: [{
                     role: 'user',
@@ -235,5 +243,41 @@ Only return the JSON object, no additional text.`;
             }],
             citations: []
         };
+    }
+
+    /**
+     * Get a simple text completion from Anthropic Claude
+     *
+     * Uses a higher temperature for natural language generation suitable for
+     * explanations, descriptions, and conversational responses.
+     *
+     * @param prompt The prompt to send to Claude
+     * @returns The generated text response
+     * @throws Error if the API call fails
+     */
+    async getCompletion(prompt: string): Promise<string> {
+        try {
+            this.logger.debug(`Getting Anthropic completion (${this.model})`);
+
+            const response = await this.client.messages.create({
+                model: this.model,
+                max_tokens: 4096,
+                temperature: TEMPERATURE.TEXT_COMPLETION,
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }]
+            });
+
+            const content = response.content[0];
+            if (content.type !== 'text') {
+                throw new Error('Unexpected response type from Anthropic');
+            }
+
+            return content.text.trim();
+        } catch (error) {
+            this.logger.error('Anthropic completion failed:', error as Error);
+            throw new Error(`Anthropic completion failed: ${(error as Error).message}`);
+        }
     }
 }

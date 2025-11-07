@@ -564,9 +564,12 @@
         root.x0 = height / 2;
         root.y0 = 0;
 
-        // Initialize node ID counter for D3 data binding
-        // This ensures each node gets a unique ID via ++window.d3NodeId
-        window.d3NodeId = 0;
+        // Initialize node ID counter for D3 data binding (instance-based to avoid global state issues)
+        // This ensures each node gets a unique ID for proper data binding
+        let nodeIdCounter = 0;
+        root.descendants().forEach(d => {
+            d.id = ++nodeIdCounter;
+        });
 
         // Initialize all nodes as expanded (d.children set, d._children null)
         // d3.hierarchy already sets children properly, so no additional initialization needed
@@ -603,7 +606,7 @@
 
             // Update the nodes
             const node = g.selectAll('g.node')
-                .data(nodes, d => d.id || (d.id = ++window.d3NodeId || 0));
+                .data(nodes, d => d.id);
 
             // Enter any new nodes at the parent's previous position
             const nodeEnter = node.enter().append('g')

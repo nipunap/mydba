@@ -73,6 +73,14 @@ export class QueriesWithoutIndexesService {
                     AND schema_name NOT IN ('performance_schema', 'information_schema', 'mysql', 'sys')
                     AND digest_text NOT LIKE 'SHOW%'
                     AND digest_text NOT LIKE 'SELECT @@%'
+                    AND digest_text NOT LIKE '%performance_schema.%'
+                    AND digest_text NOT LIKE '%information_schema.%'
+                    AND digest_text NOT LIKE '%mysql.%'
+                    AND digest_text NOT LIKE '%\`performance_schema\`.%'
+                    AND digest_text NOT LIKE '%\`information_schema\`.%'
+                    AND digest_text NOT LIKE '%\`mysql\`.%'
+                    AND digest_text NOT LIKE '%sys.%'
+                    AND digest_text NOT LIKE '%\`sys\`.%'
                     AND (
                         sum_no_index_used > 0
                         OR sum_no_good_index_used > 0

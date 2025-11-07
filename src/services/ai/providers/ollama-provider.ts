@@ -3,6 +3,14 @@ import { Logger } from '../../../utils/logger';
 import { Ollama } from 'ollama';
 
 /**
+ * Temperature constants for different types of AI requests
+ */
+const TEMPERATURE = {
+    QUERY_ANALYSIS: 0.3,      // Lower temperature for structured analysis
+    TEXT_COMPLETION: 0.7       // Higher temperature for natural language
+} as const;
+
+/**
  * Ollama Provider
  *
  * Uses local Ollama models for query analysis
@@ -71,7 +79,7 @@ export class OllamaProvider implements AIProvider {
                 ],
                 stream: false,
                 options: {
-                    temperature: 0.3,
+                    temperature: TEMPERATURE.QUERY_ANALYSIS,
                     top_p: 0.9
                 }
             });
@@ -218,6 +226,49 @@ Return ONLY the JSON, no explanatory text.`;
             }],
             citations: []
         };
+    }
+
+    /**
+     * Get a simple text completion from Ollama
+     *
+     * Uses a higher temperature for natural language generation suitable for
+     * explanations, descriptions, and conversational responses. All processing
+     * happens locally for maximum privacy.
+     *
+     * @param prompt The prompt to send to the local Ollama model
+     * @returns The generated text response
+     * @throws Error if Ollama is not running or the API call fails
+     */
+    async getCompletion(prompt: string): Promise<string> {
+        try {
+            this.logger.debug(`Getting Ollama completion (${this.model})`);
+
+            const response = await this.client.chat({
+                model: this.model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                stream: false,
+                options: {
+                    temperature: TEMPERATURE.TEXT_COMPLETION,
+                    top_p: 0.9
+                }
+            });
+
+            return response.message.content.trim();
+        } catch (error) {
+            this.logger.error('Ollama completion failed:', error as Error);
+
+            // Provide helpful error message
+            if ((error as Error).message.includes('ECONNREFUSED')) {
+                throw new Error('Ollama is not running. Please start Ollama with: ollama serve');
+            }
+
+            throw new Error(`Ollama completion failed: ${(error as Error).message}`);
+        }
     }
 
     /**

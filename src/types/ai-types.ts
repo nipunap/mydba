@@ -121,4 +121,5 @@ export interface AIProvider {
     readonly name: string;
     isAvailable(): Promise<boolean>;
     analyzeQuery(query: string, context: QueryContext): Promise<AIAnalysisResult>;
+    getCompletion(prompt: string): Promise<string>;
 }

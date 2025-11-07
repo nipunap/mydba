@@ -536,33 +536,59 @@ export class AIServiceCoordinator {
     /**
      * Get a simple AI response for a prompt without query analysis
      * Useful for variable descriptions, general questions, etc.
+     *
+     * @param prompt The prompt to send to the AI
+     * @param dbType The database type (mysql or mariadb)
+     * @param includeRAG Whether to include RAG documentation context (default: false)
+     * @param ragQuery Optional custom query for RAG (defaults to using the prompt)
      */
     async getSimpleCompletion(
         prompt: string,
-        dbType: 'mysql' | 'mariadb' = 'mysql'
+        dbType: 'mysql' | 'mariadb' = 'mysql',
+        includeRAG: boolean = false,
+        ragQuery?: string
     ): Promise<string> {
         this.logger.info('Getting simple AI completion');
 
         try {
-            // Create a minimal context for the AI
-            const context = {
-                tables: {},
-                dbType
-            };
+            let enhancedPrompt = prompt;
 
-            // Call the AI service directly
-            const result = await this.aiService.analyzeQuery(
-                `-- This is a general inquiry, not a SQL query to analyze
--- Respond directly to the question below without treating it as SQL
+            // Optionally include RAG documentation context
+            if (includeRAG) {
+                const { RAGService } = await import('./rag-service');
+                const ragService = new RAGService(this.logger);
+                await ragService.initialize(this.context.extensionPath);
 
-${prompt}`,
-                context,
-                dbType
-            );
+                // Use custom RAG query or extract key terms from the prompt
+                const queryForRAG = ragQuery || prompt;
+                const ragDocs = ragService.retrieveRelevantDocs(queryForRAG, dbType, 3);
 
-            // Return just the summary
-            return result.summary || 'No response generated';
+                if (ragDocs.length > 0) {
+                    this.logger.debug(`RAG retrieved ${ragDocs.length} relevant documents`);
 
+                    // Add RAG context to the prompt
+                    enhancedPrompt = `${prompt}
+
+**Reference Documentation:**
+`;
+                    for (let i = 0; i < ragDocs.length; i++) {
+                        const doc = ragDocs[i];
+                        enhancedPrompt += `
+[${i + 1}] ${doc.title}:
+${doc.content}
+
+`;
+                    }
+
+                    enhancedPrompt += `
+Use the reference documentation above to inform your response when relevant.`;
+                } else {
+                    this.logger.debug('No RAG documents found for query');
+                }
+            }
+
+            // Use the new getCompletion method which is designed for general text completion
+            return await this.aiService.getCompletion(enhancedPrompt);
         } catch (error) {
             this.logger.error('Failed to get AI completion:', error as Error);
             throw error;

@@ -316,4 +316,61 @@ export class AIService {
     } {
         return this.ragService.getStats();
     }
+
+    /**
+     * Get a simple text completion from the AI provider
+     *
+     * This method is designed for general-purpose text generation tasks that don't
+     * require structured query analysis. It uses a higher temperature setting for
+     * more natural, conversational responses.
+     *
+     * @param prompt The prompt to send to the AI provider
+     * @returns The AI-generated text response
+     * @throws Error if AI service is not configured or all providers fail
+     *
+     * @example
+     * ```typescript
+     * const description = await aiService.getCompletion(
+     *     'Explain what the max_connections MySQL variable does'
+     * );
+     * ```
+     *
+     * Use cases:
+     * - Variable descriptions and explanations
+     * - General database questions
+     * - Documentation queries
+     * - Natural language responses
+     *
+     * For structured SQL query analysis, use analyzeQuery() instead.
+     */
+    async getCompletion(prompt: string): Promise<string> {
+        // Check if AI provider is available
+        if (!this.provider) {
+            throw new Error('AI service not available. Please configure an AI provider in settings.');
+        }
+
+        try {
+            // Get completion from primary provider
+            return await this.provider.getCompletion(prompt);
+        } catch (primaryError) {
+            this.logger.warn(`Primary AI provider completion failed: ${(primaryError as Error).message}`);
+
+            // Try fallback providers
+            for (const fallbackProvider of this.fallbackProviders) {
+                try {
+                    this.logger.info(`Trying fallback provider for completion: ${fallbackProvider.name}`);
+                    const result = await fallbackProvider.getCompletion(prompt);
+                    this.logger.info(`Fallback provider ${fallbackProvider.name} succeeded`);
+                    return result;
+                } catch (fallbackError) {
+                    this.logger.debug(`Fallback provider ${fallbackProvider.name} failed:`, fallbackError as Error);
+                    // Continue to next fallback
+                }
+            }
+
+            // All providers failed
+            this.logger.error('All AI providers failed for completion');
+            throw new Error(`AI completion failed: ${(primaryError as Error).message}`);
+        }
+    }
 }

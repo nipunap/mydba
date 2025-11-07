@@ -198,4 +198,53 @@ Format your response as JSON with this structure:
             citations: []
         };
     }
+
+    /**
+     * Get a simple text completion from VSCode Language Models
+     *
+     * Uses VSCode's built-in language models (typically GitHub Copilot) for
+     * natural language generation suitable for explanations and descriptions.
+     *
+     * @param prompt The prompt to send to the VSCode language model
+     * @returns The generated text response
+     * @throws Error if no language models are available or the API call fails
+     */
+    async getCompletion(prompt: string): Promise<string> {
+        try {
+            // Select best available model
+            const models = await vscode.lm.selectChatModels({
+                family: 'gpt-4o' // Prefer GPT-4o if available
+            });
+
+            if (models.length === 0) {
+                throw new Error('No language models available. Please ensure GitHub Copilot is activated.');
+            }
+
+            const model = models[0];
+            this.logger.debug(`Using model for completion: ${model.name} (${model.family})`);
+
+            // Create messages
+            const messages = [
+                vscode.LanguageModelChatMessage.User(prompt)
+            ];
+
+            // Send request
+            const response = await model.sendRequest(
+                messages,
+                {},
+                new vscode.CancellationTokenSource().token
+            );
+
+            // Collect response text
+            let responseText = '';
+            for await (const chunk of response.text) {
+                responseText += chunk;
+            }
+
+            return responseText.trim();
+        } catch (error) {
+            this.logger.error('VSCode LM completion failed:', error as Error);
+            throw new Error(`AI completion failed: ${(error as Error).message}`);
+        }
+    }
 }

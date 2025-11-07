@@ -184,7 +184,18 @@ export class VariablesPanel {
 
     private escapeValue(value: string, variableType: string): string {
         // Handle different value types based on variable metadata
-        const upperValue = value.toUpperCase();
+        const trimmedValue = value.trim();
+        const upperValue = trimmedValue.toUpperCase();
+
+        // Handle NULL - unquoted keyword
+        if (upperValue === 'NULL') {
+            return 'NULL';
+        }
+
+        // Handle DEFAULT - unquoted keyword to reset to default value
+        if (upperValue === 'DEFAULT') {
+            return 'DEFAULT';
+        }
 
         // Boolean keywords should only be unquoted for boolean/enum types
         if ((variableType === 'boolean' || variableType === 'enum') &&
@@ -195,13 +206,17 @@ export class VariablesPanel {
 
         // Numeric values (integers and sizes)
         if (variableType === 'integer' || variableType === 'size') {
-            // For size types, allow K/M/G suffixes
-            if (variableType === 'size' && /^\d+[KMG]?$/i.test(value)) {
-                return value;
+            // For size types, allow K/M/G suffixes (but not negative values)
+            if (variableType === 'size' && /^\d+[KMG]?$/i.test(trimmedValue)) {
+                // Validate that size isn't negative
+                if (trimmedValue.startsWith('-')) {
+                    throw new Error('Size values cannot be negative');
+                }
+                return trimmedValue;
             }
             // For integers and plain numbers
-            if (/^-?\d+(\.\d+)?$/.test(value)) {
-                return value;
+            if (/^-?\d+(\.\d+)?$/.test(trimmedValue)) {
+                return trimmedValue;
             }
         }
 
@@ -215,20 +230,28 @@ export class VariablesPanel {
         // String values and everything else - escape and quote
         // This ensures that if a user wants to set a string variable to "on" or "off",
         // it will be properly quoted as 'on' or 'off' instead of treated as a boolean keyword
-        return `'${value.replace(/'/g, "''")}'`;
+        return `'${trimmedValue.replace(/'/g, "''")}'`;
     }
 
     private validateValue(variableInfo: VariableMetadata, value: string): { valid: boolean; message: string } {
+        const trimmedValue = value.trim();
+        const upperValue = trimmedValue.toUpperCase();
+
+        // Allow NULL and DEFAULT for all types (MySQL keywords)
+        if (upperValue === 'NULL' || upperValue === 'DEFAULT') {
+            return { valid: true, message: 'Valid' };
+        }
+
         // Type validation
         if (variableInfo.type === 'boolean') {
-            if (!['ON', 'OFF', '0', '1', 'TRUE', 'FALSE'].includes(value.toUpperCase())) {
-                return { valid: false, message: 'Must be ON, OFF, 0, 1, TRUE, or FALSE' };
+            if (!['ON', 'OFF', '0', '1', 'TRUE', 'FALSE'].includes(upperValue)) {
+                return { valid: false, message: 'Must be ON, OFF, 0, 1, TRUE, or FALSE (or NULL/DEFAULT)' };
             }
         } else if (variableInfo.type === 'integer') {
-            if (!/^-?\d+$/.test(value)) {
-                return { valid: false, message: 'Must be an integer' };
+            if (!/^-?\d+$/.test(trimmedValue)) {
+                return { valid: false, message: 'Must be an integer (or NULL/DEFAULT)' };
             }
-            const num = parseInt(value, 10);
+            const num = parseInt(trimmedValue, 10);
             if (variableInfo.min !== undefined && num < variableInfo.min) {
                 return { valid: false, message: `Must be at least ${variableInfo.min}` };
             }
@@ -237,12 +260,16 @@ export class VariablesPanel {
             }
         } else if (variableInfo.type === 'size') {
             // Size with suffixes like 1M, 1G, etc.
-            if (!/^\d+[KMG]?$/i.test(value)) {
-                return { valid: false, message: 'Must be a number with optional K/M/G suffix' };
+            if (!/^\d+[KMG]?$/i.test(trimmedValue)) {
+                return { valid: false, message: 'Must be a number with optional K/M/G suffix (or NULL/DEFAULT)' };
+            }
+            // Reject negative sizes
+            if (trimmedValue.startsWith('-')) {
+                return { valid: false, message: 'Size values cannot be negative' };
             }
         } else if (variableInfo.type === 'enum' && variableInfo.options) {
-            if (!variableInfo.options.includes(value.toUpperCase())) {
-                return { valid: false, message: `Must be one of: ${variableInfo.options.join(', ')}` };
+            if (!variableInfo.options.includes(upperValue)) {
+                return { valid: false, message: `Must be one of: ${variableInfo.options.join(', ')} (or NULL/DEFAULT)` };
             }
         }
 
@@ -263,7 +290,7 @@ export class VariablesPanel {
             const connection = this.connectionManager.getConnection(this.connectionId);
             const dbType = connection?.type === 'mariadb' ? 'mariadb' : 'mysql';
 
-            // Initialize AI service coordinator
+            // Initialize AI service coordinator and RAG service
             const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
             const aiCoordinator = new AIServiceCoordinator(this.logger, this.context);
             await aiCoordinator.initialize();
@@ -274,19 +301,34 @@ export class VariablesPanel {
                 throw new Error('AI service not available. Please configure an AI provider in settings.');
             }
 
-            // Create a prompt for the AI to describe the variable
-            const prompt = `You are a senior database administrator expert. Provide a clear, concise description for the ${dbType === 'mariadb' ? 'MariaDB' : 'MySQL'} system variable '${name}' which currently has the value '${currentValue}'.
+            // Get RAG statistics to check if documentation is available
+            const ragStats = aiCoordinator.getRAGStats();
+            this.logger.debug(`RAG stats: ${ragStats.total} documents available`);
 
-Include:
-1. What this variable controls
-2. Common use cases
-3. Recommended values or best practices
-4. Any risks or warnings about changing it
+            // Create a structured prompt for the AI
+            const prompt = `You are a senior database administrator expert. Analyze the ${dbType === 'mariadb' ? 'MariaDB' : 'MySQL'} system variable '${name}' which currently has the value '${currentValue}'.
 
-Be concise (2-3 sentences) and practical. Focus on actionable information for a DBA.`;
+Provide your response in the following format (use the exact section headers shown):
 
-            // Get AI response using simple completion (not query analysis)
-            const description = await aiCoordinator.getSimpleCompletion(prompt, dbType);
+DESCRIPTION:
+Explain what this variable controls, how it affects the database, and what the current value means. 2-3 sentences. Start directly with the explanation - do NOT repeat the word "DESCRIPTION" in your content.
+
+RECOMMENDATION:
+Provide specific, actionable advice about whether to keep or change this value, best practices, and any warnings. 1-2 sentences. Start directly with the advice - do NOT repeat the word "RECOMMENDATION" in your content.
+
+Focus on practical, production-ready advice based on real-world DBA experience. If reference documentation is provided, incorporate it into your response.`;
+
+            // Get AI response with RAG support
+            // RAG will retrieve relevant documentation about the variable if available
+            const response = await aiCoordinator.getSimpleCompletion(
+                prompt,
+                dbType,
+                true, // Include RAG documentation
+                name  // Use variable name as RAG query
+            );
+
+            // Parse the response to extract description and recommendation
+            const { description, recommendation } = this.parseAIResponse(response, name);
 
             // Determine risk level based on variable name patterns
             let risk: 'safe' | 'caution' | 'dangerous' = 'safe';
@@ -296,11 +338,6 @@ Be concise (2-3 sentences) and practical. Focus on actionable information for a 
             } else if (name.includes('timeout') || name.includes('lock') || name.includes('innodb')) {
                 risk = 'caution';
             }
-
-            // Extract recommendation from description or provide default
-            const recommendation = description.includes('recommend') || description.includes('suggest')
-                ? description
-                : 'Review documentation and test changes in a non-production environment before applying';
 
             // Send the AI-generated description
             this.panel.webview.postMessage({
@@ -319,6 +356,48 @@ Be concise (2-3 sentences) and practical. Focus on actionable information for a 
                 error: (error as Error).message
             });
         }
+    }
+
+    /**
+     * Parse AI response to extract description and recommendation
+     */
+    private parseAIResponse(response: string, variableName: string): { description: string; recommendation: string } {
+        // Try to extract DESCRIPTION: and RECOMMENDATION: sections
+        const descMatch = response.match(/DESCRIPTION:\s*\n([\s\S]*?)(?=\n\s*RECOMMENDATION:|$)/i);
+        const recMatch = response.match(/RECOMMENDATION:\s*\n([\s\S]*?)$/i);
+
+        if (descMatch && recMatch) {
+            let description = descMatch[1].trim();
+            let recommendation = recMatch[1].trim();
+
+            // Remove any markdown headers that AI might have added (e.g., **DESCRIPTION:**, **RECOMMENDATION:**)
+            description = description.replace(/^\*\*DESCRIPTION:\*\*\s*/i, '').trim();
+            recommendation = recommendation.replace(/^\*\*RECOMMENDATION:\*\*\s*/i, '').trim();
+
+            // Also remove plain text headers if present
+            description = description.replace(/^DESCRIPTION:\s*/i, '').trim();
+            recommendation = recommendation.replace(/^RECOMMENDATION:\s*/i, '').trim();
+
+            return {
+                description,
+                recommendation
+            };
+        }
+
+        // Fallback: Try to split by paragraph or sentence
+        const sentences = response.split(/\n\n+|\. (?=[A-Z])/);
+        if (sentences.length >= 2) {
+            // First part is description, rest is recommendation
+            const description = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim();
+            const recommendation = sentences.slice(Math.ceil(sentences.length / 2)).join('. ').trim();
+            return { description, recommendation };
+        }
+
+        // Last resort: Use full response as description with generic recommendation
+        return {
+            description: response.trim(),
+            recommendation: `Review ${variableName} documentation and test changes in a non-production environment before applying.`
+        };
     }
 
     private getVariableMetadata(name: string): VariableMetadata {

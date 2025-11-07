@@ -5,6 +5,14 @@ import { Logger } from '../../../utils/logger';
 import OpenAI from 'openai';
 
 /**
+ * Temperature constants for different types of AI requests
+ */
+const TEMPERATURE = {
+    QUERY_ANALYSIS: 0.3,      // Lower temperature for structured analysis
+    TEXT_COMPLETION: 0.7       // Higher temperature for natural language
+} as const;
+
+/**
  * OpenAI Provider
  *
  * Uses OpenAI's API for query analysis
@@ -62,7 +70,7 @@ export class OpenAIProvider implements AIProvider {
                         content: prompt
                     }
                 ],
-                temperature: 0.3, // Lower temperature for more focused, technical responses
+                temperature: TEMPERATURE.QUERY_ANALYSIS,
                 response_format: { type: 'json_object' }
             });
 
@@ -211,6 +219,43 @@ Provide your response as a JSON object with this exact structure:
                 }],
                 citations: []
             };
+        }
+    }
+
+    /**
+     * Get a simple text completion from OpenAI
+     *
+     * Uses a higher temperature for natural language generation suitable for
+     * explanations, descriptions, and conversational responses.
+     *
+     * @param prompt The prompt to send to OpenAI
+     * @returns The generated text response
+     * @throws Error if the API call fails
+     */
+    async getCompletion(prompt: string): Promise<string> {
+        try {
+            this.logger.debug(`Getting OpenAI completion (${this.model})`);
+
+            const response = await this.client.chat.completions.create({
+                model: this.model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: TEMPERATURE.TEXT_COMPLETION
+            });
+
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error('Empty response from OpenAI');
+            }
+
+            return content.trim();
+        } catch (error) {
+            this.logger.error('OpenAI completion failed:', error as Error);
+            throw new Error(`OpenAI completion failed: ${(error as Error).message}`);
         }
     }
 }
