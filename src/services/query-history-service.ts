@@ -30,7 +30,7 @@ export interface QueryStats {
 export class QueryHistoryService {
     private static readonly MAX_HISTORY_SIZE = 1000;
     private static readonly STORAGE_KEY = 'mydba.queryHistory';
-    
+
     private history: QueryHistoryEntry[] = [];
 
     constructor(
@@ -320,4 +320,3 @@ export class QueryHistoryService {
         }
     }
 }
-

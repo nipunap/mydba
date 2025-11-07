@@ -42,6 +42,7 @@ export class CommandRegistry {
             vscode.commands.registerCommand('mydba.showVariables', (connectionId: string) => this.showVariables(connectionId)),
             vscode.commands.registerCommand('mydba.showMetricsDashboard', (connectionId: string) => this.showMetricsDashboard(connectionId)),
             vscode.commands.registerCommand('mydba.showQueryEditor', (connectionId: string) => this.showQueryEditor(connectionId)),
+            vscode.commands.registerCommand('mydba.showQueryHistory', () => this.showQueryHistory()),
             vscode.commands.registerCommand('mydba.showQueriesWithoutIndexes', (connectionId: string) => this.showQueriesWithoutIndexes(connectionId)),
             vscode.commands.registerCommand('mydba.showSlowQueries', (connectionId: string) => this.showSlowQueries(connectionId)),
             vscode.commands.registerCommand('mydba.previewTableData', (treeItem: { metadata?: { connectionId?: string; database?: string; table?: string } }) => {
@@ -278,6 +279,20 @@ export class CommandRegistry {
         } catch (error) {
             this.logger.error('Failed to show process list:', error as Error);
             vscode.window.showErrorMessage(`Failed to show process list: ${(error as Error).message}`);
+        }
+    }
+
+    private async showQueryHistory(): Promise<void> {
+        try {
+            this.logger.info('Opening query history...');
+            // Import service container to get query history service
+            const { ServiceContainer, SERVICE_TOKENS } = await import('../core/service-container');
+            const serviceContainer = ServiceContainer.getInstance();
+            const historyService = serviceContainer.get(SERVICE_TOKENS.QueryHistoryService);
+            await this.webviewManager.showQueryHistory(historyService);
+        } catch (error) {
+            this.logger.error('Failed to show query history:', error as Error);
+            vscode.window.showErrorMessage(`Failed to show query history: ${(error as Error).message}`);
         }
     }
 

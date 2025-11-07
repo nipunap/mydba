@@ -78,7 +78,7 @@
     modalClose?.addEventListener('click', closeModal);
     cancelBtn?.addEventListener('click', closeModal);
     saveBtn?.addEventListener('click', saveVariable);
-    
+
     editVarValue?.addEventListener('input', debounce((e) => {
         if (currentEditingVariable) {
             vscode.postMessage({
@@ -183,14 +183,14 @@
             // Name with risk indicator
             const nameCell = document.createElement('td');
             nameCell.classList.add('name-cell');
-            
+
             const nameWrapper = document.createElement('div');
             nameWrapper.classList.add('name-wrapper');
-            
+
             const nameSpan = document.createElement('span');
             nameSpan.textContent = variable.name;
             nameWrapper.appendChild(nameSpan);
-            
+
             // Add risk indicator badge
             if (variable.metadata) {
                 const riskBadge = document.createElement('span');
@@ -199,7 +199,7 @@
                 riskBadge.title = `Risk Level: ${variable.metadata.risk}`;
                 nameWrapper.appendChild(riskBadge);
             }
-            
+
             nameCell.appendChild(nameWrapper);
             row.appendChild(nameCell);
 
@@ -211,20 +211,20 @@
             // Actions
             const actionsCell = document.createElement('td');
             actionsCell.classList.add('actions-cell');
-            
+
             const editBtn = document.createElement('button');
             editBtn.classList.add('action-btn', 'edit-btn');
             editBtn.innerHTML = '<span class="codicon codicon-edit"></span>';
             editBtn.title = 'Edit Variable';
             editBtn.addEventListener('click', () => openEditModal(variable));
-            
+
             const rollbackBtn = document.createElement('button');
             rollbackBtn.classList.add('action-btn', 'rollback-btn');
             rollbackBtn.innerHTML = '<span class="codicon codicon-discard"></span>';
             rollbackBtn.title = 'Rollback to Previous Value';
             rollbackBtn.disabled = !variableHistory.has(variable.name);
             rollbackBtn.addEventListener('click', () => rollbackVariable(variable));
-            
+
             actionsCell.appendChild(editBtn);
             actionsCell.appendChild(rollbackBtn);
             row.appendChild(actionsCell);
@@ -237,14 +237,14 @@
 
     function openEditModal(variable) {
         currentEditingVariable = variable;
-        
+
         // Populate modal
         editVarName.value = variable.name;
         editVarValue.value = variable.value;
         varCurrent.textContent = variable.value;
         validationMessage.textContent = '';
         validationMessage.className = 'validation-message';
-        
+
         if (variable.metadata) {
             varCategory.textContent = variable.metadata.category || 'Other';
             varRisk.textContent = variable.metadata.risk.charAt(0).toUpperCase() + variable.metadata.risk.slice(1);
@@ -252,7 +252,7 @@
             varDescription.textContent = variable.metadata.description || 'No description available';
             varRecommendation.textContent = variable.metadata.recommendation || 'Consult MySQL documentation';
         }
-        
+
         // Show modal
         editModal.style.display = 'flex';
         editVarValue.focus();
@@ -343,7 +343,7 @@
         closeModal();
         saveBtn.disabled = false;
         saveBtn.textContent = 'Save Changes';
-        
+
         // Update the variable in the list
         const variable = allVariables.find(v => v.name === name);
         if (variable) {

@@ -89,6 +89,11 @@
         "category": "MyDBA"
       },
       {
+        "command": "mydba.showQueryHistory",
+        "title": "Show Query History",
+        "category": "MyDBA"
+      },
+      {
         "command": "mydba.showVariables",
         "title": "Show Variables",
         "category": "MyDBA"

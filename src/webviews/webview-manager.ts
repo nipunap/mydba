@@ -13,6 +13,7 @@ import { MetricsDashboardPanel } from './metrics-dashboard-panel';
 import { QueriesWithoutIndexesPanel } from './queries-without-indexes-panel';
 import { SlowQueriesPanel } from './slow-queries-panel';
 import { QueryProfilingPanel } from './query-profiling-panel';
+import { QueryHistoryPanel } from './query-history-panel';
 
 export class WebviewManager {
     private explainProvider?: ExplainViewerProvider;
@@ -151,6 +152,14 @@ export class WebviewManager {
             connectionId,
             query,
             aiService
+        );
+    }
+
+    async showQueryHistory(historyService: any): Promise<void> {
+        QueryHistoryPanel.show(
+            this.context,
+            this.logger,
+            historyService
         );
     }
 
