@@ -3,7 +3,7 @@ import { Logger } from './logger';
 
 /**
  * Error Recovery Service
- * 
+ *
  * Handles graceful degradation and recovery from initialization errors.
  * Allows partial activation when some components fail.
  */
@@ -51,7 +51,7 @@ export class ErrorRecovery {
         try {
             this.logger.info(`Attempting recovery for ${component} (attempt ${currentRetries + 1}/${this.maxRetries})`);
             await recoveryFn();
-            
+
             // Success - clear error
             this.errors.delete(component);
             this.recoveryAttempts.delete(component);
@@ -78,7 +78,7 @@ export class ErrorRecovery {
             : `MyDBA encountered an error in ${component}. Some features may be unavailable.`;
 
         const actions: string[] = ['Show Details'];
-        
+
         if (canRetry) {
             actions.unshift('Retry');
         }
@@ -110,7 +110,7 @@ export class ErrorRecovery {
      */
     private showErrorDetails(component: string, error: Error): void {
         const activationError = this.errors.get(component);
-        
+
         const details = [
             `Component: ${component}`,
             `Error: ${error.message}`,
@@ -175,11 +175,11 @@ export class ErrorRecovery {
     clearComponentError(component: string): boolean {
         const hadError = this.errors.delete(component);
         this.recoveryAttempts.delete(component);
-        
+
         if (hadError) {
             this.logger.info(`Cleared error for ${component}`);
         }
-        
+
         return hadError;
     }
 
@@ -209,7 +209,7 @@ export class ErrorRecovery {
      */
     exportErrors(): string {
         const errors = this.getErrors();
-        
+
         if (errors.length === 0) {
             return 'No errors recorded.';
         }
@@ -265,10 +265,10 @@ export async function safeInitialize<T>(
         return await initFn();
     } catch (error) {
         errorRecovery.recordError(component, error as Error, critical);
-        
+
         // Show error dialog
         const action = await errorRecovery.showErrorDialog(component, error as Error);
-        
+
         if (action === 'RETRY') {
             const recovered = await errorRecovery.attemptRecovery(component, initFn);
             if (recovered) {
@@ -280,13 +280,12 @@ export async function safeInitialize<T>(
                 }
             }
         }
-        
+
         // If critical and couldn't recover, throw
         if (critical && !errorRecovery.hasError(component)) {
             throw error;
         }
-        
+
         return null;
     }
 }
-

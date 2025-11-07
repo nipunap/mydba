@@ -1,6 +1,6 @@
 /**
  * Application Constants
- * 
+ *
  * Centralized location for all constants used throughout the extension
  */
 
@@ -272,4 +272,3 @@ export const EXTENSION = {
     DISPLAY_NAME: 'MyDBA - AI-Powered Database Assistant',
     VERSION: '1.1.0' // Should match package.json
 } as const;
-

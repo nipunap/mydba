@@ -29,6 +29,16 @@ MyDBA is an AI-powered VSCode extension that brings database management, monitor
 - **Editor Compatibility**: Works in VSCode, Cursor, Windsurf, and VSCodium
 - **Comprehensive Testing**: Integration tests with Docker, 70%+ code coverage
 
+### Phase 1.5 Status (Quality Sprint)
+> Current focus: Code Quality & Production Readiness prior to Phase 2.
+>
+> - Test Coverage: Raising from 1.7% to ≥ 70% (with CI gate)
+> - AI Service: Completing coordinator (real responses, provider fallback)
+> - Technical Debt: Resolving CRITICAL/HIGH TODOs
+> - Production Readiness: Error recovery, disposables hygiene, caching, audit logging
+>
+> See the roadmap for details: [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md). For current coverage, open `coverage/index.html` after running tests.
+
 ### Metrics Dashboard
 
 ![Database Metrics Dashboard](resources/metrics-dashboard-screenshot.png)

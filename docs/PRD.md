@@ -727,6 +727,69 @@ Would you like me to:
 
 ---
 
+#### 4.1.12 Phase 1.5 — Code Quality & Production Readiness
+
+This phase addresses critical gaps identified during the code review to ensure production readiness before Phase 2.
+
+A. Test Infrastructure & Coverage (Target: 70%+, 20–28h)
+- Tasks: Unit tests (security validators, adapters, core services), integration tests (end‑to‑end query flow, webviews), coverage reporting.
+- Definition of Done:
+  - Coverage ≥ 70% (Jest + c8)
+  - All unit/integration tests pass in CI
+  - ESLint: zero errors; no file‑level disables
+  - Coverage gate enforced in CI
+- Risks & Mitigations:
+  - Complex SQL parsing → verify via server EXPLAIN; add parser fallbacks
+  - MySQL/MariaDB INFORMATION_SCHEMA differences → version‑aware queries; defensive parsing
+
+B. AI Service Coordinator Implementation (12–16h)
+- Tasks: Implement analyzeQuery(), interpretExplain(), interpretProfiling(); provider selection/fallbacks; VSCode LM integration; request rate limiting; streaming where available.
+- Definition of Done:
+  - Methods return real data (no mocks)
+  - Auto‑detect best provider; graceful fallback (VSCode LM → OpenAI/Anthropic/Ollama)
+  - Feature‑flagged via `mydba.ai.enabled` and availability checks
+  - Basic E2E test with at least one provider
+- Risks & Mitigations:
+  - VSCode LM unavailable in forks → fallback to API providers/local
+  - Cost/quotas → rate limiter + circuit breaker; clear UI status/errors
+
+C. Technical Debt Resolution (CRITICAL/HIGH only) (14–18h)
+- Tasks:
+  - Complete `MySQLAdapter.getTableSchema()` (remove mock; query INFORMATION_SCHEMA)
+  - Implement config reload + metrics pause/resume in `extension.ts`
+  - Replace non‑null assertions on pool with a TS guard (e.g., `asserts this.pool`)
+  - Remove file‑level ESLint disables; prefer narrow, per‑line exceptions only when unavoidable
+  - Fix hardcoded URL in welcome message
+- Definition of Done:
+  - All CRITICAL/HIGH items completed and marked “Done” in the TODO index
+  - MEDIUM items scheduled for v1.1; LOW for Phase 2
+
+D. Production Readiness (6–10h)
+- Tasks: Error‑recovery flow in activation; disposables cleanup across providers/services; cache integration (schema/EXPLAIN/variables TTL) via `CacheManager`; audit logging for destructive operations; performance budgets and smoke checks.
+- Definition of Done:
+  - Activation failures offer user actions (reset/view logs)
+  - All long‑lived components track `disposables` and implement `dispose()`
+  - Caching wired with sensible TTLs and invalidation hooks
+  - Budgets documented (activation < 500ms; tree refresh < 200ms; AI analysis < 3s)
+
+E. TODO Index (tracking)
+- A table maintained in this PRD listing all TODOs with: File, Line, Description, Priority (CRITICAL/HIGH/MEDIUM/LOW), Estimate, Status. CRITICAL/HIGH items belong to Phase 1.5. MEDIUM target v1.1; LOW target Phase 2.
+
+Acceptance Criteria (Phase 1.5)
+- Coverage ≥ 70% with CI gate; tests green; ESLint clean
+- AI Coordinator methods implemented; feature‑flagged; provider fallback works
+- All CRITICAL/HIGH TODOs resolved (tracked in TODO index)
+- Non‑null assertions on pool replaced with guards; no file‑level ESLint disables
+- Error recovery and disposables hygiene in place
+
+Risks & Mitigations
+- Parser fragility; provider availability; cost overrun; schema differences between engines → mitigated as noted above
+
+CI Quality Gates
+- Coverage gate: fail CI if coverage < 70%
+- Lint gate: fail on ESLint errors
+- Publish workflow must block release if gates fail
+
 ### 4.2 Phase 2: Advanced Features
 
 #### 4.2.1 Host-Level Metrics Dashboard (Moved from Phase 1 MVP)

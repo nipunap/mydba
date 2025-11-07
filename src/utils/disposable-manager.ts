@@ -3,7 +3,7 @@ import { Logger } from './logger';
 
 /**
  * Disposable Manager
- * 
+ *
  * Centralized manager for tracking and disposing of all extension resources.
  * Helps prevent memory leaks and ensures clean shutdown.
  */
@@ -144,7 +144,7 @@ export class DisposableManager {
      */
     createChild(name: string): DisposableManager {
         const child = new DisposableManager(this.logger);
-        
+
         // When parent disposes, dispose child
         this.add({
             dispose: () => child.dispose()
@@ -161,7 +161,7 @@ export class DisposableManager {
         fn: (scope: DisposableScope) => Promise<T>
     ): Promise<T> {
         const scope = new DisposableScope(this, name);
-        
+
         try {
             return await fn(scope);
         } finally {
@@ -224,4 +224,3 @@ export interface DisposableDiagnostics {
     names: string[];
     disposed: boolean;
 }
-

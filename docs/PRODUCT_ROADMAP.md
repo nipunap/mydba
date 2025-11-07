@@ -1,9 +1,9 @@
 # MyDBA Product Roadmap & Progress
 
-## Current Status: Phase 1 MVP - 95% Complete (Dec 26, 2025)
+## Current Status: Phase 1 MVP — Code Review Complete; Phase 1.5 — Code Quality Sprint (In Planning)
 
-**🎯 Final Sprint:** Process List UI enhancements (6-8 hours remaining)
-**📅 Target MVP:** December 27-28, 2025
+**🎯 Focus:** Phase 1.5 (Code Quality & Production Readiness)
+**📅 Target Phase 1.5:** January–February 2026
 
 ---
 
@@ -202,7 +202,42 @@
 
 ---
 
-## 🚀 **Phase 2: Advanced Features** (PLANNED - Q1 2026)
+## 🔴 **Phase 1.5: Code Quality & Production Readiness** (BLOCKING)
+
+**Estimated Time:** 60–80 hours (January–February 2026)
+**Status:** In Planning (blocks Phase 2 until complete)
+
+### Milestone 4.5: Test Infrastructure & Coverage (Target ≥ 70%, 20–28h)
+- Unit tests: security validators, adapters, core services
+- Integration tests: query execution E2E, webviews
+- CI coverage gate and reporting
+- DoD: Coverage ≥ 70%; tests green; ESLint clean; gates enforced in CI
+
+### Milestone 4.6: AI Service Coordinator (12–16h)
+- Implement analyzeQuery(), interpretExplain(), interpretProfiling()
+- Provider selection + graceful fallback; LM integration; rate limiting
+- DoD: Real responses (no mocks); feature‑flagged; basic E2E test
+
+### Milestone 4.7: Technical Debt (CRITICAL/HIGH only) (14–18h)
+- Complete MySQLAdapter.getTableSchema(); config reload; metrics pause/resume
+- Replace non‑null assertions with TS guard; remove file‑level ESLint disables
+- DoD: CRITICAL/HIGH TODOs moved to “Done” in PRD index
+
+### Milestone 4.8: Production Readiness (6–10h)
+- Error recovery in activation; disposables hygiene; cache integration; audit logging
+- Performance budgets + smoke checks
+- DoD: Recovery prompts; disposables tracked; caches with TTL; budgets documented
+
+### Acceptance Test Matrix (summary)
+- Providers × Editors: VSCode LM/OpenAI/Anthropic/Ollama × VSCode/Cursor/Windsurf/VSCodium
+- Expected behavior documented; fallbacks verified
+
+### Performance Budgets (targets)
+- Activation < 500ms; Tree refresh < 200ms; AI analysis < 3s
+
+---
+
+## 🚀 **Phase 2: Advanced Features** (REVISED - Q2 2026)
 
 ### **Milestone 5: Visual Query Analysis** (20-25 hours)
 
@@ -438,16 +473,17 @@
 | **Phase 1** | 1. Foundation | ✅ Complete | 100% | ✅ Done |
 | **Phase 1** | 2. Core UI | ✅ Complete | 100% | ✅ Done |
 | **Phase 1** | 3. Monitoring | ✅ Complete | 90% | ✅ Done |
-| **Phase 1** | 4. AI Integration | ⏳ In Progress | 95% | 🎯 Dec 27-28 |
-| **Phase 2** | 5. Visual Query Analysis | ⏳ Planned | 0% | 📅 Q1 2026 |
-| **Phase 2** | 6. Conversational AI | ⏳ Planned | 0% | 📅 Q1 2026 |
-| **Phase 2** | 7. Architecture Improvements | ⏳ Planned | 0% | 📅 Q1 2026 |
-| **Phase 2** | 8. UI Enhancements | ⏳ Planned | 0% | 📅 Q2 2026 |
-| **Phase 2** | 9. Quality & Testing | ⏳ Planned | 0% | 📅 Q1 2026 |
-| **Phase 2** | 10. Advanced AI | ⏳ Planned | 0% | 📅 Q2 2026 |
+| **Phase 1** | 4. AI Integration | ✅ Complete | 85% | 🔄 Code Review |
+| **Phase 1.5** | Code Quality Sprint | ⏳ In Planning | 0% | 📅 Jan–Feb 2026 |
+| **Phase 2** | 5. Visual Query Analysis | 🚫 Blocked | 0% | 📅 Q2 2026 |
+| **Phase 2** | 6. Conversational AI | 🚫 Blocked | 0% | 📅 Q2 2026 |
+| **Phase 2** | 7. Architecture Improvements | 🚫 Blocked | 0% | 📅 Q2 2026 |
+| **Phase 2** | 8. UI Enhancements | 🚫 Blocked | 0% | 📅 Q2 2026 |
+| **Phase 2** | 9. Quality & Testing | 🚫 Blocked | 0% | 📅 Q2 2026 |
+| **Phase 2** | 10. Advanced AI | 🚫 Blocked | 0% | 📅 Q2 2026 |
 
-**Phase 1 MVP**: 95% complete (8-11 hours remaining)
-**Phase 2 Total**: 85-118 hours (10-15 weeks part-time)
+**Phase 1.5**: 60–80 hours (6–8 weeks part‑time); blocks Phase 2
+**Phase 2 Total**: 85–118 hours (10–15 weeks part‑time)
 
 ---
 

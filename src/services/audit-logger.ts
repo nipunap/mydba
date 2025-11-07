@@ -6,7 +6,7 @@ import { LIMITS, FILE_PATHS } from '../constants';
 
 /**
  * Audit Logger Service
- * 
+ *
  * Logs destructive operations and critical actions for compliance and debugging.
  * Logs are stored in workspace storage and rotated when size limit is reached.
  */
@@ -30,7 +30,7 @@ export class AuditLogger {
         try {
             const dir = path.dirname(this.auditLogPath);
             await fs.mkdir(dir, { recursive: true });
-            
+
             // Check if file exists, create if not
             try {
                 await fs.access(this.auditLogPath);
@@ -161,12 +161,12 @@ export class AuditLogger {
     private async rotateIfNeeded(): Promise<void> {
         try {
             const stats = await fs.stat(this.auditLogPath);
-            
+
             if (stats.size > LIMITS.MAX_AUDIT_LOG_SIZE) {
                 const backupPath = `${this.auditLogPath}.${Date.now()}.bak`;
                 await fs.rename(this.auditLogPath, backupPath);
                 await fs.writeFile(this.auditLogPath, '');
-                
+
                 this.logger.info(`Audit log rotated. Backup saved to: ${backupPath}`);
 
                 // Clean up old backups (keep last 3)
@@ -219,10 +219,10 @@ export class AuditLogger {
         try {
             const content = await fs.readFile(this.auditLogPath, 'utf8');
             const lines = content.trim().split('\n').filter(line => line.length > 0);
-            
+
             // Get last N lines
             const recentLines = lines.slice(-limit);
-            
+
             return recentLines.map(line => {
                 try {
                     return JSON.parse(line) as AuditLogEntry;
@@ -246,7 +246,7 @@ export class AuditLogger {
      */
     async searchEntries(filter: AuditLogFilter): Promise<AuditLogEntry[]> {
         const entries = await this.getEntries(1000); // Get more entries for searching
-        
+
         return entries.filter(entry => {
             if (filter.type && entry.type !== filter.type) {
                 return false;
@@ -319,4 +319,3 @@ export interface AuditLogFilter {
     endDate?: Date;
     success?: boolean;
 }
-
