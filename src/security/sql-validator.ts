@@ -62,11 +62,35 @@ export class SQLValidator {
         // Normalize SQL
         const normalizedSQL = this.normalizeSQL(sql);
 
+        // Check for empty or whitespace-only queries
+        if (!normalizedSQL || normalizedSQL.trim().length === 0) {
+            issues.push('Query cannot be empty');
+        }
+
         // Detect statement type
         const statementType = this.detectStatementType(normalizedSQL);
 
         // Check if destructive
         const isDestructive = this.isDestructive(statementType);
+
+        // Check for dangerous file operations
+        if (/LOAD\s+DATA\s+(LOCAL\s+)?INFILE/i.test(normalizedSQL)) {
+            issues.push('LOAD DATA INFILE is not allowed due to security risks');
+        }
+
+        if (/INTO\s+OUTFILE/i.test(normalizedSQL)) {
+            warnings.push('INTO OUTFILE writes data to files on the server');
+        }
+
+        // Check for dangerous privilege operations
+        if (statementType === SQLStatementType.GRANT) {
+            issues.push('GRANT statements are not allowed - use database admin tools instead');
+        }
+
+        // Check for user management operations
+        if (/CREATE\s+USER/i.test(normalizedSQL)) {
+            issues.push('CREATE USER statements are not allowed - use database admin tools instead');
+        }
 
         // Check for basic SQL injection patterns
         if (this.hasSQLInjection(normalizedSQL)) {

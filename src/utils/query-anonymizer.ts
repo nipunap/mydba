@@ -20,16 +20,14 @@ export class QueryAnonymizer {
      */
     anonymize(query: string): string {
         try {
-            // Parse the query
-            const ast = this.parser.astify(query, { database: 'MySQL' });
+            // Validate query syntax by attempting to parse
+            this.parser.astify(query, { database: 'MySQL' });
 
-            // Replace literals in AST
-            this.anonymizeAST(ast);
-
-            // Convert back to SQL
-            return this.parser.sqlify(ast, { database: 'MySQL' });
+            // Use regex-based approach as it's more reliable
+            // AST approach with sqlify has issues with placeholder quoting
+            return this.anonymizeWithRegex(query);
         } catch {
-            // If parsing fails, use regex fallback
+            // If parsing fails, also use regex fallback
             return this.anonymizeWithRegex(query);
         }
     }
@@ -112,11 +110,13 @@ export class QueryAnonymizer {
     hasSensitiveData(query: string): boolean {
         const sensitivePatterns = [
             /password/i,
-            /credit[_\s]?card/i,
+            /credit[_\s]?card|card/i,
             /ssn|social[_\s]?security/i,
             /api[_\s]?key/i,
             /token/i,
             /secret/i,
+            /phone/i,
+            /email/i,
         ];
 
         return sensitivePatterns.some(pattern => pattern.test(query));

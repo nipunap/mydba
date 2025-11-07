@@ -53,8 +53,10 @@ describe('QueryAnonymizer', () => {
             const query = "SELECT * FROM users WHERE id IN (1, 2, 3, 4, 5)";
             const result = anonymizer.anonymize(query);
 
-            expect(result).toContain('IN (?)');
-            expect(result).not.toContain('1, 2, 3');
+            // Each literal is anonymized individually
+            expect(result).toContain('IN (?, ?, ?, ?, ?)');
+            expect(result).not.toContain('1');
+            expect(result).not.toContain('2');
         });
     });
 
