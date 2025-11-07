@@ -447,7 +447,7 @@
         // Calculate dimensions with proper padding
         const containerWidth = treeDiagram.clientWidth || CONFIG.DIAGRAM.WIDTH;
         const containerHeight = CONFIG.DIAGRAM.HEIGHT;
-        
+
         // Count total nodes to determine SVG size
         function countNodes(node) {
             let count = 1;
@@ -457,7 +457,7 @@
             return count;
         }
         const nodeCount = countNodes(data);
-        
+
         // Dynamic sizing based on node count
         const width = Math.max(containerWidth, nodeCount * 180); // 180px per level
         const height = Math.max(containerHeight, nodeCount * 60); // 60px per node vertically
@@ -1471,7 +1471,7 @@
                 const svgData = new XMLSerializer().serializeToString(svg);
                 const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
                 const svgUrl = URL.createObjectURL(svgBlob);
-                
+
                 const downloadLink = document.createElement('a');
                 downloadLink.href = svgUrl;
                 downloadLink.download = `explain-diagram-${Date.now()}.svg`;
@@ -1557,7 +1557,7 @@
             btn.addEventListener('click', (e) => {
                 const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
                 const suggestion = suggestions[index];
-                
+
                 if (!suggestion) {
                     console.error('Suggestion not found for index:', index);
                     return;
@@ -1584,7 +1584,7 @@
             btn.addEventListener('click', (e) => {
                 const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
                 const suggestion = suggestions[index];
-                
+
                 if (!suggestion) {
                     console.error('Suggestion not found for index:', index);
                     return;
@@ -1607,25 +1607,25 @@
             btn.addEventListener('click', async (e) => {
                 const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
                 const suggestion = suggestions[index];
-                
+
                 if (!suggestion) {
                     console.error('Suggestion not found for index:', index);
                     return;
                 }
 
                 const codeToCopy = suggestion.after || suggestion.ddl || suggestion.before || '';
-                
+
                 try {
                     // Use Clipboard API if available
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         await navigator.clipboard.writeText(codeToCopy);
-                        
+
                         // Show feedback
                         const button = e.currentTarget;
                         const originalHTML = button.innerHTML;
                         button.innerHTML = '<span class="codicon codicon-check"></span> Copied!';
                         button.style.backgroundColor = 'rgba(75, 255, 192, 0.2)';
-                        
+
                         setTimeout(() => {
                             button.innerHTML = originalHTML;
                             button.style.backgroundColor = '';
@@ -1785,22 +1785,22 @@
 
                 // Add action buttons for optimization
                 html += `<div class="optimization-actions">`;
-                
+
                 // Only show Apply button if there's executable code (after/DDL)
                 if (suggestion.after || suggestion.ddl) {
                     html += `<button class="optimization-action-btn apply-btn" data-index="${index}" title="Apply this optimization">`;
                     html += `<span class="codicon codicon-check"></span> Apply Fix`;
                     html += `</button>`;
                 }
-                
+
                 html += `<button class="optimization-action-btn compare-btn" data-index="${index}" title="Compare before and after">`;
                 html += `<span class="codicon codicon-diff"></span> Compare`;
                 html += `</button>`;
-                
+
                 html += `<button class="optimization-action-btn copy-btn" data-index="${index}" title="Copy optimized code">`;
                 html += `<span class="codicon codicon-copy"></span> Copy`;
                 html += `</button>`;
-                
+
                 html += `</div>`;
 
                 html += `</div>`;
