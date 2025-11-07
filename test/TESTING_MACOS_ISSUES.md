@@ -143,4 +143,3 @@ If you continue to have issues:
 2. Try deleting `node_modules` and `package-lock.json`, then `npm install`
 3. Ensure macOS is up to date
 4. Consider using Docker for consistent test environments
-

@@ -23,4 +23,3 @@ echo "Note: If the problem persists, you may need to:"
 echo "1. Delete .vscode-test manually from Finder with sudo"
 echo "2. Or run: sudo rm -rf .vscode-test"
 echo "3. Then run this script again after tests download VS Code"
-

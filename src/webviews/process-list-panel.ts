@@ -128,9 +128,32 @@ export class ProcessListPanel {
             const processes = await adapter.getProcessList();
             this.logger.info(`Retrieved ${processes.length} processes`);
 
+            // Fetch lock information
+            const lockInfo = await this.getLockInformation(adapter);
+            this.logger.debug(`Retrieved lock information for ${lockInfo.length} processes`);
+
+            // Merge lock information with processes
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const enrichedProcesses = processes.map((proc: any) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const locks = lockInfo.filter((lock: any) => lock.processId === proc.id);
+                if (locks.length > 0) {
+                    return {
+                        ...proc,
+                        hasLocks: true,
+                        locks: locks,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        isBlocked: locks.some((l: any) => l.isBlocked),
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        isBlocking: locks.some((l: any) => l.isBlocking)
+                    };
+                }
+                return proc;
+            });
+
             this.panel.webview.postMessage({
                 type: 'processListLoaded',
-                processes: processes,
+                processes: enrichedProcesses,
                 timestamp: new Date().toISOString()
             });
         } catch (error) {
@@ -141,6 +164,71 @@ export class ProcessListPanel {
             });
         } finally {
             this.isRefreshing = false;
+        }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private async getLockInformation(adapter: any): Promise<any[]> {
+        try {
+            // Try to get lock information from performance_schema (MySQL 5.7+)
+            const lockQuery = `
+                SELECT 
+                    l.ENGINE_TRANSACTION_ID as processId,
+                    l.OBJECT_NAME as lockObject,
+                    l.LOCK_TYPE as lockType,
+                    l.LOCK_MODE as lockMode,
+                    l.LOCK_STATUS as lockStatus,
+                    w.REQUESTING_ENGINE_TRANSACTION_ID as blockingProcessId
+                FROM performance_schema.data_locks l
+                LEFT JOIN performance_schema.data_lock_waits w ON l.ENGINE_LOCK_ID = w.REQUESTED_LOCK_ID
+                WHERE l.ENGINE_TRANSACTION_ID IS NOT NULL
+            `;
+
+            const locks = await adapter.query(lockQuery);
+            
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return locks.map((lock: any) => ({
+                processId: lock.processId,
+                lockObject: lock.lockObject,
+                lockType: lock.lockType,
+                lockMode: lock.lockMode,
+                lockStatus: lock.lockStatus,
+                isBlocked: lock.lockStatus === 'WAITING',
+                isBlocking: !!lock.blockingProcessId,
+                blockingProcessId: lock.blockingProcessId
+            }));
+        } catch {
+            // If performance_schema is not available, try INFORMATION_SCHEMA (MySQL 5.5/5.6)
+            try {
+                const legacyLockQuery = `
+                    SELECT 
+                        l.lock_trx_id as processId,
+                        l.lock_table as lockObject,
+                        l.lock_type as lockType,
+                        l.lock_mode as lockMode,
+                        'GRANTED' as lockStatus,
+                        w.blocking_trx_id as blockingProcessId
+                    FROM INFORMATION_SCHEMA.INNODB_LOCKS l
+                    LEFT JOIN INFORMATION_SCHEMA.INNODB_LOCK_WAITS w ON l.lock_id = w.requested_lock_id
+                `;
+                
+                const locks = await adapter.query(legacyLockQuery);
+                
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return locks.map((lock: any) => ({
+                    processId: lock.processId,
+                    lockObject: lock.lockObject,
+                    lockType: lock.lockType,
+                    lockMode: lock.lockMode,
+                    lockStatus: lock.lockStatus,
+                    isBlocked: false, // Will be determined by lock_waits
+                    isBlocking: !!lock.blockingProcessId,
+                    blockingProcessId: lock.blockingProcessId
+                }));
+            } catch (legacyError) {
+                this.logger.warn('Could not fetch lock information:', legacyError as Error);
+                return [];
+            }
         }
     }
 
@@ -228,7 +316,11 @@ export class ProcessListPanel {
                     <option value="none">None</option>
                     <option value="user">User</option>
                     <option value="host">Host</option>
+                    <option value="db">Database</option>
+                    <option value="command">Command</option>
+                    <option value="state">State</option>
                     <option value="query">Query Fingerprint</option>
+                    <option value="locks">Lock Status</option>
                 </select>
                 <input
                     type="text"
@@ -270,6 +362,7 @@ export class ProcessListPanel {
                         <th data-sort="time">Time (s)</th>
                         <th data-sort="state">State</th>
                         <th data-sort="inTransaction">Transaction</th>
+                        <th data-sort="hasLocks">Locks</th>
                         <th data-sort="info">Info</th>
                         <th>Actions</th>
                     </tr>
