@@ -4,14 +4,14 @@ import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
 import { QueryProfilingService } from '../services/query-profiling-service';
-import { AIService } from '../services/ai-service';
+import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 
 export class QueryProfilingPanel {
     private static panelRegistry: Map<string, QueryProfilingPanel> = new Map();
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
     private service: QueryProfilingService;
-    private aiService?: AIService;
+    private aiServiceCoordinator?: AIServiceCoordinator;
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -20,11 +20,11 @@ export class QueryProfilingPanel {
         private connectionManager: ConnectionManager,
         private connectionId: string,
         private query: string,
-        aiService?: AIService
+        aiServiceCoordinator?: AIServiceCoordinator
     ) {
         this.panel = panel;
         this.service = new QueryProfilingService(logger);
-        this.aiService = aiService;
+        this.aiServiceCoordinator = aiServiceCoordinator;
         this.panel.webview.html = this.getHtml();
         this.setupMessageHandling();
         this.profile();
@@ -37,7 +37,7 @@ export class QueryProfilingPanel {
         connectionManager: ConnectionManager,
         connectionId: string,
         query: string,
-        aiService?: AIService
+        aiServiceCoordinator?: AIServiceCoordinator
     ): void {
         const key = `profile-${connectionId}-${query.substring(0, 64)}`;
         const existing = QueryProfilingPanel.panelRegistry.get(key);
@@ -54,7 +54,7 @@ export class QueryProfilingPanel {
                 vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@vscode/webview-ui-toolkit')
             ] }
         );
-        const p = new QueryProfilingPanel(panel, context, logger, connectionManager, connectionId, query, aiService);
+        const p = new QueryProfilingPanel(panel, context, logger, connectionManager, connectionId, query, aiServiceCoordinator);
         QueryProfilingPanel.panelRegistry.set(key, p);
     }
 
@@ -83,8 +83,8 @@ export class QueryProfilingPanel {
     }
 
     private async getAIInsights(profile: any): Promise<void> {
-        if (!this.aiService) {
-            this.logger.warn('AI service not available');
+        if (!this.aiServiceCoordinator) {
+            this.logger.warn('AI service coordinator not available');
             return;
         }
 
@@ -97,47 +97,36 @@ export class QueryProfilingPanel {
                 return;
             }
 
-            // Extract tables from the query
-            const tables = this.extractTablesFromQuery(this.query);
-            this.logger.info(`Extracted tables from query: ${tables.join(', ')}`);
+            // Get connection to determine DB type
+            const connection = this.connectionManager.getConnection(this.connectionId);
+            const dbType = connection?.type === 'mariadb' ? 'mariadb' : 'mysql';
 
-            // Fetch schema context for all tables in the query
-            const schemaContext = await this.buildSchemaContext(adapter, tables);
+            this.logger.info(`Requesting AI profiling interpretation for ${dbType.toUpperCase()} database...`);
 
-            // Add profiling performance data to schema context
-            if (schemaContext) {
-                schemaContext.performance = {
-                    totalDuration: profile.totalDuration,
-                    rowsExamined: profile.summary.totalRowsExamined,
-                    rowsSent: profile.summary.totalRowsSent,
-                    efficiency: profile.summary.efficiency,
-                    lockTime: profile.summary.totalLockTime,
-                    stages: profile.stages?.map((s: any) => ({
-                        name: s.eventName,
-                        duration: s.duration
-                    }))
-                };
-
-                this.logger.info(`Schema context built with ${Object.keys(schemaContext.tables || {}).length} tables and performance data`);
-                this.logger.debug(`Performance context: Duration=${profile.totalDuration}µs, Rows Examined=${profile.summary.totalRowsExamined}, Efficiency=${profile.summary.efficiency}`);
-            }
-
-            // Get AI analysis with full context
-            const dbType = adapter.isMariaDB ? 'mariadb' : 'mysql';
-            this.logger.info(`Requesting AI analysis for ${dbType.toUpperCase()} database...`);
-            this.logger.debug(`AI request details: query="${this.query.substring(0, 100)}...", tables=${tables.join(',')}, dbType=${dbType}`);
-            this.logger.debug(`Adapter info: isMariaDB=${adapter.isMariaDB}, version=${adapter.version}`);
-
-            const analysis = await this.aiService.analyzeQuery(
+            // Use AIServiceCoordinator's interpretProfiling for specialized profiling analysis
+            const interpretation = await this.aiServiceCoordinator.interpretProfiling(
+                profile,
                 this.query,
-                schemaContext,
                 dbType
             );
 
-            this.logger.info('AI analysis completed successfully');
+            this.logger.info('AI profiling interpretation completed successfully');
+            
+            // Send enhanced insights to webview
             this.panel.webview.postMessage({
                 type: 'aiInsights',
-                insights: analysis
+                insights: {
+                    // Core profiling interpretation
+                    stages: interpretation.stages,
+                    bottlenecks: interpretation.bottlenecks,
+                    totalDuration: interpretation.totalDuration,
+                    insights: interpretation.insights,
+                    suggestions: interpretation.suggestions,
+                    citations: interpretation.citations,
+                    // Include summary for backward compatibility
+                    summary: interpretation.insights.join('\n\n'),
+                    optimizationSuggestions: interpretation.suggestions
+                }
             });
         } catch (error) {
             this.logger.error('AI analysis failed:', error as Error);

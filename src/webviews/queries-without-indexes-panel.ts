@@ -289,16 +289,15 @@ export class QueriesWithoutIndexesPanel {
                 throw new Error('Connection not found');
             }
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
-            const { AIService } = await import('../services/ai-service');
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
             QueryProfilingPanel.show(
                 this.context,
                 this.logger,
                 this.connectionManager,
                 this.connectionId,
                 queryText,
-                aiService
+                aiServiceCoordinator
             );
         } catch (error) {
             this.logger.error('Failed to profile query:', error as Error);

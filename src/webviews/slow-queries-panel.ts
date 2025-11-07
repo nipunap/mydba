@@ -160,10 +160,9 @@ export class SlowQueriesPanel {
             }
 
             const { QueryProfilingPanel } = await import('./query-profiling-panel');
-            const { AIService } = await import('../services/ai-service');
-            const aiService = new AIService(this.logger, this.context);
-            await aiService.initialize();
-            QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiService);
+            const { AIServiceCoordinator } = await import('../services/ai-service-coordinator');
+            const aiServiceCoordinator = new AIServiceCoordinator(this.logger, this.context);
+            QueryProfilingPanel.show(this.context, this.logger, this.connectionManager, this.connectionId, queryText, aiServiceCoordinator);
         } catch (error) {
             this.logger.error('Failed to open Profiling:', error as Error);
             vscode.window.showErrorMessage(`Failed to open Profiling: ${(error as Error).message}`);

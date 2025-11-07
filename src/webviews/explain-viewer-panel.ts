@@ -810,15 +810,15 @@ export class ExplainViewerPanel {
                     case 'log':
                         this.logger.debug(message.message as string);
                         break;
-                    
+
                     case 'applyOptimization':
                         await this.handleApplyOptimization(message.suggestion);
                         break;
-                    
+
                     case 'compareOptimization':
                         await this.handleCompareOptimization(message.suggestion);
                         break;
-                    
+
                     case 'copyToClipboard':
                         await this.handleCopyToClipboard(message.text);
                         break;
@@ -843,7 +843,7 @@ export class ExplainViewerPanel {
             }
 
             // Safe Mode confirmation
-            const impactWarning = suggestion.impact === 'high' 
+            const impactWarning = suggestion.impact === 'high'
                 ? '⚠️  HIGH IMPACT - This change could significantly affect performance or behavior.'
                 : suggestion.impact === 'medium'
                 ? '⚠️  MEDIUM IMPACT - Review this change carefully before applying.'
@@ -904,7 +904,7 @@ export class ExplainViewerPanel {
                 await adapter.query(ddl);
 
                 progress.report({ message: 'Verifying changes...' });
-                
+
                 // Wait a moment for changes to propagate
                 await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -922,7 +922,7 @@ export class ExplainViewerPanel {
                 // Re-run EXPLAIN to show the new plan
                 const explainQuery = `EXPLAIN FORMAT=JSON ${this.query}`;
                 await adapter.query<unknown>(explainQuery);
-                
+
                 // Reload the panel with new data
                 await this.processAndSendExplainData();
             }
@@ -958,13 +958,13 @@ export class ExplainViewerPanel {
             );
 
             // Create temporary files with the content
-            const beforeDoc = await vscode.workspace.openTextDocument({ 
-                content: suggestion.before, 
-                language: 'sql' 
+            const beforeDoc = await vscode.workspace.openTextDocument({
+                content: suggestion.before,
+                language: 'sql'
             });
-            const afterDoc = await vscode.workspace.openTextDocument({ 
-                content: suggestion.after, 
-                language: 'sql' 
+            const afterDoc = await vscode.workspace.openTextDocument({
+                content: suggestion.after,
+                language: 'sql'
             });
 
             // Show diff
