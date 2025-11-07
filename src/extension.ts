@@ -142,7 +142,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     } catch (error) {
         logger.error('Failed to activate MyDBA:', error as Error);
-        
+
         // Show detailed error message with recovery options
         await handleActivationError(context, logger, error as Error);
     }
@@ -220,7 +220,7 @@ async function handleActivationError(
  */
 async function retryActivation(context: vscode.ExtensionContext, logger: Logger): Promise<void> {
     logger.info('Retrying activation...');
-    
+
     await vscode.window.withProgress(
         {
             location: vscode.ProgressLocation.Notification,
@@ -230,7 +230,7 @@ async function retryActivation(context: vscode.ExtensionContext, logger: Logger)
         async () => {
             // Wait a moment before retry
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+
             try {
                 // Dispose existing container if it exists
                 if (serviceContainer) {
@@ -331,6 +331,20 @@ async function continueInLimitedMode(context: vscode.ExtensionContext, logger: L
             }),
             vscode.commands.registerCommand('mydba.configureAIProvider', async () => {
                 try {
+                    // Check if service container is available
+                    if (!serviceContainer) {
+                        logger.warn('AI configuration attempted without service container in limited mode');
+                        vscode.window.showWarningMessage(
+                            'AI configuration is unavailable in limited mode. Please retry full activation first.',
+                            'Retry Activation'
+                        ).then(async (selection) => {
+                            if (selection === 'Retry Activation') {
+                                await retryActivation(context, logger);
+                            }
+                        });
+                        return;
+                    }
+
                     const { configureAIProvider } = await import('./commands/configure-ai-provider');
                     await configureAIProvider(context, logger, serviceContainer);
                 } catch (error) {
