@@ -52,7 +52,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should replace single parameter with sample value', () => {
             const query = 'SELECT * FROM users WHERE id = ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toMatch(/WHERE id = \d+/);
         });
@@ -60,7 +60,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should replace multiple parameters with sample values', () => {
             const query = 'SELECT * FROM users WHERE id = ? AND name = ? AND email = ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             // The getSampleValue method checks the ENTIRE query for keywords, so all placeholders
             // get the same type (email in this case)
@@ -70,7 +70,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle numeric context', () => {
             const query = 'SELECT * FROM numbers WHERE value > ? AND count < ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             // Should use sample values (default to string then number for subsequent params)
             expect(result).toContain('value >');
@@ -80,7 +80,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle string context', () => {
             const query = "SELECT * FROM users WHERE name = ? AND email LIKE ?";
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             // Should use strings after = or LIKE
             expect(result).toMatch(/name = '[^']+'/);
@@ -90,7 +90,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle IN clause', () => {
             const query = 'SELECT * FROM users WHERE id IN (?, ?, ?)';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toMatch(/IN \(\d+, \d+, \d+\)/);
         });
@@ -98,7 +98,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle INSERT statements', () => {
             const query = 'INSERT INTO users (name, email, age) VALUES (?, ?, ?)';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toContain('VALUES');
         });
@@ -106,7 +106,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle UPDATE statements', () => {
             const query = 'UPDATE products SET price = ?, quantity = ? WHERE product_id = ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toContain('SET price =');
             expect(result).toContain('quantity =');
@@ -116,7 +116,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle DELETE statements', () => {
             const query = 'DELETE FROM users WHERE id = ? AND status = ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toMatch(/WHERE id = \d+/);
         });
@@ -124,7 +124,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle BETWEEN clauses', () => {
             const query = 'SELECT * FROM orders WHERE created_at BETWEEN ? AND ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toMatch(/BETWEEN '[^']+' AND '[^']+'/);
         });
@@ -136,7 +136,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
                 WHERE u.email = ? AND o.status = ?
             `;
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toMatch(/u.email = '[^']+'/);
             expect(result).toMatch(/o.status = '[^']+'/);
@@ -149,7 +149,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
                 AND active = ?
             `;
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toContain('amount >');
             expect(result).toContain('active =');
@@ -167,7 +167,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
                 LIMIT ?
             `;
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).toContain('SELECT');
             expect(result).toContain('FROM');
             expect(result).toContain('LEFT JOIN');
@@ -182,21 +182,21 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle queries with no parameters', () => {
             const query = 'SELECT * FROM users WHERE id = 1';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).toBe(query);
         });
 
         test('should handle empty queries', () => {
             const query = '';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).toBe('');
         });
 
         test('should use sample values based on keyword detection', () => {
             const query = 'SELECT * FROM products WHERE product_id = ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(result).toContain('product_id =');
             // The function uses keyword detection to determine sample value type
@@ -208,7 +208,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle multiple consecutive parameters', () => {
             const query = 'SELECT * FROM test WHERE a = ? AND b = ? AND c = ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
             expect(QueryDeanonymizer.countParameters(result)).toBe(0);
         });
@@ -216,7 +216,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should replace all question marks (including those in literals)', () => {
             const query = "SELECT * FROM users WHERE comment = 'What? Really?' AND user_id = ?";
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             // The simple regex replacement replaces ALL question marks, even in literals
             // This is a known limitation - in practice, parameterized queries don't have ? in strings
             expect(result).not.toContain('?');
@@ -231,7 +231,7 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
                   AND phone = ? AND address = ? AND zip_code = ? AND score = ?
             `;
             const result = QueryDeanonymizer.replaceParametersForExplain(longQuery);
-            
+
             expect(result).not.toContain('?');
             expect(QueryDeanonymizer.countParameters(result)).toBe(0);
         });
@@ -239,9 +239,8 @@ describe('QueryDeanonymizer - Parameter Replacement', () => {
         test('should handle case-insensitive SQL keywords', () => {
             const query = 'select * from users where id = ? and name = ?';
             const result = QueryDeanonymizer.replaceParametersForExplain(query);
-            
+
             expect(result).not.toContain('?');
         });
     });
 });
-

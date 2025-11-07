@@ -188,11 +188,11 @@
         // Query
         const querySection = document.createElement('div');
         querySection.className = 'query-section';
-        
+
         const queryPre = document.createElement('pre');
         queryPre.className = 'query-text';
         queryPre.textContent = entry.query;
-        
+
         querySection.appendChild(queryPre);
 
         // Metadata
@@ -300,11 +300,11 @@
 
     function applyFilters() {
         const options = {};
-        
+
         if (filterFavorites && filterFavorites.checked) {
             options.onlyFavorites = true;
         }
-        
+
         if (filterSuccess && filterSuccess.checked) {
             options.successOnly = true;
         }
@@ -341,7 +341,7 @@
                     <div class="stat-label">Avg Duration</div>
                 </div>
             </div>
-            
+
             <div class="stats-section">
                 <h4>Most Frequently Executed</h4>
                 <table class="stats-table">
@@ -361,7 +361,7 @@
                     </tbody>
                 </table>
             </div>
-            
+
             ${stats.recentErrors.length > 0 ? `
             <div class="stats-section">
                 <h4>Recent Errors</h4>
@@ -471,4 +471,3 @@
     // Initialize
     vscode.postMessage({ type: 'refresh' });
 })();
-

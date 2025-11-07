@@ -57,12 +57,16 @@ export interface QueryContext {
 }
 
 export interface RAGDocument {
-    id: string;
+    id?: string;
     title: string;
     keywords: string[];
     content: string;
     source: string;
-    version: string;
+    version?: string;
+    // Enhanced RAG fields (Phase 2.5)
+    relevanceScore?: number; // Combined score (0-1)
+    semanticScore?: number; // Vector similarity score (0-1)
+    keywordScore?: number; // Keyword matching score (0-1)
 }
 
 export interface AntiPattern {

@@ -172,7 +172,7 @@ export class QueryHistoryPanel {
             });
 
             await vscode.window.showTextDocument(document);
-            
+
             vscode.window.showInformationMessage(
                 `Replaying query from ${new Date(entry.timestamp).toLocaleString()}`
             );
@@ -220,7 +220,7 @@ export class QueryHistoryPanel {
 
     private async handleExport(format: 'json' | 'csv'): Promise<void> {
         try {
-            const data = format === 'json' 
+            const data = format === 'json'
                 ? this.historyService.exportToJSON()
                 : this.historyService.exportToCSV();
 
@@ -256,10 +256,10 @@ export class QueryHistoryPanel {
             if (uri && uri[0]) {
                 const data = await vscode.workspace.fs.readFile(uri[0]);
                 const json = Buffer.from(data).toString('utf-8');
-                
+
                 const count = this.historyService.importFromJSON(json);
                 await this.loadHistory();
-                
+
                 vscode.window.showInformationMessage(`Imported ${count} query entries`);
             }
         } catch (error) {
@@ -292,7 +292,7 @@ export class QueryHistoryPanel {
     private async handleFilter(options: { limit?: number; connectionId?: string; onlyFavorites?: boolean; successOnly?: boolean }): Promise<void> {
         try {
             const results = this.historyService.getHistory(options);
-            
+
             this.panel.webview.postMessage({
                 type: 'filterResults',
                 results: results
@@ -305,7 +305,7 @@ export class QueryHistoryPanel {
     private async handleGetStats(): Promise<void> {
         try {
             const stats = this.historyService.getStats();
-            
+
             this.panel.webview.postMessage({
                 type: 'stats',
                 stats: stats
@@ -435,4 +435,3 @@ export class QueryHistoryPanel {
         }
     }
 }
-
