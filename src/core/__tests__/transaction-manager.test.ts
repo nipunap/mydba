@@ -55,7 +55,7 @@ describe('TransactionManager', () => {
 
         it('should track affected objects', async () => {
             const operations = [
-                jest.fn().mockResolvedValue({ 
+                jest.fn().mockResolvedValue({
                     sql: 'CREATE INDEX idx_users ON users (email)',
                     affectedObject: 'users.idx_users'
                 })
@@ -166,7 +166,7 @@ describe('TransactionManager', () => {
             ];
 
             await transactionManager.execute('conn-1', operations);
-            
+
             // Should only rollback once
             expect(rollbackCount).toBe(1);
         });
@@ -226,7 +226,7 @@ describe('TransactionManager', () => {
                 })
             ];
 
-            const executePromise = transactionManager.execute('conn-1', operations, { timeout: 100 });
+            const _executePromise = transactionManager.execute('conn-1', operations, { timeout: 100 });
 
             // Fast-forward time
             jest.advanceTimersByTime(150);
@@ -259,7 +259,7 @@ describe('TransactionManager', () => {
     describe('Idempotency Tests', () => {
         it('should detect already-executed operations', async () => {
             const sql = 'CREATE INDEX idx1 ON users (email)';
-            
+
             // Execute first time
             await transactionManager.execute('conn-1', [
                 jest.fn().mockResolvedValue({ sql })
@@ -267,14 +267,14 @@ describe('TransactionManager', () => {
 
             // Check idempotency
             const isIdempotent = await transactionManager.checkIdempotency('conn-1', sql);
-            
+
             expect(isIdempotent).toBe(true);
         });
 
         it('should normalize SQL for comparison', async () => {
             const sql1 = '  CREATE   INDEX   idx1   ON   users (email)  ';
             const sql2 = 'create index idx1 on users (email);';
-            
+
             // Execute first time
             await transactionManager.execute('conn-1', [
                 jest.fn().mockResolvedValue({ sql: sql1 })
@@ -282,7 +282,7 @@ describe('TransactionManager', () => {
 
             // Should detect as idempotent despite different formatting
             const isIdempotent = await transactionManager.checkIdempotency('conn-1', sql2);
-            
+
             expect(isIdempotent).toBe(true);
         });
 
@@ -318,7 +318,7 @@ describe('TransactionManager', () => {
 
             const isIdempotent1 = await transactionManager.checkIdempotency('conn-1', 'CREATE INDEX idx1 ON users (email)');
             const isIdempotent2 = await transactionManager.checkIdempotency('conn-2', 'CREATE INDEX idx2 ON users (name)');
-            
+
             expect(isIdempotent1).toBe(false);
             expect(isIdempotent2).toBe(false);
         });
@@ -458,7 +458,7 @@ describe('TransactionManager', () => {
 
             // Dry run catches errors and returns result with error, doesn't throw
             const result = await transactionManager.execute('conn-1', operations, { dryRun: true });
-            
+
             expect(result.success).toBe(false);
             expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Invalid SQL');
@@ -522,4 +522,3 @@ describe('TransactionManager', () => {
         });
     });
 });
-
