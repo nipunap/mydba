@@ -111,7 +111,7 @@ export class QueryProfilingPanel {
             );
 
             this.logger.info('AI profiling interpretation completed successfully');
-            
+
             // Send enhanced insights to webview
             this.panel.webview.postMessage({
                 type: 'aiInsights',
