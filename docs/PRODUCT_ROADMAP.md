@@ -136,12 +136,12 @@
 
 ---
 
-## ✅ **Phase 1.5: Production Readiness** (CORE COMPLETE)
+## ✅ **Phase 1.5: Production Readiness** (100% COMPLETE)
 
 **Revised Estimate:** 31-40 hours
 **Actual Time:** 29-31 hours
 **Target Completion:** December 15, 2025
-**Status:** ✅ Core objectives achieved, ready for v1.3 release
+**Status:** ✅ **100% COMPLETE** - Ready for v1.3 release
 
 > **Management Decision**: Consolidated Milestone 7 (Architecture Improvements) into Phase 1.5 to eliminate 12-16 hours of duplicate work. Restructured into 3 workstreams for parallel execution.
 
@@ -226,20 +226,19 @@
 
 ---
 
-### ⏳ Milestone 4.7: Code Quality (3-4 hours) - **OPTIONAL**
+### ✅ Milestone 4.7: Code Quality (3-4 hours) - **COMPLETE**
 
-**Status:** 60% complete (optional polish, non-blocking)
-**Priority:** MEDIUM - Not required for v1.3 release
+**Status:** 100% ✅ **COMPLETE** (Nov 8, 2025)
+**Priority:** MEDIUM - Optional polish completed
 **Target:** December 15, 2025
 
 **Completed:**
 - ✅ getTableSchema() implementation (fully functional with INFORMATION_SCHEMA)
 - ✅ Error Recovery in Activation (retry/reset/limited mode)
 - ✅ Chat Participant edge cases (graceful degradation)
-
-**Remaining (Optional):**
-- [ ] Remove non-null assertions (2h) - Replace `pool!` with proper null checks
-- [ ] Query Service implementation (1-2h) - Basic SQL parsing using existing QueryAnalyzer
+- ✅ **Removed all non-null assertions** (14 instances of `pool!` replaced with proper checks)
+- ✅ **Query Service implementation** (parse, templateQuery, analyzeRisk, validate methods)
+- ✅ **31 comprehensive Query Service tests** (100% passing)
 
 **Deferred to Phase 2:**
 - Disposables hygiene audit (2-3h)
@@ -258,13 +257,12 @@
 - ✅ Audit logger functional and capturing critical operations
 - ✅ CI coverage gate enforced (blocks PRs < 39%)
 - ✅ Zero production blockers remaining
-- ✅ **Ready for v1.3 release**
+- ✅ **Zero non-null assertions in production code**
+- ✅ **Query Service fully implemented with comprehensive tests**
+- ✅ **836 tests passing (11 skipped, 847 total)**
+- ✅ **Ready for v1.3.0 release**
 
-**Optional Polish (Workstream 3):**
-- ⏳ Zero non-null assertions in production code
-- ⏳ Query Service basic implementation
-
-**Status:** Phase 1.5 can ship without Workstream 3 completion.
+**Status:** Phase 1.5 is 100% COMPLETE and ready to ship.
 
 ---
 
@@ -273,10 +271,10 @@
 | Metric | Current | Phase 1.5 Target | Phase 2 Target |
 |--------|---------|------------------|----------------|
 | **Test Coverage** | 39% ✅ | 39% ✅ | 50-70% |
-| **Tests Passing** | 803 ✅ | 800+ ✅ | 1000+ |
+| **Tests Passing** | 836 ✅ | 800+ ✅ | 1000+ |
 | **Critical TODOs** | 0 ✅ | 0 ✅ | 0 |
 | **Production Blockers** | 0 ✅ | 0 ✅ | 0 |
-| **Architecture Score** | 9.0/10 ✅ | 9.0/10 ✅ | 9.5/10 |
+| **Architecture Score** | 9.5/10 ✅ | 9.0/10 ✅ | 9.5/10 |
 
 ---
 

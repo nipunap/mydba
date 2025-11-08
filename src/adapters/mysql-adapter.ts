@@ -173,11 +173,9 @@ export class MySQLAdapter {
     }
 
     async getDatabases(): Promise<DatabaseInfo[]> {
-        this.ensureConnected();
-
         try {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW DATABASES');
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW DATABASES');
             return (rows as Array<{ Database: string }>).map((row) => ({ name: row.Database }));
 
         } catch (error) {
@@ -187,8 +185,6 @@ export class MySQLAdapter {
     }
 
     async getTables(database: string): Promise<TableInfo[]> {
-        this.ensureConnected();
-
         // Validate database name
         const validation = InputValidator.validateDatabaseName(database);
         if (!validation.valid) {
@@ -196,6 +192,7 @@ export class MySQLAdapter {
         }
 
         try {
+            const pool = this.ensureConnected();
             const sql = `SHOW TABLE STATUS FROM \`${database}\``;
             interface TableRow {
                 Name: string;
@@ -205,8 +202,7 @@ export class MySQLAdapter {
                 Index_length?: number;
                 Collation?: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query(sql) as [TableRow[], mysql.FieldPacket[]];
+            const [rows] = await pool.query(sql) as [TableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Name,
@@ -292,8 +288,8 @@ export class MySQLAdapter {
             extra: string;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const [rows] = await this.pool!.query(sql, [database, table]) as [ColumnRow[], mysql.FieldPacket[]];
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [ColumnRow[], mysql.FieldPacket[]];
 
         return rows.map(row => ({
             name: row.name,
@@ -330,8 +326,8 @@ export class MySQLAdapter {
             seqInIndex: number;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const [rows] = await this.pool!.query(sql, [database, table]) as [IndexRow[], mysql.FieldPacket[]];
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [IndexRow[], mysql.FieldPacket[]];
 
         // Group columns by index name
         const indexMap = new Map<string, { columns: string[]; unique: boolean; type: string }>();
@@ -408,8 +404,8 @@ export class MySQLAdapter {
             updateRule: string;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const [rows] = await this.pool!.query(sql, [database, table]) as [ForeignKeyRow[], mysql.FieldPacket[]];
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [ForeignKeyRow[], mysql.FieldPacket[]];
 
         // Group by constraint name
         const fkMap = new Map<string, {
@@ -474,15 +470,13 @@ export class MySQLAdapter {
             rowCount: number | null;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const [rows] = await this.pool!.query(sql, [database, table]) as [RowCountResult[], mysql.FieldPacket[]];
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [RowCountResult[], mysql.FieldPacket[]];
 
         return rows[0]?.rowCount ?? 0;
     }
 
     async query<T = unknown>(sql: string, params?: unknown[]): Promise<QueryResult<T>> {
-        this.ensureConnected();
-
         // Track query start time for performance monitoring
         const queryStartTime = Date.now();
 
@@ -522,8 +516,8 @@ export class MySQLAdapter {
             const safeForConsole = sanitizedSQL.replace(/%/g, '%%');
             this.logger.info(`Executing query: ${DataSanitizer.truncate(safeForConsole, 200)}`);
 
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows, fields] = await this.pool!.query(sql, params);
+            const pool = this.ensureConnected();
+            const [rows, fields] = await pool.query(sql, params);
 
             // Calculate query duration
             const queryDuration = Date.now() - queryStartTime;
@@ -613,12 +607,10 @@ export class MySQLAdapter {
      * Useful for operations that need thread consistency (like profiling).
      */
     async withConnection<T>(fn: (conn: mysql.PoolConnection) => Promise<T>): Promise<T> {
-        this.ensureConnected();
-
         let connection: mysql.PoolConnection | null = null;
         try {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            connection = await this.pool!.getConnection();
+            const pool = this.ensureConnected();
+            connection = await pool.getConnection();
             this.logger.debug('Acquired dedicated connection from pool');
 
             // Ensure database is selected if configured
@@ -665,15 +657,13 @@ export class MySQLAdapter {
     }
 
     async getProcessList(): Promise<Process[]> {
-        this.ensureConnected();
-
         try {
             // First, check if Performance Schema is enabled
             interface PerformanceSchemaConfig {
                 enabled: number;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [psConfig] = await this.pool!.query(
+            const pool = this.ensureConnected();
+            const [psConfig] = await pool.query(
                 "SELECT @@global.performance_schema AS enabled"
             ) as [PerformanceSchemaConfig[], mysql.FieldPacket[]];
             const psEnabled = psConfig && psConfig[0]?.enabled === 1;
@@ -725,8 +715,7 @@ export class MySQLAdapter {
                 transactionState: string | null;
                 transactionStarted: Date | null;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query(query) as [ProcessRow[], mysql.FieldPacket[]];
+            const [rows] = await pool.query(query) as [ProcessRow[], mysql.FieldPacket[]];
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             // Import QueryAnonymizer for fingerprinting
@@ -776,8 +765,8 @@ export class MySQLAdapter {
                 State: string | null;
                 Info: string | null;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW FULL PROCESSLIST') as [BasicProcessRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW FULL PROCESSLIST') as [BasicProcessRow[], mysql.FieldPacket[]];
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             return rows.map((row) => ({
@@ -798,15 +787,13 @@ export class MySQLAdapter {
     }
 
     async getGlobalVariables(): Promise<Variable[]> {
-        this.ensureConnected();
-
         try {
             interface VariableRow {
                 Variable_name: string;
                 Value: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW GLOBAL VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW GLOBAL VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -821,15 +808,13 @@ export class MySQLAdapter {
     }
 
     async getSessionVariables(): Promise<Variable[]> {
-        this.ensureConnected();
-
         try {
             interface VariableRow {
                 Variable_name: string;
                 Value: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW SESSION VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW SESSION VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -844,15 +829,13 @@ export class MySQLAdapter {
     }
 
     async getMetrics(): Promise<Metrics> {
-        this.ensureConnected();
-
         try {
             interface StatusRow {
                 Variable_name: string;
                 Value: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW GLOBAL STATUS') as [StatusRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW GLOBAL STATUS') as [StatusRow[], mysql.FieldPacket[]];
 
             // Parse status variables into metrics
             const statusMap = new Map<string, string>();
@@ -889,13 +872,14 @@ export class MySQLAdapter {
 
     // Private helper methods
 
-    private ensureConnected(): void {
+    private ensureConnected(): mysql.Pool {
         if (!this.isConnectedState) {
             throw new ConnectionError('Not connected to database');
         }
         if (!this.pool) {
             throw new ConnectionError('Connection pool not initialized');
         }
+        return this.pool;
     }
 
     private isSupportedVersion(version: string): boolean {

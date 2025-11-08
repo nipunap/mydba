@@ -4,11 +4,11 @@
 
 # MyDBA - AI-Powered Database Assistant
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=mydba.mydba)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=mydba.mydba)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![VSCode](https://img.shields.io/badge/VSCode-1.85%2B-blue.svg)](https://code.visualstudio.com/)
-[![Tests](https://img.shields.io/badge/tests-186_passing-brightgreen.svg)](https://github.com/nipunap/mydba/actions)
-[![Coverage](https://img.shields.io/badge/coverage-10.76%25-yellow.svg)](coverage/index.html)
+[![Tests](https://img.shields.io/badge/tests-836_passing-brightgreen.svg)](https://github.com/nipunap/mydba/actions)
+[![Coverage](https://img.shields.io/badge/coverage-39%25-green.svg)](coverage/index.html)
 [![License Compliance](https://img.shields.io/badge/licenses-compliant-brightgreen.svg)](https://github.com/nipunap/mydba/actions)
 [![PR Checks](https://img.shields.io/badge/PR%20checks-automated-blue.svg)](https://github.com/nipunap/mydba/actions)
 
@@ -27,7 +27,7 @@ MyDBA is an AI-powered VSCode extension that brings database management, monitor
 - **Documentation-Grounded AI**: RAG system with MySQL/MariaDB docs to reduce hallucinations
 - **Chat Integration**: `@mydba` commands in VSCode Chat with natural language support
 - **Editor Compatibility**: Works in VSCode, Cursor, Windsurf, and VSCodium
-- **Testing**: 186 unit tests passing, integration tests with Docker (coverage improving to 70%)
+- **Testing**: 836 unit tests passing, integration tests with Docker, 39% code coverage
 
 ### Metrics Dashboard
 

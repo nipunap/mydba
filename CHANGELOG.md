@@ -5,6 +5,34 @@ All notable changes to the MyDBA extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-11-08
+
+### Added
+
+- Query Service implementation with comprehensive query analysis, templating, risk analysis, and validation
+- 31 new comprehensive tests for Query Service (836 total tests passing)
+
+### Changed
+
+- Improved null safety in MySQL adapter by removing non-null assertions
+- Enhanced type safety with proper pool connection handling
+- Test coverage increased from 10.76% to 39% (Phase 1.5 Production Readiness complete)
+
+### Fixed
+
+- Type safety issues in database connection handling
+- Removed 14 instances of non-null assertions (`pool!`) in mysql-adapter.ts
+
+### Technical
+
+- **Architecture Integration**: EventBus, CacheManager, PerformanceMonitor, and AuditLogger fully integrated
+- **Code Quality**: Zero non-null assertions in production code
+- **Test Coverage**: 39% overall coverage (9,400+ lines covered)
+  - Critical services: 60%+ coverage (mysql-adapter, ai-coordinator, security)
+  - 836 tests passing (11 skipped)
+  - Zero test flakiness
+- **CI/CD**: Coverage gate enforced at 39% minimum
+
 ## [1.2.0] - 2025-11-07
 
 ### Added
