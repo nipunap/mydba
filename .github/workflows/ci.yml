@@ -385,40 +385,45 @@ jobs:
           BRANCHES_PCT=$(node -e "const coverage = require('./coverage/coverage-summary.json'); console.log(coverage.total.branches.pct);")
           FUNCTIONS_PCT=$(node -e "const coverage = require('./coverage/coverage-summary.json'); console.log(coverage.total.functions.pct);")
 
-          # Set minimum threshold to 39% (Phase 1.5 achieved after comprehensive testing)
-          MIN_THRESHOLD=39
+          # Set minimum thresholds (matching jest.config.js)
+          MIN_BRANCHES=33
+          MIN_LINES=38
+          MIN_STATEMENTS=39
+          MIN_FUNCTIONS=39
 
           echo "📊 Coverage Report:"
-          echo "  Lines: ${LINES_PCT}%"
-          echo "  Statements: ${STATEMENTS_PCT}%"
-          echo "  Branches: ${BRANCHES_PCT}%"
-          echo "  Functions: ${FUNCTIONS_PCT}%"
+          echo "  Lines: ${LINES_PCT}% (threshold: ${MIN_LINES}%)"
+          echo "  Statements: ${STATEMENTS_PCT}% (threshold: ${MIN_STATEMENTS}%)"
+          echo "  Branches: ${BRANCHES_PCT}% (threshold: ${MIN_BRANCHES}%)"
+          echo "  Functions: ${FUNCTIONS_PCT}% (threshold: ${MIN_FUNCTIONS}%)"
           echo ""
-          echo "Minimum threshold: ${MIN_THRESHOLD}%"
 
           # Save to output for PR comment
           echo "lines_pct=$LINES_PCT" >> $GITHUB_OUTPUT
           echo "statements_pct=$STATEMENTS_PCT" >> $GITHUB_OUTPUT
           echo "branches_pct=$BRANCHES_PCT" >> $GITHUB_OUTPUT
           echo "functions_pct=$FUNCTIONS_PCT" >> $GITHUB_OUTPUT
-          echo "min_threshold=$MIN_THRESHOLD" >> $GITHUB_OUTPUT
+          echo "min_lines=$MIN_LINES" >> $GITHUB_OUTPUT
+          echo "min_statements=$MIN_STATEMENTS" >> $GITHUB_OUTPUT
+          echo "min_branches=$MIN_BRANCHES" >> $GITHUB_OUTPUT
+          echo "min_functions=$MIN_FUNCTIONS" >> $GITHUB_OUTPUT
 
           # Check if any metric is below threshold
           FAILED=0
-          if awk "BEGIN {exit !($LINES_PCT < $MIN_THRESHOLD)}"; then
-            echo "❌ Lines coverage ($LINES_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
+          if awk "BEGIN {exit !($LINES_PCT < $MIN_LINES)}"; then
+            echo "❌ Lines coverage ($LINES_PCT%) is below minimum threshold ($MIN_LINES%)"
             FAILED=1
           fi
-          if awk "BEGIN {exit !($STATEMENTS_PCT < $MIN_THRESHOLD)}"; then
-            echo "❌ Statements coverage ($STATEMENTS_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
+          if awk "BEGIN {exit !($STATEMENTS_PCT < $MIN_STATEMENTS)}"; then
+            echo "❌ Statements coverage ($STATEMENTS_PCT%) is below minimum threshold ($MIN_STATEMENTS%)"
             FAILED=1
           fi
-          if awk "BEGIN {exit !($BRANCHES_PCT < $MIN_THRESHOLD)}"; then
-            echo "❌ Branches coverage ($BRANCHES_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
+          if awk "BEGIN {exit !($BRANCHES_PCT < $MIN_BRANCHES)}"; then
+            echo "❌ Branches coverage ($BRANCHES_PCT%) is below minimum threshold ($MIN_BRANCHES%)"
             FAILED=1
           fi
-          if awk "BEGIN {exit !($FUNCTIONS_PCT < $MIN_THRESHOLD)}"; then
-            echo "❌ Functions coverage ($FUNCTIONS_PCT%) is below minimum threshold ($MIN_THRESHOLD%)"
+          if awk "BEGIN {exit !($FUNCTIONS_PCT < $MIN_FUNCTIONS)}"; then
+            echo "❌ Functions coverage ($FUNCTIONS_PCT%) is below minimum threshold ($MIN_FUNCTIONS%)"
             FAILED=1
           fi
 
@@ -453,21 +458,20 @@ jobs:
               coverageComment += '| Metric | Coverage | Threshold | Status |\n';
               coverageComment += '|--------|----------|-----------|--------|\n';
 
-              const minThreshold = parseFloat('${{ steps.coverage_check.outputs.min_threshold }}');
               const metrics = [
-                { name: 'Lines', pct: total.lines.pct },
-                { name: 'Statements', pct: total.statements.pct },
-                { name: 'Branches', pct: total.branches.pct },
-                { name: 'Functions', pct: total.functions.pct }
+                { name: 'Lines', pct: total.lines.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_lines }}') },
+                { name: 'Statements', pct: total.statements.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_statements }}') },
+                { name: 'Branches', pct: total.branches.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_branches }}') },
+                { name: 'Functions', pct: total.functions.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_functions }}') }
               ];
 
               metrics.forEach(metric => {
-                const emoji = metric.pct >= minThreshold ? '✅' : '❌';
-                coverageComment += `| ${metric.name} | ${metric.pct.toFixed(2)}% | ${minThreshold}% | ${emoji} |\n`;
+                const emoji = metric.pct >= metric.threshold ? '✅' : '❌';
+                coverageComment += `| ${metric.name} | ${metric.pct.toFixed(2)}% | ${metric.threshold}% | ${emoji} |\n`;
               });
 
               if (status !== 'passed') {
-                coverageComment += `\n⚠️ **Coverage is below the minimum threshold of ${minThreshold}%.** Please add tests to improve coverage.\n`;
+                coverageComment += `\n⚠️ **One or more coverage metrics are below their thresholds.** Please add tests to improve coverage.\n`;
               }
             } else {
               coverageComment += '❌ Coverage report not found.\n';
