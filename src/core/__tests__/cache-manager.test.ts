@@ -79,7 +79,7 @@ describe('CacheManager', () => {
 
         it.skip('should check if key exists', () => {
             cacheManager.set('schema:conn1:db1', { data: 'test' });
-            
+
             // has() internally calls get(), so it will increment stats
             expect(cacheManager.has('schema:conn1:db1')).toBe(true);
             expect(cacheManager.has('schema:conn1:nonexistent')).toBe(false);
@@ -338,7 +338,7 @@ describe('CacheManager', () => {
             const onCalls = (mockEventBus.on as jest.Mock).mock.calls;
             const queryExecutedCall = onCalls.find(call => call[0] === EVENTS.QUERY_EXECUTED);
             expect(queryExecutedCall).toBeDefined();
-            
+
             const eventHandler = queryExecutedCall[1];
             eventHandler(queryResult);
 
@@ -450,6 +450,46 @@ describe('CacheManager', () => {
                 expect.stringContaining('Invalidated all caches for removed connection conn1')
             );
         });
+
+        it('should handle connection IDs with regex special characters', () => {
+            // Connection ID with regex special characters
+            const specialConnId = 'conn.1+test*id?[0]';
+
+            cacheManager.set(`schema:${specialConnId}:db1`, { data: '1' });
+            cacheManager.set('schema:conn2:db1', { data: '2' });
+
+            // Should not throw and should invalidate only the matching connection
+            expect(() => {
+                cacheManager.onConnectionRemoved(specialConnId);
+            }).not.toThrow();
+
+            expect(cacheManager.get(`schema:${specialConnId}:db1`)).toBeUndefined();
+            expect(cacheManager.get('schema:conn2:db1')).toEqual({ data: '2' });
+        });
+
+        it('should handle schema names with regex special characters', () => {
+            // Schema name with regex special characters
+            const specialSchema = 'db.test+schema*[1]';
+
+            cacheManager.set(`schema:conn1:${specialSchema}`, { data: '1' });
+            cacheManager.set('schema:conn1:db2', { data: '2' });
+            cacheManager.set('schema:conn2:db1', { data: '3' });
+            cacheManager.set(`query:conn1:hash1`, { data: '4' });
+
+            // Should not throw and should invalidate only the matching schema
+            expect(() => {
+                cacheManager.onSchemaChanged('conn1', specialSchema);
+            }).not.toThrow();
+
+            // The specific schema should be invalidated
+            expect(cacheManager.get(`schema:conn1:${specialSchema}`)).toBeUndefined();
+            // Other schemas for conn1 are NOT invalidated when specific schema is provided
+            expect(cacheManager.get('schema:conn1:db2')).toEqual({ data: '2' });
+            // But query cache for conn1 IS invalidated
+            expect(cacheManager.get(`query:conn1:hash1`)).toBeUndefined();
+            // Other connections should not be affected
+            expect(cacheManager.get('schema:conn2:db1')).toEqual({ data: '3' });
+        });
     });
 
     describe('Disposal', () => {
@@ -525,4 +565,3 @@ describe('CacheKeyBuilder', () => {
         });
     });
 });
-

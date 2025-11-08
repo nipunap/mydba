@@ -8,6 +8,13 @@ import { Logger } from '../utils/logger';
 import { EventBus, EVENTS, QueryResult } from '../services/event-bus';
 
 /**
+ * Escape special regex characters in a string for safe use in RegExp
+ */
+function escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Cache configuration for different types
  */
 interface CacheConfig {
@@ -145,7 +152,8 @@ export class CacheManager implements ICacheManager {
 
         if (isWriteOp) {
             // Invalidate query cache for this connection
-            const pattern = new RegExp(`^query:${data.connectionId}:`);
+            const escapedConnectionId = escapeRegExp(data.connectionId);
+            const pattern = new RegExp(`^query:${escapedConnectionId}:`);
             this.invalidatePattern(pattern);
             this.logger.debug(`Cache invalidated for write operation on connection: ${data.connectionId}`);
         }
@@ -309,14 +317,15 @@ export class CacheManager implements ICacheManager {
      * Handle schema change event (invalidate schema and related caches)
      */
     onSchemaChanged(connectionId: string, schema?: string): void {
+        const escapedConnectionId = escapeRegExp(connectionId);
         const pattern = schema
-            ? new RegExp(`^schema:${connectionId}:${schema}`)
-            : new RegExp(`^schema:${connectionId}`);
+            ? new RegExp(`^schema:${escapedConnectionId}:${escapeRegExp(schema)}`)
+            : new RegExp(`^schema:${escapedConnectionId}`);
 
         this.invalidatePattern(pattern);
 
         // Also invalidate related query and explain caches
-        const queryPattern = new RegExp(`^(query|explain):${connectionId}`);
+        const queryPattern = new RegExp(`^(query|explain):${escapedConnectionId}`);
         this.invalidatePattern(queryPattern);
 
         this.logger.info(`Invalidated caches for connection ${connectionId} due to schema change`);
@@ -326,7 +335,8 @@ export class CacheManager implements ICacheManager {
      * Handle connection removed event
      */
     onConnectionRemoved(connectionId: string): void {
-        const pattern = new RegExp(`^[^:]+:${connectionId}`);
+        const escapedConnectionId = escapeRegExp(connectionId);
+        const pattern = new RegExp(`^[^:]+:${escapedConnectionId}`);
         this.invalidatePattern(pattern);
 
         this.logger.info(`Invalidated all caches for removed connection ${connectionId}`);
@@ -336,12 +346,12 @@ export class CacheManager implements ICacheManager {
      * Parse cache key into cache name and key
      */
     private parseKey(key: string): [string, string] {
-        const parts = key.split(':', 2);
-        if (parts.length !== 2) {
+        const colonIndex = key.indexOf(':');
+        if (colonIndex === -1) {
             throw new Error(`Invalid cache key format: ${key}. Expected format: cacheName:key`);
         }
 
-        return [parts[0], parts[1]];
+        return [key.substring(0, colonIndex), key.substring(colonIndex + 1)];
     }
 
     /**
