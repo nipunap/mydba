@@ -473,6 +473,9 @@ async function disableExtension(context: vscode.ExtensionContext, logger: Logger
 }
 
 export function deactivate(): Promise<void> {
+    // Reset activation retry counter for fresh start on next activation
+    activationRetryCount = 0;
+
     if (serviceContainer) {
         return serviceContainer.dispose();
     }

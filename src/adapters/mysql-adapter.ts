@@ -571,7 +571,7 @@ export class MySQLAdapter {
                     duration: queryDuration,
                     rowsAffected: result.affected
                 };
-                this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
+                await this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
             }
 
             return result;
@@ -600,7 +600,7 @@ export class MySQLAdapter {
                     duration: queryDuration,
                     error: error as Error
                 };
-                this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
+                await this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
             }
 
             throw new QueryError('Query execution failed', sql, error as Error);

@@ -52,10 +52,14 @@ export class AIServiceCoordinator {
         // Generate query hash for event
         const queryHash = crypto.createHash('sha256').update(query).digest('hex').substring(0, 16);
 
+        // Get actual AI provider name
+        const providerInfo = this.aiService.getProviderInfo();
+        const providerName = providerInfo?.name || 'unknown';
+
         // Log AI request to audit log (with anonymized query)
         if (this.auditLogger) {
             await this.auditLogger.logAIRequest(
-                'openai', // Provider would need to be passed in or retrieved
+                providerName,
                 'query_analysis',
                 true, // Initial state, will be updated
                 undefined
