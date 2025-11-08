@@ -131,7 +131,8 @@ export class ServiceContainer {
                 c.context,
                 c.get(SERVICE_TOKENS.SecretStorageService),
                 c.get(SERVICE_TOKENS.EventBus),
-                c.get(SERVICE_TOKENS.Logger)
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.CacheManager)
             )
         );
 

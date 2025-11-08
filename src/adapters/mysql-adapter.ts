@@ -479,6 +479,9 @@ export class MySQLAdapter {
     async query<T = unknown>(sql: string, params?: unknown[]): Promise<QueryResult<T>> {
         this.ensureConnected();
 
+        // Track query start time for performance monitoring
+        const queryStartTime = Date.now();
+
         // Check if this is a system/admin query (performance_schema, information_schema, SHOW, etc.)
         const isSystemQuery = this.isSystemQuery(sql);
 
@@ -513,6 +516,16 @@ export class MySQLAdapter {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const [rows, fields] = await this.pool!.query(sql, params);
 
+            // Calculate query duration
+            const queryDuration = Date.now() - queryStartTime;
+
+            // Log slow queries (>100ms)
+            if (queryDuration > 100) {
+                this.logger.warn(`Slow query detected: ${queryDuration}ms - ${DataSanitizer.truncate(safeForConsole, 100)}`);
+            } else {
+                this.logger.debug(`Query completed in ${queryDuration}ms`);
+            }
+
             // Convert mysql2 field info to our format
             const fieldInfo: FieldInfo[] = Array.isArray(fields) ? (fields as mysql.FieldPacket[]).map((f) => ({
                 name: f.name,
@@ -532,7 +545,9 @@ export class MySQLAdapter {
             };
 
         } catch (error) {
-            this.logger.error('Query execution failed:', error as Error);
+            // Calculate duration even on error
+            const queryDuration = Date.now() - queryStartTime;
+            this.logger.error(`Query execution failed after ${queryDuration}ms:`, error as Error);
             throw new QueryError('Query execution failed', sql, error as Error);
         }
     }

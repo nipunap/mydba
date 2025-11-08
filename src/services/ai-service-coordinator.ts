@@ -41,6 +41,7 @@ export class AIServiceCoordinator {
         schema?: SchemaContext,
         dbType: 'mysql' | 'mariadb' = 'mysql'
     ): Promise<AIAnalysisResult> {
+        const startTime = Date.now();
         this.logger.info('Analyzing query with AI Service Coordinator');
 
         try {
@@ -63,11 +64,20 @@ export class AIServiceCoordinator {
                 citations: aiAnalysis.citations
             };
 
+            // Track performance
+            const duration = Date.now() - startTime;
+            if (duration > 2000) {
+                this.logger.warn(`AI query analysis took ${duration}ms (exceeded 2s budget)`);
+            } else {
+                this.logger.debug(`AI query analysis completed in ${duration}ms`);
+            }
+
             this.logger.info(`Query analysis complete: ${result.optimizationSuggestions.length} suggestions`);
             return result;
 
         } catch (error) {
-            this.logger.error('Query analysis failed:', error as Error);
+            const duration = Date.now() - startTime;
+            this.logger.error(`Query analysis failed after ${duration}ms:`, error as Error);
 
             // Fallback to static analysis only
             const staticAnalysis = this.queryAnalyzer.analyze(query);

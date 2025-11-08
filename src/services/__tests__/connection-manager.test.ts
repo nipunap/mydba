@@ -3,6 +3,7 @@ import { SecretStorageService } from '../secret-storage-service';
 import { EventBus, EVENTS } from '../event-bus';
 import { Logger } from '../../utils/logger';
 import { ConnectionConfig } from '../../types';
+import { CacheManager } from '../../core/cache-manager';
 import * as vscode from 'vscode';
 
 // Mock dependencies
@@ -10,6 +11,29 @@ jest.mock('../secret-storage-service');
 jest.mock('../event-bus');
 jest.mock('../../utils/logger');
 jest.mock('../../adapters/adapter-registry');
+jest.mock('../../core/cache-manager', () => {
+    const actual = jest.requireActual('../../core/cache-manager');
+    return {
+        ...actual,
+        CacheManager: jest.fn().mockImplementation(() => ({
+            get: jest.fn(),
+            set: jest.fn(),
+            has: jest.fn(),
+            invalidate: jest.fn(),
+            invalidatePattern: jest.fn(),
+            clear: jest.fn(),
+            clearTier: jest.fn(),
+            getStats: jest.fn(),
+            getDetailedStats: jest.fn(),
+            onSchemaChanged: jest.fn(),
+            onConnectionRemoved: jest.fn(),
+            getVersion: jest.fn(),
+            init: jest.fn().mockResolvedValue(undefined),
+            dispose: jest.fn()
+        })),
+        CacheKeyBuilder: actual.CacheKeyBuilder // Use the real CacheKeyBuilder
+    };
+});
 
 describe('ConnectionManager', () => {
     let connectionManager: ConnectionManager;
@@ -541,6 +565,330 @@ describe('ConnectionManager', () => {
                 config.id,
                 expect.objectContaining({ password: undefined })
             );
+        });
+    });
+
+    describe('Cache Integration', () => {
+        let connectionManagerWithCache: ConnectionManager;
+        let mockCache: jest.Mocked<CacheManager>;
+
+        beforeEach(() => {
+            // Mock CacheManager
+            mockCache = {
+                get: jest.fn(),
+                set: jest.fn(),
+                has: jest.fn(),
+                invalidate: jest.fn(),
+                invalidatePattern: jest.fn(),
+                clear: jest.fn(),
+                clearTier: jest.fn(),
+                getStats: jest.fn(),
+                getDetailedStats: jest.fn(),
+                onSchemaChanged: jest.fn(),
+                onConnectionRemoved: jest.fn(),
+                getVersion: jest.fn(),
+                init: jest.fn().mockResolvedValue(undefined),
+                dispose: jest.fn()
+            } as unknown as jest.Mocked<CacheManager>;
+
+            // Create ConnectionManager with cache
+            connectionManagerWithCache = new ConnectionManager(
+                mockContext,
+                mockSecretStorage,
+                mockEventBus,
+                mockLogger,
+                mockCache
+            );
+        });
+
+        it('should cache database list on first call', async () => {
+            // Add and connect a connection
+            const config: ConnectionConfig = {
+                id: 'cache-test-1',
+                name: 'Cache Test 1',
+                type: 'mysql',
+                host: 'localhost',
+                port: 3306,
+                user: 'root',
+                database: 'test',
+                environment: 'dev'
+            };
+
+            await connectionManagerWithCache.addConnection(config);
+
+            // Mock adapter for getDatabases
+            const mockAdapter = {
+                getDatabases: jest.fn().mockResolvedValue([
+                    { name: 'db1' },
+                    { name: 'db2' }
+                ])
+            };
+
+            // Manually set the adapter (since we're mocking)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (connectionManagerWithCache as any).adapters.set(config.id, mockAdapter);
+
+            // Mock cache miss
+            mockCache.get.mockReturnValueOnce(undefined);
+
+            // Call getDatabases
+            const databases = await connectionManagerWithCache.getDatabases(config.id);
+
+            expect(databases).toEqual([{ name: 'db1' }, { name: 'db2' }]);
+            expect(mockAdapter.getDatabases).toHaveBeenCalledTimes(1);
+            expect(mockCache.get).toHaveBeenCalledWith('schema:cache-test-1:__databases__');
+            expect(mockCache.set).toHaveBeenCalledWith(
+                'schema:cache-test-1:__databases__',
+                [{ name: 'db1' }, { name: 'db2' }],
+                3600000 // 1 hour TTL
+            );
+        });
+
+        it('should return cached database list on subsequent calls', async () => {
+            const config: ConnectionConfig = {
+                id: 'cache-test-2',
+                name: 'Cache Test 2',
+                type: 'mysql',
+                host: 'localhost',
+                port: 3306,
+                user: 'root',
+                database: 'test',
+                environment: 'dev'
+            };
+
+            await connectionManagerWithCache.addConnection(config);
+
+            const mockAdapter = {
+                getDatabases: jest.fn().mockResolvedValue([
+                    { name: 'db1' },
+                    { name: 'db2' }
+                ])
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (connectionManagerWithCache as any).adapters.set(config.id, mockAdapter);
+
+            // Mock cache hit
+            mockCache.get.mockReturnValueOnce([{ name: 'cached-db1' }, { name: 'cached-db2' }]);
+
+            // Call getDatabases
+            const databases = await connectionManagerWithCache.getDatabases(config.id);
+
+            expect(databases).toEqual([{ name: 'cached-db1' }, { name: 'cached-db2' }]);
+            expect(mockAdapter.getDatabases).not.toHaveBeenCalled();
+            expect(mockCache.get).toHaveBeenCalledWith('schema:cache-test-2:__databases__');
+            expect(mockCache.set).not.toHaveBeenCalled();
+            expect(mockLogger.debug).toHaveBeenCalledWith('Cache hit for databases: cache-test-2');
+        });
+
+        it('should cache table schema on first call', async () => {
+            const config: ConnectionConfig = {
+                id: 'cache-test-3',
+                name: 'Cache Test 3',
+                type: 'mysql',
+                host: 'localhost',
+                port: 3306,
+                user: 'root',
+                database: 'test',
+                environment: 'dev'
+            };
+
+            await connectionManagerWithCache.addConnection(config);
+
+            const mockSchema = {
+                table: 'users',
+                database: 'testdb',
+                columns: [],
+                indexes: [],
+                foreignKeys: [],
+                rowEstimate: 0,
+                dataLength: 0,
+                indexLength: 0
+            };
+
+            const mockAdapter = {
+                getTableSchema: jest.fn().mockResolvedValue(mockSchema)
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (connectionManagerWithCache as any).adapters.set(config.id, mockAdapter);
+
+            // Mock cache miss
+            mockCache.get.mockReturnValueOnce(undefined);
+
+            // Call getTableSchema
+            const schema = await connectionManagerWithCache.getTableSchema(
+                config.id,
+                'testdb',
+                'users'
+            );
+
+            expect(schema).toEqual(mockSchema);
+            expect(mockAdapter.getTableSchema).toHaveBeenCalledWith('testdb', 'users');
+            expect(mockCache.get).toHaveBeenCalledWith('schema:cache-test-3:testdb:users');
+            expect(mockCache.set).toHaveBeenCalledWith(
+                'schema:cache-test-3:testdb:users',
+                mockSchema,
+                3600000 // 1 hour TTL
+            );
+        });
+
+        it('should return cached table schema on subsequent calls', async () => {
+            const config: ConnectionConfig = {
+                id: 'cache-test-4',
+                name: 'Cache Test 4',
+                type: 'mysql',
+                host: 'localhost',
+                port: 3306,
+                user: 'root',
+                database: 'test',
+                environment: 'dev'
+            };
+
+            await connectionManagerWithCache.addConnection(config);
+
+            const cachedSchema = {
+                table: 'users',
+                database: 'testdb',
+                columns: [{ name: 'id', type: 'int' }],
+                indexes: [],
+                foreignKeys: [],
+                rowEstimate: 100,
+                dataLength: 1024,
+                indexLength: 512
+            };
+
+            const mockAdapter = {
+                getTableSchema: jest.fn().mockResolvedValue({})
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (connectionManagerWithCache as any).adapters.set(config.id, mockAdapter);
+
+            // Mock cache hit
+            mockCache.get.mockReturnValueOnce(cachedSchema);
+
+            // Call getTableSchema
+            const schema = await connectionManagerWithCache.getTableSchema(
+                config.id,
+                'testdb',
+                'users'
+            );
+
+            expect(schema).toEqual(cachedSchema);
+            expect(mockAdapter.getTableSchema).not.toHaveBeenCalled();
+            expect(mockCache.get).toHaveBeenCalledWith('schema:cache-test-4:testdb:users');
+            expect(mockCache.set).not.toHaveBeenCalled();
+            expect(mockLogger.debug).toHaveBeenCalledWith('Cache hit for table schema: testdb.users');
+        });
+
+        it('should invalidate cache when connection state changes to disconnected', async () => {
+            // The event listener should be registered in constructor
+            expect(mockEventBus.on).toHaveBeenCalledWith(
+                EVENTS.CONNECTION_STATE_CHANGED,
+                expect.any(Function)
+            );
+
+            // Get the registered callback
+            const eventCallback = (mockEventBus.on as jest.Mock).mock.calls
+                .find(call => call[0] === EVENTS.CONNECTION_STATE_CHANGED)?.[1];
+
+            expect(eventCallback).toBeDefined();
+
+            // Simulate a connection state change to disconnected
+            await eventCallback({
+                connectionId: 'test-conn',
+                oldState: 'connected',
+                newState: 'disconnected'
+            });
+
+            expect(mockCache.onConnectionRemoved).toHaveBeenCalledWith('test-conn');
+        });
+
+        it('should invalidate cache when connection state changes to error', async () => {
+            // Get the registered callback
+            const eventCallback = (mockEventBus.on as jest.Mock).mock.calls
+                .find(call => call[0] === EVENTS.CONNECTION_STATE_CHANGED)?.[1];
+
+            expect(eventCallback).toBeDefined();
+
+            // Simulate a connection state change to error
+            await eventCallback({
+                connectionId: 'test-conn',
+                oldState: 'connected',
+                newState: 'error',
+                error: new Error('Connection lost')
+            });
+
+            expect(mockCache.onConnectionRemoved).toHaveBeenCalledWith('test-conn');
+        });
+
+        it('should not invalidate cache when connection state changes to connected', async () => {
+            // Get the registered callback
+            const eventCallback = (mockEventBus.on as jest.Mock).mock.calls
+                .find(call => call[0] === EVENTS.CONNECTION_STATE_CHANGED)?.[1];
+
+            expect(eventCallback).toBeDefined();
+
+            // Reset mock to clear previous calls
+            mockCache.onConnectionRemoved.mockClear();
+
+            // Simulate a connection state change to connected
+            await eventCallback({
+                connectionId: 'test-conn',
+                oldState: 'connecting',
+                newState: 'connected'
+            });
+
+            expect(mockCache.onConnectionRemoved).not.toHaveBeenCalled();
+        });
+
+        it('should throw error when adapter not found for getDatabases', async () => {
+            await expect(
+                connectionManagerWithCache.getDatabases('non-existent')
+            ).rejects.toThrow('No adapter found for connection: non-existent');
+        });
+
+        it('should throw error when adapter not found for getTableSchema', async () => {
+            await expect(
+                connectionManagerWithCache.getTableSchema('non-existent', 'testdb', 'users')
+            ).rejects.toThrow('No adapter found for connection: non-existent');
+        });
+
+        it('should work without cache manager (optional dependency)', async () => {
+            // Create ConnectionManager without cache
+            const connectionManagerNoCache = new ConnectionManager(
+                mockContext,
+                mockSecretStorage,
+                mockEventBus,
+                mockLogger
+            );
+
+            const config: ConnectionConfig = {
+                id: 'no-cache-test',
+                name: 'No Cache Test',
+                type: 'mysql',
+                host: 'localhost',
+                port: 3306,
+                user: 'root',
+                database: 'test',
+                environment: 'dev'
+            };
+
+            await connectionManagerNoCache.addConnection(config);
+
+            const mockAdapter = {
+                getDatabases: jest.fn().mockResolvedValue([{ name: 'db1' }])
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (connectionManagerNoCache as any).adapters.set(config.id, mockAdapter);
+
+            // Call getDatabases - should work without cache
+            const databases = await connectionManagerNoCache.getDatabases(config.id);
+
+            expect(databases).toEqual([{ name: 'db1' }]);
+            expect(mockAdapter.getDatabases).toHaveBeenCalledTimes(1);
         });
     });
 });

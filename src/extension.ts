@@ -25,6 +25,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         serviceContainer = new ServiceContainer(context, logger);
         await serviceContainer.initialize();
 
+        // Get performance monitor from service container
+        const perfMon = serviceContainer.get(SERVICE_TOKENS.PerformanceMonitor);
+        const activationSpan = perfMon.startSpan('extension.activate');
+
         // Register providers
         const treeViewProvider = serviceContainer.get(SERVICE_TOKENS.TreeViewProvider) as TreeViewProvider;
         const treeView = vscode.window.createTreeView('mydba.treeView', {
@@ -140,6 +144,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         const activationTime = Date.now() - startTime;
         logger.info(`MyDBA activated successfully in ${activationTime}ms`);
+
+        // End performance span
+        perfMon.endSpan(activationSpan, { activationTime });
 
         // Show welcome message for first-time users
         await showWelcomeMessage(context, logger);
@@ -611,7 +618,7 @@ async function showWelcomeMessage(context: vscode.ExtensionContext, _logger: Log
         if (action === 'Get Started') {
             await vscode.commands.executeCommand('mydba.newConnection');
         } else if (action === 'View Documentation') {
-            await vscode.env.openExternal(vscode.Uri.parse('https://github.com/your-org/mydba#readme'));
+            await vscode.env.openExternal(vscode.Uri.parse('https://github.com/nipunap/mydba#readme'));
         }
 
         await context.globalState.update('mydba.hasShownWelcome', true);

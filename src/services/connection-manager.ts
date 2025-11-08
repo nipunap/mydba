@@ -7,6 +7,7 @@ import { AdapterRegistry } from '../adapters/adapter-registry';
 import { MySQLAdapter } from '../adapters/mysql-adapter';
 import { ConnectionConfig, ConnectionTestResult } from '../types';
 import type { SSLConfig as _SSLConfig, SSHConfig as _SSHConfig, AWSIAMConfig as _AWSIAMConfig } from '../types';
+import { CacheManager, CacheKeyBuilder } from '../core/cache-manager';
 
 // Re-export types for backward compatibility
 export { ConnectionConfig, ConnectionTestResult };
@@ -21,8 +22,19 @@ export class ConnectionManager {
         private context: vscode.ExtensionContext,
         private secretStorage: SecretStorageService,
         private eventBus: EventBus,
-        private logger: Logger
-    ) {}
+        private logger: Logger,
+        private cache?: CacheManager
+    ) {
+        // Set up cache invalidation listener if cache is provided
+        if (this.cache) {
+            this.eventBus.on(EVENTS.CONNECTION_STATE_CHANGED, async (data: ConnectionStateChange) => {
+                // Invalidate cache when connection state changes
+                if (data.newState === 'disconnected' || data.newState === 'error') {
+                    this.cache?.onConnectionRemoved(data.connectionId);
+                }
+            });
+        }
+    }
 
     async addConnection(config: ConnectionConfig): Promise<Connection> {
         this.logger.info(`Adding connection: ${config.name}`);
@@ -358,6 +370,68 @@ export class ConnectionManager {
         } catch (error) {
             this.logger.error('Failed to delete connection config:', error as Error);
         }
+    }
+
+    /**
+     * Get databases with caching support
+     */
+    async getDatabases(connectionId: string): Promise<Array<{ name: string }>> {
+        const adapter = this.adapters.get(connectionId);
+        if (!adapter) {
+            throw new Error(`No adapter found for connection: ${connectionId}`);
+        }
+
+        // Try cache first - use a special key for database list
+        const cacheKey = `schema:${connectionId}:__databases__`;
+        if (this.cache) {
+            const cached = this.cache.get<Array<{ name: string }>>(cacheKey);
+            if (cached) {
+                this.logger.debug(`Cache hit for databases: ${connectionId}`);
+                return cached;
+            }
+        }
+
+        // Fetch from database
+        this.logger.debug(`Cache miss for databases: ${connectionId}, fetching from DB`);
+        const databases = await adapter.getDatabases();
+
+        // Store in cache with 1-hour TTL
+        if (this.cache) {
+            this.cache.set(cacheKey, databases, 3600000); // 1 hour
+        }
+
+        return databases;
+    }
+
+    /**
+     * Get table schema with caching support
+     */
+    async getTableSchema(connectionId: string, database: string, table: string): Promise<unknown> {
+        const adapter = this.adapters.get(connectionId);
+        if (!adapter) {
+            throw new Error(`No adapter found for connection: ${connectionId}`);
+        }
+
+        // Try cache first
+        const cacheKey = CacheKeyBuilder.schema(connectionId, database, table);
+        if (this.cache) {
+            const cached = this.cache.get<unknown>(cacheKey);
+            if (cached) {
+                this.logger.debug(`Cache hit for table schema: ${database}.${table}`);
+                return cached;
+            }
+        }
+
+        // Fetch from database
+        this.logger.debug(`Cache miss for table schema: ${database}.${table}, fetching from DB`);
+        const schema = await adapter.getTableSchema(database, table);
+
+        // Store in cache with 1-hour TTL
+        if (this.cache) {
+            this.cache.set(cacheKey, schema, 3600000); // 1 hour
+        }
+
+        return schema;
     }
 
     async dispose(): Promise<void> {
