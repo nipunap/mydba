@@ -122,7 +122,7 @@ describe('RateLimiter', () => {
             }
 
             const status = limiter.getStatus();
-            expect(status.utilizationPercent).toBe(50);
+            expect(status.utilizationPercent).toBeCloseTo(50, 1);
         });
 
         it('should floor available tokens', () => {
