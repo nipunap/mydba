@@ -507,21 +507,16 @@ export class MySQLAdapter {
             const destructiveCheck = InputValidator.isDestructiveQuery(sql);
             if (destructiveCheck.destructive) {
                 this.logger.warn(`Destructive query detected: ${destructiveCheck.reason}`);
-
-                // Log destructive operation to audit log
-                if (this.auditLogger) {
-                    await this.auditLogger.logDestructiveOperation(
-                        this.config.id,
-                        sql.substring(0, 500),
-                        this.config.user,
-                        { success: false } // Will be updated after execution
-                    );
-                }
                 // Note: Actual confirmation would be handled at command level
+                // Audit logging will be done after execution with actual result
             }
         }
 
+        let isDestructive = false;
         try {
+            // Check if query is destructive for audit logging
+            isDestructive = InputValidator.isDestructiveQuery(sql).destructive;
+
             // Sanitize SQL for logging and escape % to avoid console formatter semantics
             const sanitizedSQL = DataSanitizer.sanitizeSQL(sql);
             const safeForConsole = sanitizedSQL.replace(/%/g, '%%');
@@ -558,6 +553,16 @@ export class MySQLAdapter {
                 insertId: Array.isArray(rows) ? 0 : (rows as QueryResultPacket).insertId || 0
             };
 
+            // Log successful destructive operation to audit log
+            if (isDestructive && this.auditLogger) {
+                await this.auditLogger.logDestructiveOperation(
+                    this.config.id,
+                    sql.substring(0, 500),
+                    this.config.user,
+                    { success: true, affectedRows: result.affected }
+                );
+            }
+
             // Emit QUERY_EXECUTED event
             if (this.eventBus) {
                 const eventData: QueryResultEvent = {
@@ -575,6 +580,16 @@ export class MySQLAdapter {
             // Calculate duration even on error
             const queryDuration = Date.now() - queryStartTime;
             this.logger.error(`Query execution failed after ${queryDuration}ms:`, error as Error);
+
+            // Log failed destructive operation to audit log
+            if (isDestructive && this.auditLogger) {
+                await this.auditLogger.logDestructiveOperation(
+                    this.config.id,
+                    sql.substring(0, 500),
+                    this.config.user,
+                    { success: false, error: (error as Error).message }
+                );
+            }
 
             // Emit QUERY_EXECUTED event with error
             if (this.eventBus) {

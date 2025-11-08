@@ -401,6 +401,7 @@ jobs:
           echo "statements_pct=$STATEMENTS_PCT" >> $GITHUB_OUTPUT
           echo "branches_pct=$BRANCHES_PCT" >> $GITHUB_OUTPUT
           echo "functions_pct=$FUNCTIONS_PCT" >> $GITHUB_OUTPUT
+          echo "min_threshold=$MIN_THRESHOLD" >> $GITHUB_OUTPUT
 
           # Check if any metric is below threshold
           FAILED=0
@@ -452,7 +453,7 @@ jobs:
               coverageComment += '| Metric | Coverage | Threshold | Status |\n';
               coverageComment += '|--------|----------|-----------|--------|\n';
 
-              const minThreshold = 24.5;
+              const minThreshold = parseFloat('${{ steps.coverage_check.outputs.min_threshold }}');
               const metrics = [
                 { name: 'Lines', pct: total.lines.pct },
                 { name: 'Statements', pct: total.statements.pct },
@@ -466,7 +467,7 @@ jobs:
               });
 
               if (status !== 'passed') {
-                coverageComment += '\n⚠️ **Coverage is below the minimum threshold of 24.5%.** Please add tests to improve coverage.\n';
+                coverageComment += `\n⚠️ **Coverage is below the minimum threshold of ${minThreshold}%.** Please add tests to improve coverage.\n`;
               }
             } else {
               coverageComment += '❌ Coverage report not found.\n';
