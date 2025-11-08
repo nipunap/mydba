@@ -3,6 +3,9 @@ import { AIService } from './ai-service';
 import { QueryAnalyzer } from './query-analyzer';
 import { Logger } from '../utils/logger';
 import { SchemaContext, AIAnalysisResult, OptimizationSuggestion, Citation, AntiPattern } from '../types/ai-types';
+import { EventBus, EVENTS, AIRequest as AIRequestEvent, AIResponse as AIResponseEvent } from './event-bus';
+import { AuditLogger } from './audit-logger';
+import * as crypto from 'crypto';
 
 /**
  * AI Service Coordinator
@@ -18,7 +21,9 @@ export class AIServiceCoordinator {
 
     constructor(
         private logger: Logger,
-        private context: vscode.ExtensionContext
+        private context: vscode.ExtensionContext,
+        private eventBus?: EventBus,
+        private auditLogger?: AuditLogger
     ) {
         this.aiService = new AIService(logger, context);
         this.queryAnalyzer = new QueryAnalyzer();
@@ -41,7 +46,29 @@ export class AIServiceCoordinator {
         schema?: SchemaContext,
         dbType: 'mysql' | 'mariadb' = 'mysql'
     ): Promise<AIAnalysisResult> {
+        const startTime = Date.now();
         this.logger.info('Analyzing query with AI Service Coordinator');
+
+        // Generate query hash for event
+        const queryHash = crypto.createHash('sha256').update(query).digest('hex').substring(0, 16);
+
+        // Get actual AI provider name
+        const providerInfo = this.aiService.getProviderInfo();
+        const providerName = providerInfo?.name || 'unknown';
+
+        // Emit AI_REQUEST_SENT event
+        if (this.eventBus) {
+            const requestEvent: AIRequestEvent = {
+                type: 'query_analysis',
+                query: queryHash, // Use hash instead of actual query for privacy
+                anonymized: true,
+                timestamp: Date.now()
+            };
+            await this.eventBus.emit(EVENTS.AI_REQUEST_SENT, requestEvent);
+        }
+
+        let success = false;
+        let error: Error | undefined;
 
         try {
             // Get static analysis first
@@ -63,11 +90,66 @@ export class AIServiceCoordinator {
                 citations: aiAnalysis.citations
             };
 
+            // Track performance
+            const duration = Date.now() - startTime;
+            if (duration > 2000) {
+                this.logger.warn(`AI query analysis took ${duration}ms (exceeded 2s budget)`);
+            } else {
+                this.logger.debug(`AI query analysis completed in ${duration}ms`);
+            }
+
+            // Mark as successful
+            success = true;
+
+            // Emit AI_RESPONSE_RECEIVED event
+            if (this.eventBus) {
+                const responseEvent: AIResponseEvent = {
+                    type: 'query_analysis',
+                    duration,
+                    success: true
+                };
+                await this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+            }
+
+            // Log AI request to audit log with actual result
+            if (this.auditLogger) {
+                await this.auditLogger.logAIRequest(
+                    providerName,
+                    'query_analysis',
+                    success,
+                    undefined
+                );
+            }
+
             this.logger.info(`Query analysis complete: ${result.optimizationSuggestions.length} suggestions`);
             return result;
 
-        } catch (error) {
-            this.logger.error('Query analysis failed:', error as Error);
+        } catch (err) {
+            error = err as Error;
+            const duration = Date.now() - startTime;
+            this.logger.error(`Query analysis failed after ${duration}ms:`, error);
+
+            // Emit AI_RESPONSE_RECEIVED event with error
+            if (this.eventBus) {
+                const responseEvent: AIResponseEvent = {
+                    type: 'query_analysis',
+                    duration,
+                    success: false,
+                    error
+                };
+                await this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+            }
+
+            // Log AI request to audit log with failure status
+            if (this.auditLogger) {
+                await this.auditLogger.logAIRequest(
+                    providerName,
+                    'query_analysis',
+                    false,
+                    undefined,
+                    error.message
+                );
+            }
 
             // Fallback to static analysis only
             const staticAnalysis = this.queryAnalyzer.analyze(query);

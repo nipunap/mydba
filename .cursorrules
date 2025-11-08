@@ -1,0 +1,78 @@
+# MyDBA Development Guidelines
+
+## Quality Gates
+
+After completing each major milestone or set of related changes:
+
+1. Run `npm run lint` - must pass with 0 errors
+2. Run `npm run compile` - must pass with 0 TypeScript errors
+3. Run `npm test:unit` - all tests must pass
+4. For test coverage work: `npm test -- --coverage` to verify coverage targets
+
+Do not proceed to the next milestone until all quality gates pass.
+
+## Testing Standards
+
+- Maintain minimum 50% code coverage across the codebase
+- Critical services (adapters, security, AI) should have 60%+ coverage
+- All tests must pass on Ubuntu, Windows, and macOS
+- No flaky tests - ensure deterministic test execution
+- Use mocks for external dependencies (database connections, AI providers)
+
+## Code Quality
+
+- Follow existing code patterns and architecture
+- Use TypeScript strict mode - no `any` types without justification
+- Prefer explicit types over type inference for public APIs
+- Document complex logic with inline comments
+- Keep functions focused and under 50 lines when possible
+
+## Architecture Principles
+
+- Service Container for dependency injection
+- Event Bus for decoupled communication between components
+- Adapter pattern for database implementations
+- Factory pattern for creating complex objects (AI providers, adapters)
+- Repository pattern for data access
+
+## Security
+
+- All SQL queries must use parameterized queries (no string concatenation)
+- Validate and sanitize all user inputs
+- Use SecretStorage API for credentials
+- Follow principle of least privilege for database connections
+- Audit log all destructive operations
+
+## Performance
+
+- Cache frequently accessed data (schema, metadata)
+- Use connection pooling for database connections
+- Lazy-load heavy dependencies
+- Monitor and log slow operations (>100ms for queries, >2s for AI)
+- Implement proper cleanup in dispose() methods
+
+## Git Workflow
+
+- Meaningful commit messages following conventional commits
+- PR reviews required before merge
+- CI must pass before merge
+- Keep PRs focused and under 500 lines when possible
+
+## Documentation
+
+- Update README.md for user-facing changes
+- Update CHANGELOG.md for all changes
+- Add inline comments for complex logic
+- Document public APIs with JSDoc
+- Keep architecture decision records (ADRs) updated
+
+## VS Code Extension Best Practices
+
+- Follow VS Code extension guidelines
+- Use proper disposal patterns for all resources
+- Handle errors gracefully with user-friendly messages
+- Respect user settings and configuration
+- Test in multiple VS Code versions
+- Support dark and light themes
+- Provide keyboard shortcuts for common actions
+- Show progress indicators for long-running operations

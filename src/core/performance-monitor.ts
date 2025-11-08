@@ -6,6 +6,7 @@
 import { IPerformanceMonitor, IPerformanceSpan } from './interfaces';
 import { Logger } from '../utils/logger';
 import { performance } from 'perf_hooks';
+import { EventBus, EVENTS, QueryResult } from '../services/event-bus';
 
 /**
  * Performance budgets for operations (in milliseconds)
@@ -33,7 +34,63 @@ export class PerformanceMonitor implements IPerformanceMonitor {
     private maxHistorySize = 1000;
     private spanCounter = 0;
 
-    constructor(private logger: Logger) {}
+    // Query performance metrics (rolling window of last 1000 queries)
+    private queryMetrics: Array<{ duration: number; timestamp: number }> = [];
+    private maxQueryMetrics = 1000;
+
+    constructor(
+        private logger: Logger,
+        private eventBus?: EventBus
+    ) {
+        // Subscribe to QUERY_EXECUTED events
+        if (this.eventBus) {
+            this.eventBus.on(EVENTS.QUERY_EXECUTED, (data: QueryResult) => {
+                this.trackQueryPerformance(data);
+            });
+        }
+    }
+
+    /**
+     * Track query performance metrics
+     */
+    private trackQueryPerformance(data: QueryResult): void {
+        // Add to metrics
+        this.queryMetrics.push({
+            duration: data.duration,
+            timestamp: Date.now()
+        });
+
+        // Trim to max size
+        if (this.queryMetrics.length > this.maxQueryMetrics) {
+            this.queryMetrics.shift();
+        }
+
+        // Log slow queries (>3s budget)
+        if (data.duration > 3000) {
+            this.logger.warn(`Slow query detected: ${data.duration}ms on connection ${data.connectionId}`);
+        }
+    }
+
+    /**
+     * Get query performance statistics
+     */
+    getQueryStats(): { min: number; max: number; avg: number; p95: number; p99: number; count: number } {
+        if (this.queryMetrics.length === 0) {
+            return { min: 0, max: 0, avg: 0, p95: 0, p99: 0, count: 0 };
+        }
+
+        const durations = this.queryMetrics.map(m => m.duration).sort((a, b) => a - b);
+        const sum = durations.reduce((a, b) => a + b, 0);
+
+        return {
+            min: durations[0],
+            max: durations[durations.length - 1],
+            avg: sum / durations.length,
+            p95: durations[Math.floor(durations.length * 0.95)] || 0,
+            p99: durations[Math.floor(durations.length * 0.99)] || 0,
+            count: durations.length
+        };
+    }
 
     /**
      * Start a performance span

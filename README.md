@@ -4,13 +4,13 @@
 
 # MyDBA - AI-Powered Database Assistant
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=mydba.mydba)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=mydba.mydba)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![VSCode](https://img.shields.io/badge/VSCode-1.85%2B-blue.svg)](https://code.visualstudio.com/)
-[![Tests](https://img.shields.io/badge/tests-186_passing-brightgreen.svg)](https://github.com/your-org/mydba/actions)
-[![Coverage](https://img.shields.io/badge/coverage-10.76%25-yellow.svg)](coverage/index.html)
-[![License Compliance](https://img.shields.io/badge/licenses-compliant-brightgreen.svg)](https://github.com/your-org/mydba/actions)
-[![PR Checks](https://img.shields.io/badge/PR%20checks-automated-blue.svg)](https://github.com/your-org/mydba/actions)
+[![Tests](https://img.shields.io/badge/tests-836_passing-brightgreen.svg)](https://github.com/nipunap/mydba/actions)
+[![Coverage](https://img.shields.io/badge/coverage-39%25-green.svg)](coverage/index.html)
+[![License Compliance](https://img.shields.io/badge/licenses-compliant-brightgreen.svg)](https://github.com/nipunap/mydba/actions)
+[![PR Checks](https://img.shields.io/badge/PR%20checks-automated-blue.svg)](https://github.com/nipunap/mydba/actions)
 
 MyDBA is an AI-powered VSCode extension that brings database management, monitoring, and optimization directly into your development environment. Built for developers and database administrators who want intelligent insights without leaving their IDE.
 
@@ -27,7 +27,7 @@ MyDBA is an AI-powered VSCode extension that brings database management, monitor
 - **Documentation-Grounded AI**: RAG system with MySQL/MariaDB docs to reduce hallucinations
 - **Chat Integration**: `@mydba` commands in VSCode Chat with natural language support
 - **Editor Compatibility**: Works in VSCode, Cursor, Windsurf, and VSCodium
-- **Testing**: 186 unit tests passing, integration tests with Docker (coverage improving to 70%)
+- **Testing**: 836 unit tests passing, integration tests with Docker, 39% code coverage
 
 ### Metrics Dashboard
 
@@ -133,7 +133,7 @@ code --install-extension mydba.mydba
 ### From Source
 ```bash
 # Clone repository
-git clone https://github.com/your-org/mydba.git
+git clone https://github.com/nipunap/mydba.git
 cd mydba
 
 # Install dependencies
@@ -396,7 +396,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ### Development Setup
 ```bash
 # Clone and install
-git clone https://github.com/your-org/mydba.git
+git clone https://github.com/nipunap/mydba.git
 cd mydba
 npm install
 
@@ -431,8 +431,8 @@ See [SECURITY.md](SECURITY.md) for security policies and supported versions.
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/mydba/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/mydba/discussions)
+- **Issues**: [GitHub Issues](https://github.com/nipunap/mydba/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/nipunap/mydba/discussions)
 - **Documentation**:
   - [Database Setup Guide](docs/DATABASE_SETUP.md)
   - [Testing Guide](test/MARIADB_TESTING.md)

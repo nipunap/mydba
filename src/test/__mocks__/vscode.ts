@@ -241,3 +241,7 @@ export interface CancellationToken {
     isCancellationRequested: boolean;
     onCancellationRequested: (listener: () => unknown) => Disposable;
 }
+
+export class ThemeColor {
+    constructor(public id: string) {}
+}

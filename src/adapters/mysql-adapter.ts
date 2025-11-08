@@ -21,6 +21,8 @@ import {
     QueryError,
     ValidationError
 } from '../types';
+import { EventBus, EVENTS, QueryResult as QueryResultEvent } from '../services/event-bus';
+import { AuditLogger } from '../services/audit-logger';
 
 /**
  * MySQL/MariaDB Database Adapter
@@ -57,7 +59,9 @@ export class MySQLAdapter {
 
     constructor(
         private readonly config: ConnectionConfig,
-        private readonly logger: Logger
+        private readonly logger: Logger,
+        private readonly eventBus?: EventBus,
+        private readonly auditLogger?: AuditLogger
     ) {
         this.id = config.id;
     }
@@ -169,11 +173,9 @@ export class MySQLAdapter {
     }
 
     async getDatabases(): Promise<DatabaseInfo[]> {
-        this.ensureConnected();
-
         try {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW DATABASES');
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW DATABASES');
             return (rows as Array<{ Database: string }>).map((row) => ({ name: row.Database }));
 
         } catch (error) {
@@ -183,8 +185,6 @@ export class MySQLAdapter {
     }
 
     async getTables(database: string): Promise<TableInfo[]> {
-        this.ensureConnected();
-
         // Validate database name
         const validation = InputValidator.validateDatabaseName(database);
         if (!validation.valid) {
@@ -192,6 +192,7 @@ export class MySQLAdapter {
         }
 
         try {
+            const pool = this.ensureConnected();
             const sql = `SHOW TABLE STATUS FROM \`${database}\``;
             interface TableRow {
                 Name: string;
@@ -201,8 +202,7 @@ export class MySQLAdapter {
                 Index_length?: number;
                 Collation?: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query(sql) as [TableRow[], mysql.FieldPacket[]];
+            const [rows] = await pool.query(sql) as [TableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Name,
@@ -234,39 +234,251 @@ export class MySQLAdapter {
         }
 
         try {
-            // TODO: Real implementation
-            // const columns = await this.getColumns(database, table);
-            // const indexes = await this.getIndexes(database, table);
-            // const foreignKeys = await this.getForeignKeys(database, table);
+            this.logger.debug(`Fetching schema for ${database}.${table}`);
 
-            // Mock data
-            const columns: ColumnInfo[] = [
-                { name: 'id', type: 'int(11)', nullable: false, defaultValue: null, key: 'PRI', extra: 'auto_increment' },
-                { name: 'name', type: 'varchar(255)', nullable: false, defaultValue: null, key: '', extra: '' },
-                { name: 'email', type: 'varchar(255)', nullable: true, defaultValue: null, key: 'UNI', extra: '' },
-                { name: 'created_at', type: 'timestamp', nullable: false, defaultValue: 'CURRENT_TIMESTAMP', key: '', extra: '' }
-            ];
+            // Get column information
+            const columns = await this.getColumns(database, table);
 
-            const indexes: IndexInfo[] = [
-                { name: 'PRIMARY', columns: ['id'], unique: true, type: 'BTREE' },
-                { name: 'idx_email', columns: ['email'], unique: true, type: 'BTREE' }
-            ];
+            // Get index information
+            const indexes = await this.getIndexes(database, table);
+
+            // Get foreign key information
+            const foreignKeys = await this.getForeignKeys(database, table);
+
+            // Get row estimate
+            const rowEstimate = await this.getRowEstimate(database, table);
 
             return {
                 columns,
                 indexes,
-                foreignKeys: [],
-                rowEstimate: 1500
+                foreignKeys,
+                rowEstimate
             };
 
         } catch (error) {
             this.logger.error(`Failed to get schema for ${database}.${table}:`, error as Error);
-            throw new QueryError(`Failed to retrieve schema for ${table}`, `DESCRIBE ${table}`, error as Error);
+            throw new QueryError(`Failed to retrieve schema for ${table}`, `INFORMATION_SCHEMA queries`, error as Error);
         }
     }
 
+    /**
+     * Get column information from INFORMATION_SCHEMA
+     */
+    private async getColumns(database: string, table: string): Promise<ColumnInfo[]> {
+        const sql = `
+            SELECT
+                COLUMN_NAME as name,
+                COLUMN_TYPE as type,
+                IS_NULLABLE as nullable,
+                COLUMN_DEFAULT as defaultValue,
+                COLUMN_KEY as \`key\`,
+                EXTRA as extra
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = ?
+            ORDER BY ORDINAL_POSITION
+        `;
+
+        interface ColumnRow {
+            name: string;
+            type: string;
+            nullable: 'YES' | 'NO';
+            defaultValue: string | null;
+            key: string;
+            extra: string;
+        }
+
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [ColumnRow[], mysql.FieldPacket[]];
+
+        return rows.map(row => ({
+            name: row.name,
+            type: row.type,
+            nullable: row.nullable === 'YES',
+            defaultValue: row.defaultValue,
+            key: row.key,
+            extra: row.extra
+        }));
+    }
+
+    /**
+     * Get index information from INFORMATION_SCHEMA
+     */
+    private async getIndexes(database: string, table: string): Promise<IndexInfo[]> {
+        const sql = `
+            SELECT
+                INDEX_NAME as indexName,
+                COLUMN_NAME as columnName,
+                NON_UNIQUE as nonUnique,
+                INDEX_TYPE as indexType,
+                SEQ_IN_INDEX as seqInIndex
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = ?
+            ORDER BY INDEX_NAME, SEQ_IN_INDEX
+        `;
+
+        interface IndexRow {
+            indexName: string;
+            columnName: string;
+            nonUnique: 0 | 1;
+            indexType: string;
+            seqInIndex: number;
+        }
+
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [IndexRow[], mysql.FieldPacket[]];
+
+        // Group columns by index name
+        const indexMap = new Map<string, { columns: string[]; unique: boolean; type: string }>();
+
+        for (const row of rows) {
+            if (!indexMap.has(row.indexName)) {
+                indexMap.set(row.indexName, {
+                    columns: [],
+                    unique: row.nonUnique === 0,
+                    type: row.indexType
+                });
+            }
+            const index = indexMap.get(row.indexName);
+            if (index) {
+                index.columns.push(row.columnName);
+            }
+        }
+
+        // Convert to IndexInfo array
+        return Array.from(indexMap.entries()).map(([name, info]) => ({
+            name,
+            columns: info.columns,
+            unique: info.unique,
+            type: this.normalizeIndexType(info.type)
+        }));
+    }
+
+    /**
+     * Normalize index type to type-safe value
+     */
+    private normalizeIndexType(type: string): 'BTREE' | 'HASH' | 'FULLTEXT' | 'SPATIAL' {
+        const normalized = type.toUpperCase();
+        if (normalized === 'BTREE' || normalized === 'HASH' || normalized === 'FULLTEXT' || normalized === 'SPATIAL') {
+            return normalized;
+        }
+        return 'BTREE'; // Default fallback for unknown types
+    }
+
+    /**
+     * Get foreign key information from INFORMATION_SCHEMA
+     */
+    private async getForeignKeys(database: string, table: string): Promise<Array<{
+        name: string;
+        columns: string[];
+        referencedTable: string;
+        referencedColumns: string[];
+        onDelete: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+        onUpdate: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+    }>> {
+        const sql = `
+            SELECT
+                kcu.CONSTRAINT_NAME as constraintName,
+                kcu.COLUMN_NAME as columnName,
+                kcu.REFERENCED_TABLE_NAME as referencedTable,
+                kcu.REFERENCED_COLUMN_NAME as referencedColumn,
+                rc.DELETE_RULE as deleteRule,
+                rc.UPDATE_RULE as updateRule
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+            JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+                ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+                AND kcu.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
+            WHERE kcu.TABLE_SCHEMA = ?
+              AND kcu.TABLE_NAME = ?
+              AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+            ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
+        `;
+
+        interface ForeignKeyRow {
+            constraintName: string;
+            columnName: string;
+            referencedTable: string;
+            referencedColumn: string;
+            deleteRule: string;
+            updateRule: string;
+        }
+
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [ForeignKeyRow[], mysql.FieldPacket[]];
+
+        // Group by constraint name
+        const fkMap = new Map<string, {
+            columns: string[];
+            referencedTable: string;
+            referencedColumns: string[];
+            onDelete: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+            onUpdate: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+        }>();
+
+        for (const row of rows) {
+            if (!fkMap.has(row.constraintName)) {
+                fkMap.set(row.constraintName, {
+                    columns: [],
+                    referencedTable: row.referencedTable,
+                    referencedColumns: [],
+                    onDelete: this.normalizeReferentialAction(row.deleteRule),
+                    onUpdate: this.normalizeReferentialAction(row.updateRule)
+                });
+            }
+            const fk = fkMap.get(row.constraintName);
+            if (fk) {
+                fk.columns.push(row.columnName);
+                fk.referencedColumns.push(row.referencedColumn);
+            }
+        }
+
+        // Convert to foreign key array
+        return Array.from(fkMap.entries()).map(([name, info]) => ({
+            name,
+            columns: info.columns,
+            referencedTable: info.referencedTable,
+            referencedColumns: info.referencedColumns,
+            onDelete: info.onDelete,
+            onUpdate: info.onUpdate
+        }));
+    }
+
+    /**
+     * Normalize referential action to type-safe value
+     */
+    private normalizeReferentialAction(action: string): 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION' {
+        const normalized = action.toUpperCase();
+        if (normalized === 'CASCADE' || normalized === 'SET NULL' || normalized === 'RESTRICT' || normalized === 'NO ACTION') {
+            return normalized;
+        }
+        return 'RESTRICT'; // Default fallback
+    }
+
+    /**
+     * Get estimated row count from INFORMATION_SCHEMA
+     */
+    private async getRowEstimate(database: string, table: string): Promise<number> {
+        const sql = `
+            SELECT TABLE_ROWS as rowCount
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = ?
+        `;
+
+        interface RowCountResult {
+            rowCount: number | null;
+        }
+
+        const pool = this.ensureConnected();
+        const [rows] = await pool.query(sql, [database, table]) as [RowCountResult[], mysql.FieldPacket[]];
+
+        return rows[0]?.rowCount ?? 0;
+    }
+
     async query<T = unknown>(sql: string, params?: unknown[]): Promise<QueryResult<T>> {
-        this.ensureConnected();
+        // Track query start time for performance monitoring
+        const queryStartTime = Date.now();
 
         // Check if this is a system/admin query (performance_schema, information_schema, SHOW, etc.)
         const isSystemQuery = this.isSystemQuery(sql);
@@ -290,17 +502,32 @@ export class MySQLAdapter {
             if (destructiveCheck.destructive) {
                 this.logger.warn(`Destructive query detected: ${destructiveCheck.reason}`);
                 // Note: Actual confirmation would be handled at command level
+                // Audit logging will be done after execution with actual result
             }
         }
 
+        let isDestructive = false;
         try {
+            // Check if query is destructive for audit logging
+            isDestructive = InputValidator.isDestructiveQuery(sql).destructive;
+
             // Sanitize SQL for logging and escape % to avoid console formatter semantics
             const sanitizedSQL = DataSanitizer.sanitizeSQL(sql);
             const safeForConsole = sanitizedSQL.replace(/%/g, '%%');
             this.logger.info(`Executing query: ${DataSanitizer.truncate(safeForConsole, 200)}`);
 
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows, fields] = await this.pool!.query(sql, params);
+            const pool = this.ensureConnected();
+            const [rows, fields] = await pool.query(sql, params);
+
+            // Calculate query duration
+            const queryDuration = Date.now() - queryStartTime;
+
+            // Log slow queries (>100ms)
+            if (queryDuration > 100) {
+                this.logger.warn(`Slow query detected: ${queryDuration}ms - ${DataSanitizer.truncate(safeForConsole, 100)}`);
+            } else {
+                this.logger.debug(`Query completed in ${queryDuration}ms`);
+            }
 
             // Convert mysql2 field info to our format
             const fieldInfo: FieldInfo[] = Array.isArray(fields) ? (fields as mysql.FieldPacket[]).map((f) => ({
@@ -313,15 +540,63 @@ export class MySQLAdapter {
                 insertId?: number;
             }
 
-            return {
+            const result = {
                 rows: rows as T[],
                 fields: fieldInfo,
                 affected: Array.isArray(rows) ? 0 : (rows as QueryResultPacket).affectedRows || 0,
                 insertId: Array.isArray(rows) ? 0 : (rows as QueryResultPacket).insertId || 0
             };
 
+            // Log successful destructive operation to audit log
+            if (isDestructive && this.auditLogger) {
+                await this.auditLogger.logDestructiveOperation(
+                    this.config.id,
+                    sql.substring(0, 500),
+                    this.config.user,
+                    { success: true, affectedRows: result.affected }
+                );
+            }
+
+            // Emit QUERY_EXECUTED event
+            if (this.eventBus) {
+                const eventData: QueryResultEvent = {
+                    connectionId: this.config.id,
+                    query: DataSanitizer.truncate(sanitizedSQL, 500),
+                    duration: queryDuration,
+                    rowsAffected: result.affected
+                };
+                await this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
+            }
+
+            return result;
+
         } catch (error) {
-            this.logger.error('Query execution failed:', error as Error);
+            // Calculate duration even on error
+            const queryDuration = Date.now() - queryStartTime;
+            this.logger.error(`Query execution failed after ${queryDuration}ms:`, error as Error);
+
+            // Log failed destructive operation to audit log
+            if (isDestructive && this.auditLogger) {
+                await this.auditLogger.logDestructiveOperation(
+                    this.config.id,
+                    sql.substring(0, 500),
+                    this.config.user,
+                    { success: false, error: (error as Error).message }
+                );
+            }
+
+            // Emit QUERY_EXECUTED event with error
+            if (this.eventBus) {
+                const sanitizedSQL = DataSanitizer.sanitizeSQL(sql);
+                const eventData: QueryResultEvent = {
+                    connectionId: this.config.id,
+                    query: DataSanitizer.truncate(sanitizedSQL, 500),
+                    duration: queryDuration,
+                    error: error as Error
+                };
+                await this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
+            }
+
             throw new QueryError('Query execution failed', sql, error as Error);
         }
     }
@@ -332,12 +607,10 @@ export class MySQLAdapter {
      * Useful for operations that need thread consistency (like profiling).
      */
     async withConnection<T>(fn: (conn: mysql.PoolConnection) => Promise<T>): Promise<T> {
-        this.ensureConnected();
-
         let connection: mysql.PoolConnection | null = null;
         try {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            connection = await this.pool!.getConnection();
+            const pool = this.ensureConnected();
+            connection = await pool.getConnection();
             this.logger.debug('Acquired dedicated connection from pool');
 
             // Ensure database is selected if configured
@@ -384,15 +657,13 @@ export class MySQLAdapter {
     }
 
     async getProcessList(): Promise<Process[]> {
-        this.ensureConnected();
-
         try {
             // First, check if Performance Schema is enabled
             interface PerformanceSchemaConfig {
                 enabled: number;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [psConfig] = await this.pool!.query(
+            const pool = this.ensureConnected();
+            const [psConfig] = await pool.query(
                 "SELECT @@global.performance_schema AS enabled"
             ) as [PerformanceSchemaConfig[], mysql.FieldPacket[]];
             const psEnabled = psConfig && psConfig[0]?.enabled === 1;
@@ -444,8 +715,7 @@ export class MySQLAdapter {
                 transactionState: string | null;
                 transactionStarted: Date | null;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query(query) as [ProcessRow[], mysql.FieldPacket[]];
+            const [rows] = await pool.query(query) as [ProcessRow[], mysql.FieldPacket[]];
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             // Import QueryAnonymizer for fingerprinting
@@ -495,8 +765,8 @@ export class MySQLAdapter {
                 State: string | null;
                 Info: string | null;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW FULL PROCESSLIST') as [BasicProcessRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW FULL PROCESSLIST') as [BasicProcessRow[], mysql.FieldPacket[]];
             this.logger.debug(`Retrieved ${rows.length} processes`);
 
             return rows.map((row) => ({
@@ -517,15 +787,13 @@ export class MySQLAdapter {
     }
 
     async getGlobalVariables(): Promise<Variable[]> {
-        this.ensureConnected();
-
         try {
             interface VariableRow {
                 Variable_name: string;
                 Value: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW GLOBAL VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW GLOBAL VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -540,15 +808,13 @@ export class MySQLAdapter {
     }
 
     async getSessionVariables(): Promise<Variable[]> {
-        this.ensureConnected();
-
         try {
             interface VariableRow {
                 Variable_name: string;
                 Value: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW SESSION VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW SESSION VARIABLES') as [VariableRow[], mysql.FieldPacket[]];
 
             return rows.map((row) => ({
                 name: row.Variable_name,
@@ -563,15 +829,13 @@ export class MySQLAdapter {
     }
 
     async getMetrics(): Promise<Metrics> {
-        this.ensureConnected();
-
         try {
             interface StatusRow {
                 Variable_name: string;
                 Value: string;
             }
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const [rows] = await this.pool!.query('SHOW GLOBAL STATUS') as [StatusRow[], mysql.FieldPacket[]];
+            const pool = this.ensureConnected();
+            const [rows] = await pool.query('SHOW GLOBAL STATUS') as [StatusRow[], mysql.FieldPacket[]];
 
             // Parse status variables into metrics
             const statusMap = new Map<string, string>();
@@ -608,13 +872,14 @@ export class MySQLAdapter {
 
     // Private helper methods
 
-    private ensureConnected(): void {
+    private ensureConnected(): mysql.Pool {
         if (!this.isConnectedState) {
             throw new ConnectionError('Not connected to database');
         }
         if (!this.pool) {
             throw new ConnectionError('Connection pool not initialized');
         }
+        return this.pool;
     }
 
     private isSupportedVersion(version: string): boolean {

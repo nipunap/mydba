@@ -312,7 +312,7 @@ jobs:
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
           mysql -h 127.0.0.1 -P 3306 -u root -ptest_password -e "FLUSH PRIVILEGES;"
           echo "MySQL permissions granted"
-          
+
           # Grant permissions for MariaDB
           mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT, UPDATE ON performance_schema.* TO 'test_user'@'%';"
           mysql -h 127.0.0.1 -P 3307 -u root -ptest_password -e "GRANT SELECT ON mysql.* TO 'test_user'@'%';"
@@ -344,6 +344,174 @@ jobs:
           else
             echo "⚠️ Coverage report not found"
           fi
+
+  coverage-gate:
+    name: Coverage Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Jest tests with coverage
+        run: npx jest --coverage --coverageReporters=json-summary --coverageReporters=text
+        continue-on-error: true
+
+      - name: Check coverage threshold
+        id: coverage_check
+        run: |
+          # Check if coverage summary exists
+          if [ ! -f coverage/coverage-summary.json ]; then
+            echo "❌ Coverage report not found"
+            echo "status=error" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Extract coverage percentages
+          LINES_PCT=$(node -e "const coverage = require('./coverage/coverage-summary.json'); console.log(coverage.total.lines.pct);")
+          STATEMENTS_PCT=$(node -e "const coverage = require('./coverage/coverage-summary.json'); console.log(coverage.total.statements.pct);")
+          BRANCHES_PCT=$(node -e "const coverage = require('./coverage/coverage-summary.json'); console.log(coverage.total.branches.pct);")
+          FUNCTIONS_PCT=$(node -e "const coverage = require('./coverage/coverage-summary.json'); console.log(coverage.total.functions.pct);")
+
+          # Set minimum thresholds (matching jest.config.js)
+          MIN_BRANCHES=33
+          MIN_LINES=38
+          MIN_STATEMENTS=39
+          MIN_FUNCTIONS=39
+
+          echo "📊 Coverage Report:"
+          echo "  Lines: ${LINES_PCT}% (threshold: ${MIN_LINES}%)"
+          echo "  Statements: ${STATEMENTS_PCT}% (threshold: ${MIN_STATEMENTS}%)"
+          echo "  Branches: ${BRANCHES_PCT}% (threshold: ${MIN_BRANCHES}%)"
+          echo "  Functions: ${FUNCTIONS_PCT}% (threshold: ${MIN_FUNCTIONS}%)"
+          echo ""
+
+          # Save to output for PR comment
+          echo "lines_pct=$LINES_PCT" >> $GITHUB_OUTPUT
+          echo "statements_pct=$STATEMENTS_PCT" >> $GITHUB_OUTPUT
+          echo "branches_pct=$BRANCHES_PCT" >> $GITHUB_OUTPUT
+          echo "functions_pct=$FUNCTIONS_PCT" >> $GITHUB_OUTPUT
+          echo "min_lines=$MIN_LINES" >> $GITHUB_OUTPUT
+          echo "min_statements=$MIN_STATEMENTS" >> $GITHUB_OUTPUT
+          echo "min_branches=$MIN_BRANCHES" >> $GITHUB_OUTPUT
+          echo "min_functions=$MIN_FUNCTIONS" >> $GITHUB_OUTPUT
+
+          # Check if any metric is below threshold
+          FAILED=0
+          if awk "BEGIN {exit !($LINES_PCT < $MIN_LINES)}"; then
+            echo "❌ Lines coverage ($LINES_PCT%) is below minimum threshold ($MIN_LINES%)"
+            FAILED=1
+          fi
+          if awk "BEGIN {exit !($STATEMENTS_PCT < $MIN_STATEMENTS)}"; then
+            echo "❌ Statements coverage ($STATEMENTS_PCT%) is below minimum threshold ($MIN_STATEMENTS%)"
+            FAILED=1
+          fi
+          if awk "BEGIN {exit !($BRANCHES_PCT < $MIN_BRANCHES)}"; then
+            echo "❌ Branches coverage ($BRANCHES_PCT%) is below minimum threshold ($MIN_BRANCHES%)"
+            FAILED=1
+          fi
+          if awk "BEGIN {exit !($FUNCTIONS_PCT < $MIN_FUNCTIONS)}"; then
+            echo "❌ Functions coverage ($FUNCTIONS_PCT%) is below minimum threshold ($MIN_FUNCTIONS%)"
+            FAILED=1
+          fi
+
+          if [ $FAILED -eq 1 ]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo ""
+            echo "⚠️ Coverage gate FAILED. Please add tests to improve coverage."
+            exit 1
+          else
+            echo "status=passed" >> $GITHUB_OUTPUT
+            echo ""
+            echo "✅ Coverage gate PASSED"
+          fi
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let coverageComment = '## 📊 Coverage Report\n\n';
+
+            if (fs.existsSync('coverage/coverage-summary.json')) {
+              const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              const total = coverage.total;
+
+              const status = '${{ steps.coverage_check.outputs.status }}';
+              const statusEmoji = status === 'passed' ? '✅' : '❌';
+
+              coverageComment += `**Status:** ${statusEmoji} ${status === 'passed' ? 'PASSED' : 'FAILED'}\n\n`;
+              coverageComment += '| Metric | Coverage | Threshold | Status |\n';
+              coverageComment += '|--------|----------|-----------|--------|\n';
+
+              const metrics = [
+                { name: 'Lines', pct: total.lines.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_lines }}') },
+                { name: 'Statements', pct: total.statements.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_statements }}') },
+                { name: 'Branches', pct: total.branches.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_branches }}') },
+                { name: 'Functions', pct: total.functions.pct, threshold: parseFloat('${{ steps.coverage_check.outputs.min_functions }}') }
+              ];
+
+              metrics.forEach(metric => {
+                const emoji = metric.pct >= metric.threshold ? '✅' : '❌';
+                coverageComment += `| ${metric.name} | ${metric.pct.toFixed(2)}% | ${metric.threshold}% | ${emoji} |\n`;
+              });
+
+              if (status !== 'passed') {
+                coverageComment += `\n⚠️ **One or more coverage metrics are below their thresholds.** Please add tests to improve coverage.\n`;
+              }
+            } else {
+              coverageComment += '❌ Coverage report not found.\n';
+            }
+
+            // Find existing comment and update or create new
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('📊 Coverage Report')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: coverageComment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: coverageComment
+              });
+            }
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-coverage-report
+          path: coverage/
+          retention-days: 30
 
   license-compliance:
     name: License Compliance Check
@@ -378,7 +546,7 @@ jobs:
   status-check:
     name: Status Check
     runs-on: ubuntu-latest
-    needs: [build-and-test, package, lint-report, integration-tests-docker, license-compliance]
+    needs: [build-and-test, package, lint-report, coverage-gate, integration-tests-docker, license-compliance]
     permissions:
       contents: read
     if: always()
@@ -393,6 +561,11 @@ jobs:
           # Package job is skipped on main branch (handled by publish-release.yml)
           if [ "${{ needs.package.result }}" != "success" ] && [ "${{ needs.package.result }}" != "skipped" ]; then
             echo "❌ Package failed"
+            exit 1
+          fi
+          # Coverage gate
+          if [ "${{ needs.coverage-gate.result }}" != "success" ]; then
+            echo "❌ Coverage gate failed - minimum 39% coverage required"
             exit 1
           fi
           # Integration tests with Docker
