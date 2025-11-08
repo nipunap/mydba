@@ -56,16 +56,6 @@ export class AIServiceCoordinator {
         const providerInfo = this.aiService.getProviderInfo();
         const providerName = providerInfo?.name || 'unknown';
 
-        // Log AI request to audit log (with anonymized query)
-        if (this.auditLogger) {
-            await this.auditLogger.logAIRequest(
-                providerName,
-                'query_analysis',
-                true, // Initial state, will be updated
-                undefined
-            );
-        }
-
         // Emit AI_REQUEST_SENT event
         if (this.eventBus) {
             const requestEvent: AIRequestEvent = {
@@ -74,8 +64,11 @@ export class AIServiceCoordinator {
                 anonymized: true,
                 timestamp: Date.now()
             };
-            this.eventBus.emit(EVENTS.AI_REQUEST_SENT, requestEvent);
+            await this.eventBus.emit(EVENTS.AI_REQUEST_SENT, requestEvent);
         }
+
+        let success = false;
+        let error: Error | undefined;
 
         try {
             // Get static analysis first
@@ -105,6 +98,9 @@ export class AIServiceCoordinator {
                 this.logger.debug(`AI query analysis completed in ${duration}ms`);
             }
 
+            // Mark as successful
+            success = true;
+
             // Emit AI_RESPONSE_RECEIVED event
             if (this.eventBus) {
                 const responseEvent: AIResponseEvent = {
@@ -112,15 +108,26 @@ export class AIServiceCoordinator {
                     duration,
                     success: true
                 };
-                this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+                await this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+            }
+
+            // Log AI request to audit log with actual result
+            if (this.auditLogger) {
+                await this.auditLogger.logAIRequest(
+                    providerName,
+                    'query_analysis',
+                    success,
+                    undefined
+                );
             }
 
             this.logger.info(`Query analysis complete: ${result.optimizationSuggestions.length} suggestions`);
             return result;
 
-        } catch (error) {
+        } catch (err) {
+            error = err as Error;
             const duration = Date.now() - startTime;
-            this.logger.error(`Query analysis failed after ${duration}ms:`, error as Error);
+            this.logger.error(`Query analysis failed after ${duration}ms:`, error);
 
             // Emit AI_RESPONSE_RECEIVED event with error
             if (this.eventBus) {
@@ -128,9 +135,20 @@ export class AIServiceCoordinator {
                     type: 'query_analysis',
                     duration,
                     success: false,
-                    error: error as Error
+                    error
                 };
-                this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+                await this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+            }
+
+            // Log AI request to audit log with failure status
+            if (this.auditLogger) {
+                await this.auditLogger.logAIRequest(
+                    providerName,
+                    'query_analysis',
+                    false,
+                    undefined,
+                    error.message
+                );
             }
 
             // Fallback to static analysis only

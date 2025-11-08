@@ -153,7 +153,11 @@ export class ServiceContainer {
 
         // Adapter registry
         this.register(SERVICE_TOKENS.AdapterRegistry, (c) =>
-            new AdapterRegistry(c.get(SERVICE_TOKENS.Logger))
+            new AdapterRegistry(
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.EventBus),
+                c.get(SERVICE_TOKENS.AuditLogger)
+            )
         );
 
         // Query service
