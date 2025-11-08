@@ -88,12 +88,26 @@ export class ServiceContainer {
 
         // Performance monitor
         this.register(SERVICE_TOKENS.PerformanceMonitor, (c) =>
-            new PerformanceMonitor(c.get(SERVICE_TOKENS.Logger))
+            new PerformanceMonitor(
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.EventBus)
+            )
         );
 
         // Cache manager
         this.register(SERVICE_TOKENS.CacheManager, (c) =>
-            new CacheManager(c.get(SERVICE_TOKENS.Logger))
+            new CacheManager(
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.EventBus)
+            )
+        );
+
+        // Audit logger
+        this.register(SERVICE_TOKENS.AuditLogger, (c) =>
+            new AuditLogger(
+                c.context,
+                c.get(SERVICE_TOKENS.Logger)
+            )
         );
 
         // Transaction manager
@@ -132,7 +146,8 @@ export class ServiceContainer {
                 c.get(SERVICE_TOKENS.SecretStorageService),
                 c.get(SERVICE_TOKENS.EventBus),
                 c.get(SERVICE_TOKENS.Logger),
-                c.get(SERVICE_TOKENS.CacheManager)
+                c.get(SERVICE_TOKENS.CacheManager),
+                c.get(SERVICE_TOKENS.AuditLogger)
             )
         );
 
@@ -150,7 +165,9 @@ export class ServiceContainer {
         this.register(SERVICE_TOKENS.AIServiceCoordinator, (c) =>
             new AIServiceCoordinator(
                 c.get(SERVICE_TOKENS.Logger),
-                c.context
+                c.context,
+                c.get(SERVICE_TOKENS.EventBus),
+                c.get(SERVICE_TOKENS.AuditLogger)
             )
         );
 
@@ -240,7 +257,8 @@ export const SERVICE_TOKENS = {
     TransactionManager: { name: 'TransactionManager' } as ServiceToken<TransactionManager>,
     PromptSanitizer: { name: 'PromptSanitizer' } as ServiceToken<PromptSanitizer>,
     SQLValidator: { name: 'SQLValidator' } as ServiceToken<SQLValidator>,
-    QueryHistoryService: { name: 'QueryHistoryService' } as ServiceToken<QueryHistoryService>
+    QueryHistoryService: { name: 'QueryHistoryService' } as ServiceToken<QueryHistoryService>,
+    AuditLogger: { name: 'AuditLogger' } as ServiceToken<AuditLogger>
 };
 
 // Import service classes (will be implemented)
@@ -261,3 +279,4 @@ import { TransactionManager } from './transaction-manager';
 import { PromptSanitizer } from '../security/prompt-sanitizer';
 import { SQLValidator } from '../security/sql-validator';
 import { QueryHistoryService } from '../services/query-history-service';
+import { AuditLogger } from '../services/audit-logger';

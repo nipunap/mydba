@@ -5,6 +5,7 @@
 
 import { ICacheManager, ICacheEntry } from './interfaces';
 import { Logger } from '../utils/logger';
+import { EventBus, EVENTS, QueryResult } from '../services/event-bus';
 
 /**
  * Cache configuration for different types
@@ -117,10 +118,36 @@ export class CacheManager implements ICacheManager {
     private misses = 0;
     private version = 1;
 
-    constructor(private logger: Logger) {
+    constructor(
+        private logger: Logger,
+        private eventBus?: EventBus
+    ) {
         // Initialize caches
         for (const [name, config] of Object.entries(CACHE_CONFIGS)) {
             this.caches.set(name, new LRUCache(config.maxSize, config.defaultTTL));
+        }
+
+        // Subscribe to QUERY_EXECUTED events for cache invalidation
+        if (this.eventBus) {
+            this.eventBus.on(EVENTS.QUERY_EXECUTED, (data: QueryResult) => {
+                this.handleQueryExecuted(data);
+            });
+        }
+    }
+
+    /**
+     * Handle QUERY_EXECUTED event for cache invalidation
+     */
+    private handleQueryExecuted(data: QueryResult): void {
+        // Only invalidate on write operations
+        const query = data.query.toUpperCase();
+        const isWriteOp = /^\s*(INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE|CREATE|RENAME)\b/i.test(query);
+
+        if (isWriteOp) {
+            // Invalidate query cache for this connection
+            const pattern = new RegExp(`^query:${data.connectionId}:`);
+            this.invalidatePattern(pattern);
+            this.logger.debug(`Cache invalidated for write operation on connection: ${data.connectionId}`);
         }
     }
 

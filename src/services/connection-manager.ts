@@ -8,6 +8,7 @@ import { MySQLAdapter } from '../adapters/mysql-adapter';
 import { ConnectionConfig, ConnectionTestResult } from '../types';
 import type { SSLConfig as _SSLConfig, SSHConfig as _SSHConfig, AWSIAMConfig as _AWSIAMConfig } from '../types';
 import { CacheManager, CacheKeyBuilder } from '../core/cache-manager';
+import { AuditLogger } from './audit-logger';
 
 // Re-export types for backward compatibility
 export { ConnectionConfig, ConnectionTestResult };
@@ -17,14 +18,19 @@ export class ConnectionManager {
     private connectionConfigs = new Map<string, ConnectionConfig>();
     private adapters = new Map<string, MySQLAdapter>();
     private readonly CONNECTIONS_KEY = 'mydba.connections';
+    private adapterRegistry: AdapterRegistry;
 
     constructor(
         private context: vscode.ExtensionContext,
         private secretStorage: SecretStorageService,
         private eventBus: EventBus,
         private logger: Logger,
-        private cache?: CacheManager
+        private cache?: CacheManager,
+        private auditLogger?: AuditLogger
     ) {
+        // Initialize adapter registry with EventBus and AuditLogger
+        this.adapterRegistry = new AdapterRegistry(this.logger, this.eventBus, this.auditLogger);
+
         // Set up cache invalidation listener if cache is provided
         if (this.cache) {
             this.eventBus.on(EVENTS.CONNECTION_STATE_CHANGED, async (data: ConnectionStateChange) => {
@@ -66,6 +72,16 @@ export class ConnectionManager {
 
         // Emit event
         await this.eventBus.emit(EVENTS.CONNECTION_ADDED, connection);
+
+        // Log authentication event to audit log
+        if (this.auditLogger) {
+            await this.auditLogger.logConnectionEvent(
+                config.id,
+                'CONNECT',
+                config.user,
+                true
+            );
+        }
 
         this.logger.info(`Connection added: ${config.name}`);
         return connection;
@@ -132,8 +148,7 @@ export class ConnectionManager {
             }
 
             // Create adapter
-            const adapterRegistry = new AdapterRegistry(this.logger);
-            const adapter = adapterRegistry.create(config.type, config);
+            const adapter = this.adapterRegistry.create(config.type, config);
 
             // Connect
             await adapter.connect(config);
@@ -212,6 +227,9 @@ export class ConnectionManager {
 
         this.logger.info(`Deleting connection: ${connection.name}`);
 
+        // Get config before deleting it (needed for audit log)
+        const config = this.connectionConfigs.get(connectionId);
+
         // Disconnect if connected
         if (connection.isConnected) {
             await this.disconnect(connectionId);
@@ -230,6 +248,16 @@ export class ConnectionManager {
         // Emit event
         await this.eventBus.emit(EVENTS.CONNECTION_REMOVED, connectionId);
 
+        // Log authentication event to audit log
+        if (this.auditLogger && config) {
+            await this.auditLogger.logConnectionEvent(
+                connectionId,
+                'DISCONNECT',
+                config.user,
+                true
+            );
+        }
+
         this.logger.info(`Connection deleted: ${connection.name}`);
     }
 
@@ -238,8 +266,7 @@ export class ConnectionManager {
             this.logger.info(`Testing connection to ${config.host}:${config.port}`);
 
             // Create adapter
-            const adapterRegistry = new AdapterRegistry(this.logger);
-            const adapter = adapterRegistry.create(config.type, config);
+            const adapter = this.adapterRegistry.create(config.type, config);
 
             // Actually test the connection (don't save it)
             await adapter.connect(config);
@@ -260,6 +287,16 @@ export class ConnectionManager {
             // Disconnect immediately - this was just a test
             await adapter.disconnect();
 
+            // Log successful connection test to audit log
+            if (this.auditLogger) {
+                await this.auditLogger.logConnectionEvent(
+                    config.id,
+                    'CONNECT',
+                    config.user,
+                    true
+                );
+            }
+
             this.logger.info(`Connection test successful: ${config.host}:${config.port}`);
             return {
                 success: true,
@@ -268,6 +305,18 @@ export class ConnectionManager {
 
         } catch (error) {
             this.logger.error(`Connection test error:`, error as Error);
+
+            // Log failed connection test to audit log
+            if (this.auditLogger) {
+                await this.auditLogger.logConnectionEvent(
+                    config.id,
+                    'CONNECT',
+                    config.user,
+                    false,
+                    (error as Error).message
+                );
+            }
+
             return {
                 success: false,
                 error: (error as Error).message

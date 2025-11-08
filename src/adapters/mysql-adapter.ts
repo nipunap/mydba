@@ -21,6 +21,8 @@ import {
     QueryError,
     ValidationError
 } from '../types';
+import { EventBus, EVENTS, QueryResult as QueryResultEvent } from '../services/event-bus';
+import { AuditLogger } from '../services/audit-logger';
 
 /**
  * MySQL/MariaDB Database Adapter
@@ -57,7 +59,9 @@ export class MySQLAdapter {
 
     constructor(
         private readonly config: ConnectionConfig,
-        private readonly logger: Logger
+        private readonly logger: Logger,
+        private readonly eventBus?: EventBus,
+        private readonly auditLogger?: AuditLogger
     ) {
         this.id = config.id;
     }
@@ -503,6 +507,16 @@ export class MySQLAdapter {
             const destructiveCheck = InputValidator.isDestructiveQuery(sql);
             if (destructiveCheck.destructive) {
                 this.logger.warn(`Destructive query detected: ${destructiveCheck.reason}`);
+
+                // Log destructive operation to audit log
+                if (this.auditLogger) {
+                    await this.auditLogger.logDestructiveOperation(
+                        this.config.id,
+                        sql.substring(0, 500),
+                        this.config.user,
+                        { success: false } // Will be updated after execution
+                    );
+                }
                 // Note: Actual confirmation would be handled at command level
             }
         }
@@ -537,17 +551,43 @@ export class MySQLAdapter {
                 insertId?: number;
             }
 
-            return {
+            const result = {
                 rows: rows as T[],
                 fields: fieldInfo,
                 affected: Array.isArray(rows) ? 0 : (rows as QueryResultPacket).affectedRows || 0,
                 insertId: Array.isArray(rows) ? 0 : (rows as QueryResultPacket).insertId || 0
             };
 
+            // Emit QUERY_EXECUTED event
+            if (this.eventBus) {
+                const eventData: QueryResultEvent = {
+                    connectionId: this.config.id,
+                    query: DataSanitizer.truncate(sanitizedSQL, 500),
+                    duration: queryDuration,
+                    rowsAffected: result.affected
+                };
+                this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
+            }
+
+            return result;
+
         } catch (error) {
             // Calculate duration even on error
             const queryDuration = Date.now() - queryStartTime;
             this.logger.error(`Query execution failed after ${queryDuration}ms:`, error as Error);
+
+            // Emit QUERY_EXECUTED event with error
+            if (this.eventBus) {
+                const sanitizedSQL = DataSanitizer.sanitizeSQL(sql);
+                const eventData: QueryResultEvent = {
+                    connectionId: this.config.id,
+                    query: DataSanitizer.truncate(sanitizedSQL, 500),
+                    duration: queryDuration,
+                    error: error as Error
+                };
+                this.eventBus.emit(EVENTS.QUERY_EXECUTED, eventData);
+            }
+
             throw new QueryError('Query execution failed', sql, error as Error);
         }
     }

@@ -3,6 +3,9 @@ import { AIService } from './ai-service';
 import { QueryAnalyzer } from './query-analyzer';
 import { Logger } from '../utils/logger';
 import { SchemaContext, AIAnalysisResult, OptimizationSuggestion, Citation, AntiPattern } from '../types/ai-types';
+import { EventBus, EVENTS, AIRequest as AIRequestEvent, AIResponse as AIResponseEvent } from './event-bus';
+import { AuditLogger } from './audit-logger';
+import * as crypto from 'crypto';
 
 /**
  * AI Service Coordinator
@@ -18,7 +21,9 @@ export class AIServiceCoordinator {
 
     constructor(
         private logger: Logger,
-        private context: vscode.ExtensionContext
+        private context: vscode.ExtensionContext,
+        private eventBus?: EventBus,
+        private auditLogger?: AuditLogger
     ) {
         this.aiService = new AIService(logger, context);
         this.queryAnalyzer = new QueryAnalyzer();
@@ -43,6 +48,30 @@ export class AIServiceCoordinator {
     ): Promise<AIAnalysisResult> {
         const startTime = Date.now();
         this.logger.info('Analyzing query with AI Service Coordinator');
+
+        // Generate query hash for event
+        const queryHash = crypto.createHash('sha256').update(query).digest('hex').substring(0, 16);
+
+        // Log AI request to audit log (with anonymized query)
+        if (this.auditLogger) {
+            await this.auditLogger.logAIRequest(
+                'openai', // Provider would need to be passed in or retrieved
+                'query_analysis',
+                true, // Initial state, will be updated
+                undefined
+            );
+        }
+
+        // Emit AI_REQUEST_SENT event
+        if (this.eventBus) {
+            const requestEvent: AIRequestEvent = {
+                type: 'query_analysis',
+                query: queryHash, // Use hash instead of actual query for privacy
+                anonymized: true,
+                timestamp: Date.now()
+            };
+            this.eventBus.emit(EVENTS.AI_REQUEST_SENT, requestEvent);
+        }
 
         try {
             // Get static analysis first
@@ -72,12 +101,33 @@ export class AIServiceCoordinator {
                 this.logger.debug(`AI query analysis completed in ${duration}ms`);
             }
 
+            // Emit AI_RESPONSE_RECEIVED event
+            if (this.eventBus) {
+                const responseEvent: AIResponseEvent = {
+                    type: 'query_analysis',
+                    duration,
+                    success: true
+                };
+                this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+            }
+
             this.logger.info(`Query analysis complete: ${result.optimizationSuggestions.length} suggestions`);
             return result;
 
         } catch (error) {
             const duration = Date.now() - startTime;
             this.logger.error(`Query analysis failed after ${duration}ms:`, error as Error);
+
+            // Emit AI_RESPONSE_RECEIVED event with error
+            if (this.eventBus) {
+                const responseEvent: AIResponseEvent = {
+                    type: 'query_analysis',
+                    duration,
+                    success: false,
+                    error: error as Error
+                };
+                this.eventBus.emit(EVENTS.AI_RESPONSE_RECEIVED, responseEvent);
+            }
 
             // Fallback to static analysis only
             const staticAnalysis = this.queryAnalyzer.analyze(query);

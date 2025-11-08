@@ -1,20 +1,26 @@
 import { MySQLAdapter } from './mysql-adapter';
 import { Logger } from '../utils/logger';
 import { ConnectionConfig } from '../types';
+import { EventBus } from '../services/event-bus';
+import { AuditLogger } from '../services/audit-logger';
 
-type AdapterFactory = (config: ConnectionConfig, logger: Logger) => MySQLAdapter;
+type AdapterFactory = (config: ConnectionConfig, logger: Logger, eventBus?: EventBus, auditLogger?: AuditLogger) => MySQLAdapter;
 
 export class AdapterRegistry {
     private factories = new Map<string, AdapterFactory>();
 
-    constructor(private logger: Logger) {
+    constructor(
+        private logger: Logger,
+        private eventBus?: EventBus,
+        private auditLogger?: AuditLogger
+    ) {
         this.registerDefaults();
     }
 
     private registerDefaults(): void {
         // Register MySQL adapter
-        this.register('mysql', (config, logger) => new MySQLAdapter(config, logger));
-        this.register('mariadb', (config, logger) => new MySQLAdapter(config, logger));
+        this.register('mysql', (config, logger, eventBus, auditLogger) => new MySQLAdapter(config, logger, eventBus, auditLogger));
+        this.register('mariadb', (config, logger, eventBus, auditLogger) => new MySQLAdapter(config, logger, eventBus, auditLogger));
 
         this.logger.info('Registered default database adapters');
     }
@@ -34,7 +40,7 @@ export class AdapterRegistry {
         }
 
         this.logger.debug(`Creating adapter: ${type}`);
-        return factory(config, this.logger);
+        return factory(config, this.logger, this.eventBus, this.auditLogger);
     }
 
     getSupportedTypes(): string[] {
