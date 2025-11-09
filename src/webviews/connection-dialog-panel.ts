@@ -88,6 +88,12 @@ export class ConnectionDialogPanel {
                     case 'browseCertFile':
                         await this.browseCertFile(message.field);
                         break;
+                    case 'browseSSHKey':
+                        await this.browseSSHKey();
+                        break;
+                    case 'discoverRDSInstances':
+                        await this.discoverRDSInstances(message.region, message.profile);
+                        break;
                 }
             },
             null,
@@ -129,12 +135,25 @@ export class ConnectionDialogPanel {
                 user: config.username || 'root',
                 password: config.password || '',
                 database: config.database,
-                environment: 'dev',
+                environment: config.environment || 'dev',
                 ssl: config.sslEnabled ? {
                     rejectUnauthorized: config.sslVerify || false,
                     ca: config.sslCa,
                     cert: config.sslCert,
                     key: config.sslKey
+                } : undefined,
+                ssh: config.sshEnabled ? {
+                    host: config.sshHost,
+                    port: config.sshPort || 22,
+                    user: config.sshUser,
+                    keyPath: config.sshKeyPath,
+                    privateKey: config.sshPrivateKey,
+                    passphrase: config.sshPassphrase
+                } : undefined,
+                awsIamAuth: config.awsIamEnabled ? {
+                    region: config.awsRegion,
+                    profile: config.awsProfile,
+                    assumeRole: config.awsRoleArn
                 } : undefined
             };
 
@@ -184,12 +203,25 @@ export class ConnectionDialogPanel {
                 user: config.username || 'root',
                 password: config.password || '',
                 database: config.database,
-                environment: 'dev', // Default to dev
+                environment: config.environment || 'dev',
                 ssl: config.sslEnabled ? {
                     rejectUnauthorized: config.sslVerify || false,
                     ca: config.sslCa,
                     cert: config.sslCert,
                     key: config.sslKey
+                } : undefined,
+                ssh: config.sshEnabled ? {
+                    host: config.sshHost,
+                    port: config.sshPort || 22,
+                    user: config.sshUser,
+                    keyPath: config.sshKeyPath,
+                    privateKey: config.sshPrivateKey,
+                    passphrase: config.sshPassphrase
+                } : undefined,
+                awsIamAuth: config.awsIamEnabled ? {
+                    region: config.awsRegion,
+                    profile: config.awsProfile,
+                    assumeRole: config.awsRoleArn
                 } : undefined
             };
 
@@ -229,6 +261,82 @@ export class ConnectionDialogPanel {
                 type: 'certFileSelected',
                 field: field,
                 path: fileUri[0].fsPath
+            });
+        }
+    }
+
+    private async browseSSHKey(): Promise<void> {
+        const fileUri = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            openLabel: 'Select SSH Private Key',
+            filters: {
+                'SSH Key Files': ['pem', 'key', ''],
+                'All Files': ['*']
+            }
+        });
+
+        if (fileUri && fileUri[0]) {
+            // Read the SSH key file content
+            try {
+                const fs = await import('fs');
+                const keyContent = fs.readFileSync(fileUri[0].fsPath, 'utf8');
+
+                this.panel.webview.postMessage({
+                    type: 'sshKeySelected',
+                    path: fileUri[0].fsPath,
+                    content: keyContent
+                });
+            } catch (error) {
+                this.logger.error('Failed to read SSH key file:', error as Error);
+                vscode.window.showErrorMessage(`Failed to read SSH key file: ${(error as Error).message}`);
+            }
+        }
+    }
+
+    private async discoverRDSInstances(region: string, profile?: string): Promise<void> {
+        try {
+            this.logger.info(`Discovering RDS instances in region: ${region}${profile ? ` with profile: ${profile}` : ''}`);
+
+            // Send loading status
+            this.panel.webview.postMessage({
+                type: 'rdsDiscoveryStatus',
+                status: 'loading',
+                message: `Discovering RDS instances in ${region}...`
+            });
+
+            // Get RDS discovery service
+            const rdsDiscoveryService = this.connectionManager.getRDSDiscoveryService();
+
+            // Discover instances
+            const instances = await rdsDiscoveryService.discoverInstances(region, profile);
+
+            if (instances.length === 0) {
+                this.panel.webview.postMessage({
+                    type: 'rdsDiscoveryStatus',
+                    status: 'info',
+                    message: `No MySQL/MariaDB RDS instances found in ${region}`
+                });
+            } else {
+                this.panel.webview.postMessage({
+                    type: 'rdsInstancesDiscovered',
+                    instances: instances
+                });
+
+                this.panel.webview.postMessage({
+                    type: 'rdsDiscoveryStatus',
+                    status: 'success',
+                    message: `Found ${instances.length} instance(s) in ${region}`
+                });
+            }
+
+        } catch (error) {
+            this.logger.error('Failed to discover RDS instances:', error as Error);
+            this.panel.webview.postMessage({
+                type: 'rdsDiscoveryStatus',
+                status: 'error',
+                message: `Failed to discover instances: ${(error as Error).message}`
             });
         }
     }
@@ -283,7 +391,63 @@ export class ConnectionDialogPanel {
                     <vscode-dropdown id="connection-type">
                         <vscode-option value="mysql" selected>MySQL</vscode-option>
                         <vscode-option value="mariadb">MariaDB</vscode-option>
+                        <vscode-option value="aws-rds-mysql">AWS RDS MySQL</vscode-option>
+                        <vscode-option value="aws-rds-mariadb">AWS RDS MariaDB</vscode-option>
                     </vscode-dropdown>
+                </div>
+                <div class="form-group">
+                    <label for="environment">Environment</label>
+                    <vscode-dropdown id="environment">
+                        <vscode-option value="dev" selected>Development</vscode-option>
+                        <vscode-option value="staging">Staging</vscode-option>
+                        <vscode-option value="prod">Production</vscode-option>
+                    </vscode-dropdown>
+                </div>
+            </section>
+
+            <!-- AWS RDS Discovery (shown only for AWS RDS types) -->
+            <section class="form-section" id="aws-discovery-section" style="display: none;">
+                <h2>AWS RDS Discovery</h2>
+
+                <div class="form-group">
+                    <label for="aws-profile">AWS Profile (optional)</label>
+                    <vscode-text-field id="aws-profile" placeholder="default"></vscode-text-field>
+                    <span class="help-text">AWS CLI profile from ~/.aws/credentials (leave empty for default)</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="aws-region">AWS Region *</label>
+                    <vscode-dropdown id="aws-region">
+                        <vscode-option value="">Select Region...</vscode-option>
+                        <vscode-option value="us-east-1">US East (N. Virginia)</vscode-option>
+                        <vscode-option value="us-east-2">US East (Ohio)</vscode-option>
+                        <vscode-option value="us-west-1">US West (N. California)</vscode-option>
+                        <vscode-option value="us-west-2">US West (Oregon)</vscode-option>
+                        <vscode-option value="ca-central-1">Canada (Central)</vscode-option>
+                        <vscode-option value="eu-west-1">Europe (Ireland)</vscode-option>
+                        <vscode-option value="eu-west-2">Europe (London)</vscode-option>
+                        <vscode-option value="eu-central-1">Europe (Frankfurt)</vscode-option>
+                        <vscode-option value="ap-south-1">Asia Pacific (Mumbai)</vscode-option>
+                        <vscode-option value="ap-northeast-1">Asia Pacific (Tokyo)</vscode-option>
+                        <vscode-option value="ap-southeast-1">Asia Pacific (Singapore)</vscode-option>
+                        <vscode-option value="ap-southeast-2">Asia Pacific (Sydney)</vscode-option>
+                    </vscode-dropdown>
+                </div>
+
+                <div class="form-group">
+                    <vscode-button id="discover-rds-btn" appearance="secondary">
+                        <span class="codicon codicon-search"></span>
+                        Discover RDS Instances
+                    </vscode-button>
+                    <span class="help-text">Find MySQL/MariaDB RDS instances in selected region</span>
+                </div>
+
+                <div class="form-group" id="rds-instance-group" style="display: none;">
+                    <label for="rds-instance">RDS Instance</label>
+                    <vscode-dropdown id="rds-instance">
+                        <vscode-option value="">Select instance...</vscode-option>
+                    </vscode-dropdown>
+                    <span class="help-text">Select an instance to auto-fill host and port</span>
                 </div>
             </section>
 
@@ -356,6 +520,66 @@ export class ConnectionDialogPanel {
                             <vscode-text-field id="ssl-key" placeholder="/path/to/client-key.pem" readonly></vscode-text-field>
                             <vscode-button id="browse-key" appearance="secondary">Browse</vscode-button>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SSH Tunnel Settings -->
+            <section class="form-section" id="ssh-section" style="display: none;">
+                <h2>SSH Tunnel</h2>
+
+                <div class="form-group">
+                    <vscode-checkbox id="ssh-enabled">Enable SSH Tunnel</vscode-checkbox>
+                    <span class="help-text">Connect through an SSH bastion/jump server</span>
+                </div>
+
+                <div id="ssh-options" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label for="ssh-host">SSH Host *</label>
+                            <vscode-text-field id="ssh-host" placeholder="bastion.example.com" required></vscode-text-field>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label for="ssh-port">SSH Port *</label>
+                            <vscode-text-field id="ssh-port" type="number" placeholder="22" value="22" required></vscode-text-field>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ssh-user">SSH Username *</label>
+                        <vscode-text-field id="ssh-user" placeholder="ubuntu" required></vscode-text-field>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ssh-key-path">SSH Private Key *</label>
+                        <div class="file-input-group">
+                            <vscode-text-field id="ssh-key-path" placeholder="/path/to/private_key or ~/.ssh/id_rsa" readonly></vscode-text-field>
+                            <vscode-button id="browse-ssh-key" appearance="secondary">Browse</vscode-button>
+                        </div>
+                        <span class="help-text">Path to your SSH private key file (e.g., ~/.ssh/id_rsa)</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ssh-passphrase">SSH Key Passphrase (optional)</label>
+                        <vscode-text-field id="ssh-passphrase" type="password" placeholder="Leave empty if key has no passphrase"></vscode-text-field>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AWS IAM Authentication -->
+            <section class="form-section" id="aws-iam-section" style="display: none;">
+                <h2>AWS IAM Authentication</h2>
+
+                <div class="form-group">
+                    <vscode-checkbox id="aws-iam-enabled">Enable AWS IAM Authentication</vscode-checkbox>
+                    <span class="help-text">Use IAM credentials to authenticate to RDS. Uses AWS Profile and Region from discovery above.</span>
+                </div>
+
+                <div id="aws-iam-options" style="display: none;">
+                    <div class="form-group">
+                        <label for="aws-iam-role-arn">Role ARN (optional)</label>
+                        <vscode-text-field id="aws-iam-role-arn" placeholder="arn:aws:iam::123456789012:role/MyRDSRole"></vscode-text-field>
+                        <span class="help-text">IAM role to assume for RDS access (for cross-account or elevated permissions)</span>
                     </div>
                 </div>
             </section>

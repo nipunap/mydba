@@ -8,7 +8,7 @@
 // Connection Types
 // ============================================================================
 
-export type DatabaseType = 'mysql' | 'mariadb' | 'postgresql' | 'redis' | 'valkey';
+export type DatabaseType = 'mysql' | 'mariadb' | 'postgresql' | 'redis' | 'valkey' | 'aws-rds-mysql' | 'aws-rds-mariadb';
 export type Environment = 'dev' | 'staging' | 'prod';
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -23,13 +23,34 @@ export interface SSHConfig {
     host: string;
     port: number;
     user: string;
-    privateKey?: string;
-    passphrase?: string;
+    keyPath?: string;           // Path to SSH private key file
+    privateKey?: string;        // SSH private key content (stored in SecretStorage)
+    passphrase?: string;        // SSH key passphrase
+}
+
+export interface SSHTunnelInfo {
+    connectionId: string;
+    sshHost: string;
+    sshPort: number;
+    localPort: number;
+    remoteHost: string;
+    remotePort: number;
+    isConnected: boolean;
 }
 
 export interface AWSIAMConfig {
     region: string;
     profile?: string;
+    assumeRole?: string;        // ARN of role to assume (optional, for future use)
+}
+
+export interface RDSInstanceInfo {
+    identifier: string;
+    endpoint: string;
+    port: number;
+    engine: string;
+    engineVersion: string;
+    status: string;
 }
 
 export interface ConnectionConfig {

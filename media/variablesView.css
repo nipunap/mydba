@@ -199,15 +199,16 @@ vscode-panels {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
+    min-width: 28px;
     height: 28px;
-    padding: 0;
+    padding: 0 8px;
     border: 1px solid var(--vscode-button-border);
     background: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
+    gap: 6px;
 }
 
 .action-btn:hover:not(:disabled) {
@@ -228,6 +229,12 @@ vscode-panels {
     font-size: 14px;
     /* Ensure icons are visible with explicit color inheritance */
     color: inherit;
+}
+
+/* Button label next to icons (visible even if icons fail to render) */
+.action-btn .btn-label {
+    font-size: 12px;
+    line-height: 1;
 }
 
 /* Specific button styling for better visibility */

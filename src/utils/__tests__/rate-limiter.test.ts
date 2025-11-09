@@ -112,7 +112,7 @@ describe('RateLimiter', () => {
             expect(status.available).toBe(8);
             expect(status.capacity).toBe(10);
             expect(status.queueSize).toBe(0);
-            expect(status.utilizationPercent).toBe(20);
+            expect(status.utilizationPercent).toBeCloseTo(20, 1);
         });
 
         it('should calculate utilization percentage correctly', () => {

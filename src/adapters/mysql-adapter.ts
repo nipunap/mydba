@@ -78,16 +78,27 @@ export class MySQLAdapter {
         return this.isConnectedState;
     }
 
-    async connect(config: ConnectionConfig): Promise<void> {
-        this.logger.info(`Connecting to MySQL/MariaDB: ${config.host}:${config.port}`);
+    async connect(config: ConnectionConfig, tunnelLocalPort?: number, iamToken?: string): Promise<void> {
+        // Determine actual host and port (may be localhost if using SSH tunnel)
+        const actualHost = tunnelLocalPort ? '127.0.0.1' : config.host;
+        const actualPort = tunnelLocalPort || config.port;
+
+        // Use IAM token as password if provided, otherwise use config password
+        const actualPassword = iamToken || config.password || '';
+
+        const logHost = tunnelLocalPort
+            ? `${config.host}:${config.port} via SSH tunnel (localhost:${tunnelLocalPort})`
+            : `${config.host}:${config.port}`;
+
+        this.logger.info(`Connecting to MySQL/MariaDB: ${logHost}`);
 
         try {
             // Create connection pool
             this.pool = mysql.createPool({
-                host: config.host,
-                port: config.port,
+                host: actualHost,
+                port: actualPort,
                 user: config.user,
-                password: config.password || '',
+                password: actualPassword,
                 database: config.database,
                 connectionLimit: 10,
                 queueLimit: 0,
@@ -118,7 +129,8 @@ export class MySQLAdapter {
 
             this.isConnectedState = true;
             const dbType = this.isMariaDBFlag ? 'MariaDB' : 'MySQL';
-            this.logger.info(`Connected to ${dbType} ${this.versionString}`);
+            const connType = tunnelLocalPort ? ' (via SSH tunnel)' : (iamToken ? ' (IAM auth)' : '');
+            this.logger.info(`Connected to ${dbType} ${this.versionString}${connType}`);
 
         } catch (error) {
             this.logger.error('Failed to connect to MySQL:', error as Error);
@@ -826,6 +838,72 @@ export class MySQLAdapter {
             this.logger.error('Failed to get session variables:', error as Error);
             throw new QueryError('Failed to retrieve session variables', 'SHOW SESSION VARIABLES', error as Error);
         }
+    }
+
+    /**
+     * Safely set a system variable with scope and optional persistence.
+     * The variable name must be validated by callers (whitelist). This method
+     * parameterizes values when possible and only inlines known-safe keywords.
+     */
+    async setSystemVariable(
+        scope: 'GLOBAL' | 'SESSION',
+        name: string,
+        value: string,
+        options?: { persist?: boolean; type?: 'boolean' | 'integer' | 'size' | 'enum' | 'string' }
+    ): Promise<void> {
+        const pool = this.ensureConnected();
+        // Validate name defensively (identifier cannot be parameterized)
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+            throw new ValidationError('Invalid variable name', 'name');
+        }
+
+        // Determine scope keyword
+        const usePersist = !!options?.persist && scope === 'GLOBAL';
+        const scopeKeyword = usePersist ? 'PERSIST' : scope;
+
+        // Map value into either a keyword token or a parameter
+        const token = this.asKeywordToken(options?.type || 'string', value);
+        const sql = token !== undefined
+            ? `SET ${scopeKeyword} ${name} = ${token}`
+            : `SET ${scopeKeyword} ${name} = ?`;
+
+        try {
+            if (token !== undefined) {
+                await pool.query(sql);
+            } else {
+                await pool.query(sql, [value]);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to set ${scopeKeyword} ${name}:`, error as Error);
+            throw new QueryError(`Failed to set ${scopeKeyword} ${name}`, sql, error as Error);
+        }
+    }
+
+    /**
+     * Convert a string value into a safe inline keyword token when applicable,
+     * otherwise return undefined to indicate it should be parameterized.
+     */
+    private asKeywordToken(type: 'boolean' | 'integer' | 'size' | 'enum' | 'string', value: string): string | undefined {
+        const trimmed = value.trim();
+        const upper = trimmed.toUpperCase();
+        if (upper === 'DEFAULT' || upper === 'NULL') {
+            return upper;
+        }
+        if (type === 'boolean' || type === 'enum') {
+            if (['ON', 'OFF', 'TRUE', 'FALSE'].includes(upper)) {
+                return upper;
+            }
+            if (/^-?\d+$/.test(trimmed)) {
+                return String(parseInt(trimmed, 10));
+            }
+        }
+        if (type === 'integer' && /^-?\d+$/.test(trimmed)) {
+            return String(parseInt(trimmed, 10));
+        }
+        if (type === 'size' && /^\d+[KMG]?$/i.test(trimmed)) {
+            return trimmed;
+        }
+        return undefined;
     }
 
     async getMetrics(): Promise<Metrics> {

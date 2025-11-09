@@ -9,6 +9,9 @@ import { ConnectionConfig, ConnectionTestResult } from '../types';
 import type { SSLConfig as _SSLConfig, SSHConfig as _SSHConfig, AWSIAMConfig as _AWSIAMConfig } from '../types';
 import { CacheManager, CacheKeyBuilder } from '../core/cache-manager';
 import { AuditLogger } from './audit-logger';
+import { SSHTunnelService } from './ssh-tunnel-service';
+import { AWSIAMAuthService } from './aws-iam-auth-service';
+import { AWSRDSDiscoveryService } from './aws-rds-discovery-service';
 
 // Re-export types for backward compatibility
 export { ConnectionConfig, ConnectionTestResult };
@@ -19,6 +22,9 @@ export class ConnectionManager {
     private adapters = new Map<string, MySQLAdapter>();
     private readonly CONNECTIONS_KEY = 'mydba.connections';
     private adapterRegistry: AdapterRegistry;
+    private sshTunnelService: SSHTunnelService;
+    private awsIamAuthService: AWSIAMAuthService;
+    private awsRdsDiscoveryService: AWSRDSDiscoveryService;
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -30,6 +36,15 @@ export class ConnectionManager {
     ) {
         // Initialize adapter registry with EventBus and AuditLogger
         this.adapterRegistry = new AdapterRegistry(this.logger, this.eventBus, this.auditLogger);
+
+        // Initialize SSH tunnel service
+        this.sshTunnelService = new SSHTunnelService(this.logger);
+
+        // Initialize AWS IAM auth service
+        this.awsIamAuthService = new AWSIAMAuthService(this.logger);
+
+        // Initialize AWS RDS discovery service
+        this.awsRdsDiscoveryService = new AWSRDSDiscoveryService(this.logger);
 
         // Set up cache invalidation listener if cache is provided
         if (this.cache) {
@@ -57,14 +72,28 @@ export class ConnectionManager {
             isConnected: false
         };
 
-        // Store connection config (without password)
+        // Store connection config (without password and SSH keys)
         await this.saveConnectionConfig(config);
 
-        // Store password securely if provided (including empty string)
+        // Store sensitive credentials securely
+        interface CredentialData {
+            password?: string;
+            sshKey?: string;
+            sshPassphrase?: string;
+        }
+        const credentials: CredentialData = {};
         if (config.password !== undefined) {
-            await this.secretStorage.storeCredentials(config.id, {
-                password: config.password
-            });
+            credentials.password = config.password;
+        }
+        if (config.ssh?.privateKey) {
+            credentials.sshKey = config.ssh.privateKey;
+        }
+        if (config.ssh?.passphrase) {
+            credentials.sshPassphrase = config.ssh.passphrase;
+        }
+
+        if (Object.keys(credentials).length > 0) {
+            await this.secretStorage.storeCredentials(config.id, credentials);
         }
 
         // Add to connections map
@@ -105,11 +134,25 @@ export class ConnectionManager {
         // Update config
         await this.saveConnectionConfig(config);
 
-        // Update password if provided (including empty string)
+        // Update sensitive credentials
+        interface CredentialData {
+            password?: string;
+            sshKey?: string;
+            sshPassphrase?: string;
+        }
+        const credentials: CredentialData = {};
         if (config.password !== undefined) {
-            await this.secretStorage.storeCredentials(config.id, {
-                password: config.password
-            });
+            credentials.password = config.password;
+        }
+        if (config.ssh?.privateKey) {
+            credentials.sshKey = config.ssh.privateKey;
+        }
+        if (config.ssh?.passphrase) {
+            credentials.sshPassphrase = config.ssh.passphrase;
+        }
+
+        if (Object.keys(credentials).length > 0) {
+            await this.secretStorage.storeCredentials(config.id, credentials);
         }
 
         // Emit event
@@ -127,6 +170,9 @@ export class ConnectionManager {
 
         this.logger.info(`Connecting to: ${connection.name}`);
 
+        let tunnelLocalPort: number | undefined;
+        let iamToken: string | undefined;
+
         try {
             // Emit state change
             await this.eventBus.emit(EVENTS.CONNECTION_STATE_CHANGED, {
@@ -141,17 +187,58 @@ export class ConnectionManager {
                 throw new Error(`Connection config not found: ${connectionId}`);
             }
 
-            // Retrieve password from secure storage (can be empty string)
+            // Retrieve credentials from secure storage
             const credentials = await this.secretStorage.getCredentials(connectionId);
             if (credentials.password !== undefined) {
                 config.password = credentials.password;
             }
 
+            // Restore SSH key if configured
+            if (config.ssh && credentials.sshKey) {
+                config.ssh.privateKey = credentials.sshKey;
+            }
+            if (config.ssh && credentials.sshPassphrase) {
+                config.ssh.passphrase = credentials.sshPassphrase;
+            }
+
+            // Set up SSH tunnel if configured
+            if (config.ssh) {
+                this.logger.info(`Setting up SSH tunnel for ${connection.name}`);
+                tunnelLocalPort = await this.sshTunnelService.createTunnel(
+                    connectionId,
+                    {
+                        host: config.ssh.host,
+                        port: config.ssh.port,
+                        user: config.ssh.user,
+                        keyPath: config.ssh.keyPath,
+                        privateKey: config.ssh.privateKey,
+                        passphrase: config.ssh.passphrase
+                    },
+                    config.host,
+                    config.port
+                );
+                this.logger.info(`SSH tunnel established on localhost:${tunnelLocalPort}`);
+            }
+
+            // Generate AWS IAM auth token if configured
+            if (config.awsIamAuth) {
+                this.logger.info(`Generating AWS IAM auth token for ${connection.name}`);
+                iamToken = await this.awsIamAuthService.generateAuthToken(
+                    config.host,
+                    config.port,
+                    config.user,
+                    config.awsIamAuth.region,
+                    config.awsIamAuth.profile,
+                    config.awsIamAuth.assumeRole
+                );
+                this.logger.info(`AWS IAM auth token generated for ${connection.name}`);
+            }
+
             // Create adapter
             const adapter = this.adapterRegistry.create(config.type, config);
 
-            // Connect
-            await adapter.connect(config);
+            // Connect with optional tunnel port and IAM token
+            await adapter.connect(config, tunnelLocalPort, iamToken);
 
             // Store adapter
             this.adapters.set(connectionId, adapter);
@@ -171,6 +258,15 @@ export class ConnectionManager {
 
         } catch (error) {
             this.logger.error(`Failed to connect to ${connection.name}:`, error as Error);
+
+            // Clean up tunnel if it was created
+            if (tunnelLocalPort) {
+                try {
+                    await this.sshTunnelService.closeTunnel(connectionId);
+                } catch (tunnelError) {
+                    this.logger.error('Failed to clean up SSH tunnel:', tunnelError as Error);
+                }
+            }
 
             // Emit error state
             await this.eventBus.emit(EVENTS.CONNECTION_STATE_CHANGED, {
@@ -198,6 +294,12 @@ export class ConnectionManager {
             if (adapter) {
                 await adapter.disconnect();
                 this.adapters.delete(connectionId);
+            }
+
+            // Close SSH tunnel if exists
+            if (this.sshTunnelService.isConnected(connectionId)) {
+                await this.sshTunnelService.closeTunnel(connectionId);
+                this.logger.info(`SSH tunnel closed for ${connection.name}`);
             }
 
             // Update connection state
@@ -262,14 +364,50 @@ export class ConnectionManager {
     }
 
     async testConnection(config: ConnectionConfig): Promise<ConnectionTestResult> {
+        let tunnelLocalPort: number | undefined;
+        const tempConnectionId = 'test-' + Date.now();
+
         try {
             this.logger.info(`Testing connection to ${config.host}:${config.port}`);
+
+            // Set up SSH tunnel if configured
+            if (config.ssh) {
+                this.logger.info(`Setting up SSH tunnel for connection test`);
+                tunnelLocalPort = await this.sshTunnelService.createTunnel(
+                    tempConnectionId,
+                    {
+                        host: config.ssh.host,
+                        port: config.ssh.port,
+                        user: config.ssh.user,
+                        keyPath: config.ssh.keyPath,
+                        privateKey: config.ssh.privateKey,
+                        passphrase: config.ssh.passphrase
+                    },
+                    config.host,
+                    config.port
+                );
+                this.logger.info(`SSH tunnel established on localhost:${tunnelLocalPort}`);
+            }
+
+            // Generate AWS IAM auth token if configured
+            let iamToken: string | undefined;
+            if (config.awsIamAuth) {
+                this.logger.info(`Generating AWS IAM auth token for connection test`);
+                iamToken = await this.awsIamAuthService.generateAuthToken(
+                    config.host,
+                    config.port,
+                    config.user,
+                    config.awsIamAuth.region,
+                    config.awsIamAuth.profile,
+                    config.awsIamAuth.assumeRole
+                );
+            }
 
             // Create adapter
             const adapter = this.adapterRegistry.create(config.type, config);
 
-            // Actually test the connection (don't save it)
-            await adapter.connect(config);
+            // Actually test the connection with optional tunnel port and IAM token
+            await adapter.connect(config, tunnelLocalPort, iamToken);
 
             // Get version info if possible
             let version: string | undefined;
@@ -286,6 +424,11 @@ export class ConnectionManager {
 
             // Disconnect immediately - this was just a test
             await adapter.disconnect();
+
+            // Close tunnel if we created one
+            if (tunnelLocalPort) {
+                await this.sshTunnelService.closeTunnel(tempConnectionId);
+            }
 
             // Log successful connection test to audit log
             if (this.auditLogger) {
@@ -306,6 +449,15 @@ export class ConnectionManager {
         } catch (error) {
             this.logger.error(`Connection test error:`, error as Error);
 
+            // Clean up tunnel if we created one
+            if (tunnelLocalPort) {
+                try {
+                    await this.sshTunnelService.closeTunnel(tempConnectionId);
+                } catch (tunnelError) {
+                    this.logger.error('Failed to clean up SSH tunnel:', tunnelError as Error);
+                }
+            }
+
             // Log failed connection test to audit log
             if (this.auditLogger) {
                 await this.auditLogger.logConnectionEvent(
@@ -322,6 +474,30 @@ export class ConnectionManager {
                 error: (error as Error).message
             };
         }
+    }
+
+    /**
+     * Get RDS discovery service
+     * @returns AWS RDS discovery service
+     */
+    getRDSDiscoveryService() {
+        return this.awsRdsDiscoveryService;
+    }
+
+    /**
+     * Get AWS IAM auth service
+     * @returns AWS IAM auth service
+     */
+    getAWSIAMAuthService() {
+        return this.awsIamAuthService;
+    }
+
+    /**
+     * Get SSH tunnel service
+     * @returns SSH tunnel service
+     */
+    getSSHTunnelService() {
+        return this.sshTunnelService;
     }
 
     getConnection(id: string): Connection | undefined {
@@ -385,8 +561,9 @@ export class ConnectionManager {
 
     private async saveConnectionConfig(config: ConnectionConfig): Promise<void> {
         try {
-            // Store in memory
-            this.connectionConfigs.set(config.id, config);
+            // Store in memory (sanitized - remove any sensitive credentials)
+            const sanitized = this.sanitizeConfigForStorage(config);
+            this.connectionConfigs.set(config.id, sanitized);
 
             // Persist to workspace state
             await this.saveAllConnections();
@@ -399,12 +576,45 @@ export class ConnectionManager {
 
     private async saveAllConnections(): Promise<void> {
         const connectionsJson = Array.from(this.connectionConfigs.values()).map(config => {
-            // Remove password before saving (stored separately in secret storage)
-            const { password: _password, ...configWithoutPassword } = config as ConnectionConfig & { password?: string };
-            return JSON.stringify(configWithoutPassword);
+            // Extra defense: ensure sensitive fields are stripped before persisting
+            const { password: _password, ...rest } = config as ConnectionConfig & { password?: string };
+            const sanitizedSsh = rest.ssh
+                ? {
+                    host: rest.ssh.host,
+                    port: rest.ssh.port,
+                    user: rest.ssh.user,
+                    keyPath: rest.ssh.keyPath
+                }
+                : undefined;
+            const configForSave: ConnectionConfig = {
+                ...rest,
+                ssh: sanitizedSsh
+            };
+            return JSON.stringify(configForSave);
         });
 
         await this.context.workspaceState.update(this.CONNECTIONS_KEY, connectionsJson);
+    }
+
+    /**
+     * Create a sanitized copy of the connection config that excludes sensitive data.
+     * This is used for both in-memory storage and persistence to workspace state.
+     */
+    private sanitizeConfigForStorage(config: ConnectionConfig): ConnectionConfig {
+        const { password: _password, ...base } = config as ConnectionConfig & { password?: string };
+        const ssh = config.ssh
+            ? {
+                host: config.ssh.host,
+                port: config.ssh.port,
+                user: config.ssh.user,
+                keyPath: config.ssh.keyPath
+            }
+            : undefined;
+
+        return {
+            ...base,
+            ssh
+        };
     }
 
     private async deleteConnectionConfig(connectionId: string): Promise<void> {

@@ -40,6 +40,65 @@ export interface EmbeddingProvider {
 }
 
 /**
+ * Local Embedding Provider via transformers.js (dynamic import)
+ * Note: Models are downloaded at runtime; nothing is bundled into VSIX.
+ */
+export class LocalTransformersEmbeddingProvider implements EmbeddingProvider {
+    name = 'local';
+    private dimension = 384; // Typical for MiniLM family; updated after model load
+    private modelId = 'Xenova/all-MiniLM-L6-v2';
+    private pipelinePromise: Promise<any> | null = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    constructor(modelId?: string) {
+        if (modelId) this.modelId = modelId;
+    }
+
+    async isAvailable(): Promise<boolean> {
+        try {
+            await this.ensurePipeline();
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    getDimension(): number {
+        return this.dimension;
+    }
+
+    async embed(text: string): Promise<EmbeddingVector> {
+        const pipe = await this.ensurePipeline();
+        const output = await pipe(text);
+        const vector = Array.from(output.data as Float32Array);
+        this.dimension = vector.length;
+        return { vector, dimension: vector.length };
+    }
+
+    async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
+        const pipe = await this.ensurePipeline();
+        const outputs = await pipe(texts);
+        // transformers.js can return a single or array depending on input size
+        const arr = Array.isArray(outputs) ? outputs : [outputs];
+        return arr.map((o: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+            const vector = Array.from(o.data as Float32Array);
+            this.dimension = vector.length;
+            return { vector, dimension: vector.length } as EmbeddingVector;
+        });
+    }
+
+    // Lazily load transformers.js pipeline
+    private async ensurePipeline(): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+        if (this.pipelinePromise) return this.pipelinePromise;
+        this.pipelinePromise = (async () => {
+            // Dynamic import so assets are not bundled
+            const { pipeline } = await import('@xenova/transformers');
+            return await pipeline('feature-extraction', this.modelId);
+        })();
+        return this.pipelinePromise;
+    }
+}
+
+/**
  * OpenAI Embedding Provider
  */
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
@@ -183,8 +242,10 @@ export class MockEmbeddingProvider implements EmbeddingProvider {
  * Embedding Provider Factory
  */
 export class EmbeddingProviderFactory {
-    static create(type: 'openai' | 'mock', config?: { apiKey?: string }): EmbeddingProvider {
+    static create(type: 'openai' | 'mock' | 'local', config?: { apiKey?: string; modelId?: string }): EmbeddingProvider {
         switch (type) {
+            case 'local':
+                return new LocalTransformersEmbeddingProvider(config?.modelId);
             case 'openai':
                 return new OpenAIEmbeddingProvider(config?.apiKey);
             case 'mock':
@@ -197,8 +258,15 @@ export class EmbeddingProviderFactory {
     /**
      * Get the best available provider
      */
-    static async getBestAvailable(config?: { openaiKey?: string }): Promise<EmbeddingProvider> {
-        // Try OpenAI first if API key is available
+    static async getBestAvailable(config?: { openaiKey?: string; preferLocal?: boolean; modelId?: string }): Promise<EmbeddingProvider> {
+        // Prefer local embeddings to avoid network and keep privacy
+        if (config?.preferLocal !== false) {
+            const local = new LocalTransformersEmbeddingProvider(config?.modelId);
+            if (await local.isAvailable()) {
+                return local;
+            }
+        }
+        // Try OpenAI if API key is available
         if (config?.openaiKey) {
             const openai = new OpenAIEmbeddingProvider(config.openaiKey);
             if (await openai.isAvailable()) {
