@@ -22,6 +22,7 @@
     let sortColumn = 'time';
     let sortDirection = 'desc';
     let groupBy = 'none';
+    let groupBy2 = 'none';
     let filterText = '';
     let expandedGroups = new Set();
     let filterTimeout = null; // For debouncing
@@ -61,6 +62,18 @@
         sortAndRenderProcesses();
     });
 
+    // Secondary grouping
+    const groupBy2Select = document.getElementById('group-by-2');
+    groupBy2Select?.addEventListener('change', (e) => {
+        groupBy2 = e.target.value;
+        try {
+            localStorage.setItem('mydba.processlist.groupBy2', groupBy2);
+        } catch (err) {
+            console.warn('Failed to save groupBy2 preference:', err);
+        }
+        sortAndRenderProcesses();
+    });
+
     // Filter input with debouncing (300ms)
     const filterInput = document.getElementById('filter-input');
     filterInput?.addEventListener('input', (e) => {
@@ -90,6 +103,11 @@
         if (savedGroupBy && groupBySelect) {
             groupBySelect.value = savedGroupBy;
             groupBy = savedGroupBy;
+        }
+        const savedGroupBy2 = localStorage.getItem('mydba.processlist.groupBy2');
+        if (savedGroupBy2 && groupBy2Select) {
+            groupBy2Select.value = savedGroupBy2;
+            groupBy2 = savedGroupBy2;
         }
     } catch (err) {
         console.warn('Failed to load groupBy preference:', err);
@@ -167,40 +185,9 @@
 
         const groups = {};
         processes.forEach(process => {
-            let key;
-            switch (groupBy) {
-                case 'user':
-                    key = process.user || '(unknown)';
-                    break;
-                case 'host':
-                    key = process.host || '(unknown)';
-                    break;
-                case 'db':
-                    key = process.db || '(no database)';
-                    break;
-                case 'command':
-                    key = process.command || '(unknown)';
-                    break;
-                case 'state':
-                    key = process.state || '(no state)';
-                    break;
-                case 'query':
-                    key = process.queryFingerprint || '(no query)';
-                    break;
-                case 'locks':
-                    if (process.isBlocked) {
-                        key = '🔒 Blocked';
-                    } else if (process.isBlocking) {
-                        key = '⛔ Blocking Others';
-                    } else if (process.hasLocks) {
-                        key = '🔐 Has Locks';
-                    } else {
-                        key = '✅ No Locks';
-                    }
-                    break;
-                default:
-                    key = 'all';
-            }
+            const primary = getGroupKey(process, groupBy);
+            const secondary = groupBy2 !== 'none' ? getGroupKey(process, groupBy2) : null;
+            const key = secondary ? `${primary} / ${secondary}` : primary;
 
             if (!groups[key]) {
                 groups[key] = [];
@@ -215,6 +202,30 @@
                 processes: procs
             }))
             .sort((a, b) => b.processes.length - a.processes.length); // Sort by count
+    }
+
+    function getGroupKey(process, by) {
+        switch (by) {
+            case 'user':
+                return process.user || '(unknown)';
+            case 'host':
+                return process.host || '(unknown)';
+            case 'db':
+                return process.db || '(no database)';
+            case 'command':
+                return process.command || '(unknown)';
+            case 'state':
+                return process.state || '(no state)';
+            case 'query':
+                return process.queryFingerprint || '(no query)';
+            case 'locks':
+                if (process.isBlocked) { return '🔒 Blocked'; }
+                if (process.isBlocking) { return '⛔ Blocking Others'; }
+                if (process.hasLocks) { return '🔐 Has Locks'; }
+                return '✅ No Locks';
+            default:
+                return 'all';
+        }
     }
 
     function renderProcesses(processes) {

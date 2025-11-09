@@ -561,8 +561,9 @@ export class ConnectionManager {
 
     private async saveConnectionConfig(config: ConnectionConfig): Promise<void> {
         try {
-            // Store in memory
-            this.connectionConfigs.set(config.id, config);
+            // Store in memory (sanitized - remove any sensitive credentials)
+            const sanitized = this.sanitizeConfigForStorage(config);
+            this.connectionConfigs.set(config.id, sanitized);
 
             // Persist to workspace state
             await this.saveAllConnections();
@@ -575,12 +576,45 @@ export class ConnectionManager {
 
     private async saveAllConnections(): Promise<void> {
         const connectionsJson = Array.from(this.connectionConfigs.values()).map(config => {
-            // Remove password before saving (stored separately in secret storage)
-            const { password: _password, ...configWithoutPassword } = config as ConnectionConfig & { password?: string };
-            return JSON.stringify(configWithoutPassword);
+            // Extra defense: ensure sensitive fields are stripped before persisting
+            const { password: _password, ...rest } = config as ConnectionConfig & { password?: string };
+            const sanitizedSsh = rest.ssh
+                ? {
+                    host: rest.ssh.host,
+                    port: rest.ssh.port,
+                    user: rest.ssh.user,
+                    keyPath: rest.ssh.keyPath
+                }
+                : undefined;
+            const configForSave: ConnectionConfig = {
+                ...rest,
+                ssh: sanitizedSsh
+            };
+            return JSON.stringify(configForSave);
         });
 
         await this.context.workspaceState.update(this.CONNECTIONS_KEY, connectionsJson);
+    }
+
+    /**
+     * Create a sanitized copy of the connection config that excludes sensitive data.
+     * This is used for both in-memory storage and persistence to workspace state.
+     */
+    private sanitizeConfigForStorage(config: ConnectionConfig): ConnectionConfig {
+        const { password: _password, ...base } = config as ConnectionConfig & { password?: string };
+        const ssh = config.ssh
+            ? {
+                host: config.ssh.host,
+                port: config.ssh.port,
+                user: config.ssh.user,
+                keyPath: config.ssh.keyPath
+            }
+            : undefined;
+
+        return {
+            ...base,
+            ssh
+        };
     }
 
     private async deleteConnectionConfig(connectionId: string): Promise<void> {

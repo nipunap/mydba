@@ -234,19 +234,21 @@
 
             const editBtn = document.createElement('button');
             editBtn.classList.add('action-btn', 'edit-btn');
-            editBtn.innerHTML = '<span class="codicon codicon-edit"></span>';
+            editBtn.innerHTML = '<span class="codicon codicon-edit" aria-hidden="true"></span><span class="btn-label">Edit</span>';
             editBtn.title = 'Edit Variable';
             editBtn.addEventListener('click', () => openEditModal(variable));
 
             const rollbackBtn = document.createElement('button');
             rollbackBtn.classList.add('action-btn', 'rollback-btn');
-            rollbackBtn.innerHTML = '<span class="codicon codicon-discard"></span>';
+            rollbackBtn.innerHTML = '<span class="codicon codicon-discard" aria-hidden="true"></span><span class="btn-label">Undo</span>';
             rollbackBtn.title = 'Rollback to Previous Value';
-            rollbackBtn.disabled = !variableHistory.has(variable.name);
             rollbackBtn.addEventListener('click', () => rollbackVariable(variable));
 
             actionsCell.appendChild(editBtn);
-            actionsCell.appendChild(rollbackBtn);
+            // Only show rollback button when we actually have a previous value recorded
+            if (variableHistory.has(variable.name)) {
+                actionsCell.appendChild(rollbackBtn);
+            }
             row.appendChild(actionsCell);
 
             variablesTbody.appendChild(row);

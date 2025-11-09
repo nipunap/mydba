@@ -17,6 +17,7 @@
         const form = document.getElementById('connection-form');
         const nameField = document.getElementById('connection-name');
         const typeField = document.getElementById('connection-type');
+        const environmentDropdown = document.getElementById('environment');
         const hostField = document.getElementById('host');
         const portField = document.getElementById('port');
         const usernameField = document.getElementById('username');
@@ -246,6 +247,7 @@
         function loadConnectionData(config) {
             if (nameField) nameField.value = config.name || '';
             if (typeField) typeField.value = config.type || 'mysql';
+            if (environmentDropdown) environmentDropdown.value = config.environment || 'dev';
             if (hostField) hostField.value = config.host || '127.0.0.1';
             if (portField) portField.value = config.port || 3306;
             if (usernameField) usernameField.value = config.username || 'root';
@@ -301,6 +303,7 @@
             return {
                 name: nameField?.value?.trim() || '',
                 type: typeField?.value || 'mysql',
+                environment: environmentDropdown?.value || 'dev',
                 host: hostField?.value?.trim() || '127.0.0.1',
                 port: parseInt(portField?.value) || 3306,
                 username: usernameField?.value?.trim() || 'root',

@@ -1,0 +1,54 @@
+{
+  "max_connections": {
+    "category": "Connection",
+    "type": "integer",
+    "min": 1,
+    "max": 100000,
+    "risk": "caution",
+    "description": "Maximum number of concurrent connections.",
+    "recommendation": "Monitor connection usage before changing."
+  },
+  "innodb_buffer_pool_size": {
+    "category": "InnoDB",
+    "type": "size",
+    "risk": "caution",
+    "description": "Size of InnoDB buffer pool (often requires restart or SET PERSIST).",
+    "recommendation": "Set to 70–80% of RAM on dedicated DB servers."
+  },
+  "max_allowed_packet": {
+    "category": "Performance",
+    "type": "size",
+    "risk": "safe",
+    "description": "Maximum size of one packet or generated/intermediate string.",
+    "recommendation": "Increase for large BLOB/TEXT operations."
+  },
+  "sql_mode": {
+    "category": "Behavior",
+    "type": "string",
+    "risk": "caution",
+    "description": "SQL mode affects query behavior and validation.",
+    "recommendation": "Changing can break existing queries; test carefully."
+  },
+  "read_only": {
+    "category": "Replication",
+    "type": "boolean",
+    "risk": "dangerous",
+    "description": "Makes server read-only (blocks writes).",
+    "recommendation": "Only change with full impact awareness."
+  },
+  "skip_networking": {
+    "category": "Security",
+    "type": "boolean",
+    "risk": "dangerous",
+    "description": "Disables TCP/IP connections.",
+    "recommendation": "Avoid changing on remote systems."
+  },
+  "innodb_flush_log_at_trx_commit": {
+    "category": "InnoDB",
+    "type": "enum",
+    "options": ["0", "1", "2"],
+    "risk": "caution",
+    "description": "Controls durability vs performance tradeoff.",
+    "recommendation": "1 = safest (default); 0/2 = faster with risk."
+  }
+}

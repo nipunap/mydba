@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
+import { LockAnalysisService } from '../services/lock-analysis-service';
 // import { Process } from '../types';
 
 export class ProcessListPanel {
@@ -128,8 +129,9 @@ export class ProcessListPanel {
             const processes = await adapter.getProcessList();
             this.logger.info(`Retrieved ${processes.length} processes`);
 
-            // Fetch lock information
-            const lockInfo = await this.getLockInformation(adapter);
+            // Fetch lock information using service with short TTL to avoid thrash
+            const lockService = new LockAnalysisService(this.connectionManager, this.logger);
+            const lockInfo = await lockService.getLocks(this.connectionId, 1500);
             this.logger.debug(`Retrieved lock information for ${lockInfo.length} processes`);
 
             // Merge lock information with processes
@@ -167,83 +169,7 @@ export class ProcessListPanel {
         }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private async getLockInformation(adapter: any): Promise<any[]> {
-        try {
-            // Try to get lock information from performance_schema (MySQL 5.7+)
-            // Map ENGINE_TRANSACTION_ID to PROCESSLIST_ID via INNODB_TRX
-            const lockQuery = `
-                SELECT
-                    t.trx_mysql_thread_id as processId,
-                    l.OBJECT_NAME as lockObject,
-                    l.LOCK_TYPE as lockType,
-                    l.LOCK_MODE as lockMode,
-                    l.LOCK_STATUS as lockStatus,
-                    t2.trx_mysql_thread_id as blockingProcessId
-                FROM performance_schema.data_locks l
-                INNER JOIN information_schema.INNODB_TRX t
-                    ON t.trx_id = l.ENGINE_TRANSACTION_ID
-                LEFT JOIN performance_schema.data_lock_waits w
-                    ON l.ENGINE_LOCK_ID = w.REQUESTED_LOCK_ID
-                LEFT JOIN information_schema.INNODB_TRX t2
-                    ON t2.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
-                WHERE t.trx_mysql_thread_id IS NOT NULL
-            `;
-
-            const locks = await adapter.query(lockQuery);
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return locks.map((lock: any) => ({
-                processId: lock.processId || lock.PROCESSID,
-                lockObject: lock.lockObject || lock.LOCKOBJECT,
-                lockType: lock.lockType || lock.LOCKTYPE,
-                lockMode: lock.lockMode || lock.LOCKMODE,
-                lockStatus: lock.lockStatus || lock.LOCKSTATUS,
-                isBlocked: (lock.lockStatus || lock.LOCKSTATUS) === 'WAITING',
-                isBlocking: !!(lock.blockingProcessId || lock.BLOCKINGPROCESSID),
-                blockingProcessId: lock.blockingProcessId || lock.BLOCKINGPROCESSID
-            }));
-        } catch {
-            // If performance_schema is not available, try INFORMATION_SCHEMA (MySQL 5.5/5.6)
-            try {
-                // In legacy versions, we need to map lock_trx_id to processlist_id via INNODB_TRX
-                const legacyLockQuery = `
-                    SELECT
-                        t.trx_mysql_thread_id as processId,
-                        l.lock_table as lockObject,
-                        l.lock_type as lockType,
-                        l.lock_mode as lockMode,
-                        'GRANTED' as lockStatus,
-                        t2.trx_mysql_thread_id as blockingProcessId
-                    FROM INFORMATION_SCHEMA.INNODB_LOCKS l
-                    INNER JOIN INFORMATION_SCHEMA.INNODB_TRX t
-                        ON t.trx_id = l.lock_trx_id
-                    LEFT JOIN INFORMATION_SCHEMA.INNODB_LOCK_WAITS w
-                        ON l.lock_id = w.requested_lock_id
-                    LEFT JOIN INFORMATION_SCHEMA.INNODB_TRX t2
-                        ON t2.trx_id = w.blocking_trx_id
-                    WHERE t.trx_mysql_thread_id IS NOT NULL
-                `;
-
-                const locks = await adapter.query(legacyLockQuery);
-
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                return locks.map((lock: any) => ({
-                    processId: lock.processId || lock.PROCESSID,
-                    lockObject: lock.lockObject || lock.LOCKOBJECT,
-                    lockType: lock.lockType || lock.LOCKTYPE,
-                    lockMode: lock.lockMode || lock.LOCKMODE,
-                    lockStatus: lock.lockStatus || lock.LOCKSTATUS,
-                    isBlocked: false, // Will be determined by lock_waits
-                    isBlocking: !!(lock.blockingProcessId || lock.BLOCKINGPROCESSID),
-                    blockingProcessId: lock.blockingProcessId || lock.BLOCKINGPROCESSID
-                }));
-            } catch (legacyError) {
-                this.logger.warn('Could not fetch lock information:', legacyError as Error);
-                return [];
-            }
-        }
-    }
+    // lock information now handled by LockAnalysisService
 
     private async killProcess(processId: number): Promise<void> {
         // Validate process ID to prevent SQL injection
@@ -326,6 +252,17 @@ export class ProcessListPanel {
             <div class="toolbar-controls">
                 <label for="group-by">Group By:</label>
                 <select id="group-by" class="dropdown" aria-label="Group processes by">
+                    <option value="none">None</option>
+                    <option value="user">User</option>
+                    <option value="host">Host</option>
+                    <option value="db">Database</option>
+                    <option value="command">Command</option>
+                    <option value="state">State</option>
+                    <option value="query">Query Fingerprint</option>
+                    <option value="locks">Lock Status</option>
+                </select>
+                <label for="group-by-2" class="then-by-label">Then by:</label>
+                <select id="group-by-2" class="dropdown" aria-label="Then group by (secondary)">
                     <option value="none">None</option>
                     <option value="user">User</option>
                     <option value="host">Host</option>

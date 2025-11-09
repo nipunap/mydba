@@ -135,7 +135,7 @@ export class ConnectionDialogPanel {
                 user: config.username || 'root',
                 password: config.password || '',
                 database: config.database,
-                environment: 'dev',
+                environment: config.environment || 'dev',
                 ssl: config.sslEnabled ? {
                     rejectUnauthorized: config.sslVerify || false,
                     ca: config.sslCa,
@@ -203,7 +203,7 @@ export class ConnectionDialogPanel {
                 user: config.username || 'root',
                 password: config.password || '',
                 database: config.database,
-                environment: 'dev', // Default to dev
+                environment: config.environment || 'dev',
                 ssl: config.sslEnabled ? {
                     rejectUnauthorized: config.sslVerify || false,
                     ca: config.sslCa,
@@ -393,6 +393,14 @@ export class ConnectionDialogPanel {
                         <vscode-option value="mariadb">MariaDB</vscode-option>
                         <vscode-option value="aws-rds-mysql">AWS RDS MySQL</vscode-option>
                         <vscode-option value="aws-rds-mariadb">AWS RDS MariaDB</vscode-option>
+                    </vscode-dropdown>
+                </div>
+                <div class="form-group">
+                    <label for="environment">Environment</label>
+                    <vscode-dropdown id="environment">
+                        <vscode-option value="dev" selected>Development</vscode-option>
+                        <vscode-option value="staging">Staging</vscode-option>
+                        <vscode-option value="prod">Production</vscode-option>
                     </vscode-dropdown>
                 </div>
             </section>

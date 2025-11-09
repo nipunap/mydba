@@ -840,6 +840,72 @@ export class MySQLAdapter {
         }
     }
 
+    /**
+     * Safely set a system variable with scope and optional persistence.
+     * The variable name must be validated by callers (whitelist). This method
+     * parameterizes values when possible and only inlines known-safe keywords.
+     */
+    async setSystemVariable(
+        scope: 'GLOBAL' | 'SESSION',
+        name: string,
+        value: string,
+        options?: { persist?: boolean; type?: 'boolean' | 'integer' | 'size' | 'enum' | 'string' }
+    ): Promise<void> {
+        const pool = this.ensureConnected();
+        // Validate name defensively (identifier cannot be parameterized)
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+            throw new ValidationError('Invalid variable name', 'name');
+        }
+
+        // Determine scope keyword
+        const usePersist = !!options?.persist && scope === 'GLOBAL';
+        const scopeKeyword = usePersist ? 'PERSIST' : scope;
+
+        // Map value into either a keyword token or a parameter
+        const token = this.asKeywordToken(options?.type || 'string', value);
+        const sql = token !== undefined
+            ? `SET ${scopeKeyword} ${name} = ${token}`
+            : `SET ${scopeKeyword} ${name} = ?`;
+
+        try {
+            if (token !== undefined) {
+                await pool.query(sql);
+            } else {
+                await pool.query(sql, [value]);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to set ${scopeKeyword} ${name}:`, error as Error);
+            throw new QueryError(`Failed to set ${scopeKeyword} ${name}`, sql, error as Error);
+        }
+    }
+
+    /**
+     * Convert a string value into a safe inline keyword token when applicable,
+     * otherwise return undefined to indicate it should be parameterized.
+     */
+    private asKeywordToken(type: 'boolean' | 'integer' | 'size' | 'enum' | 'string', value: string): string | undefined {
+        const trimmed = value.trim();
+        const upper = trimmed.toUpperCase();
+        if (upper === 'DEFAULT' || upper === 'NULL') {
+            return upper;
+        }
+        if (type === 'boolean' || type === 'enum') {
+            if (['ON', 'OFF', 'TRUE', 'FALSE'].includes(upper)) {
+                return upper;
+            }
+            if (/^-?\d+$/.test(trimmed)) {
+                return String(parseInt(trimmed, 10));
+            }
+        }
+        if (type === 'integer' && /^-?\d+$/.test(trimmed)) {
+            return String(parseInt(trimmed, 10));
+        }
+        if (type === 'size' && /^\d+[KMG]?$/i.test(trimmed)) {
+            return trimmed;
+        }
+        return undefined;
+    }
+
     async getMetrics(): Promise<Metrics> {
         try {
             interface StatusRow {

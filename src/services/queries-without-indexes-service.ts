@@ -73,14 +73,9 @@ export class QueriesWithoutIndexesService {
                     AND schema_name NOT IN ('performance_schema', 'information_schema', 'mysql', 'sys')
                     AND digest_text NOT LIKE 'SHOW%'
                     AND digest_text NOT LIKE 'SELECT @@%'
-                    AND digest_text NOT LIKE '%performance_schema.%'
-                    AND digest_text NOT LIKE '%information_schema.%'
-                    AND digest_text NOT LIKE '%mysql.%'
-                    AND digest_text NOT LIKE '%\`performance_schema\`.%'
-                    AND digest_text NOT LIKE '%\`information_schema\`.%'
-                    AND digest_text NOT LIKE '%\`mysql\`.%'
-                    AND digest_text NOT LIKE '%sys.%'
-                    AND digest_text NOT LIKE '%\`sys\`.%'
+                    -- Exclude any queries that reference system schemas anywhere in the text.
+                    -- Using REGEXP with word boundaries to handle cases with backticks and/or whitespace around dots.
+                    AND digest_text NOT REGEXP '[[:<:]](performance_schema|information_schema|mysql|sys)[[:>:]]'
                     AND (
                         sum_no_index_used > 0
                         OR sum_no_good_index_used > 0

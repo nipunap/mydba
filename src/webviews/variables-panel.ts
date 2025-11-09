@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConnectionManager } from '../services/connection-manager';
+import { VariablesService } from '../services/variables-service';
+import { AuditLogger } from '../services/audit-logger';
+import { DisposableManager } from '../core/disposable-manager';
 // import { Variable } from '../types';
 
 interface VariableMetadata {
@@ -17,7 +20,7 @@ interface VariableMetadata {
 export class VariablesPanel {
     private static currentPanel: VariablesPanel | undefined;
     private readonly panel: vscode.WebviewPanel;
-    private disposables: vscode.Disposable[] = [];
+    private disposables = new DisposableManager();
     private currentScope: 'global' | 'session' = 'global';
 
     private constructor(
@@ -35,7 +38,7 @@ export class VariablesPanel {
         this.loadVariables();
 
         // Handle panel disposal
-        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+        this.panel.onDidDispose(() => this.dispose(), null, this.disposables.bag);
     }
 
     public static show(
@@ -102,7 +105,7 @@ export class VariablesPanel {
                 }
             },
             null,
-            this.disposables
+            this.disposables.bag
         );
     }
 
@@ -139,11 +142,57 @@ export class VariablesPanel {
                 }
             }
 
-            // Execute SET command
-            const scopeKeyword = scope === 'global' ? 'GLOBAL' : 'SESSION';
-            const setQuery = `SET ${scopeKeyword} ${name} = ${this.escapeValue(value, variableInfo.type)}`;
+            // Prod safeguards: block GLOBAL by default; require explict override + reason
+            const connection = this.connectionManager.getConnection(this.connectionId);
+            const isProd = connection?.environment === 'prod';
+            let reason: string | undefined;
+            let allowGlobalInProd = false;
+            if (isProd && scope === 'global') {
+                const override = await vscode.window.showWarningMessage(
+                    'GLOBAL variable changes are blocked by default in production. Override?',
+                    { modal: true },
+                    'Override',
+                    'Cancel'
+                );
+                if (override !== 'Override') {
+                    this.panel.webview.postMessage({
+                        type: 'editCancelled',
+                        name: name
+                    });
+                    return;
+                }
+                reason = await vscode.window.showInputBox({
+                    title: 'Reason for GLOBAL change (required)',
+                    prompt: 'Provide a brief reason for audit logging.',
+                    validateInput: (text) => text.trim().length === 0 ? 'Reason is required' : undefined
+                });
+                if (!reason) {
+                    this.panel.webview.postMessage({
+                        type: 'editCancelled',
+                        name: name
+                    });
+                    return;
+                }
+                allowGlobalInProd = true;
+            }
 
-            await adapter.query(setQuery);
+            // Use VariablesService for safe setting, validation, audit, undo
+            const variablesService = new VariablesService(
+                this.context,
+                this.logger,
+                this.connectionManager,
+                new AuditLogger(this.context, this.logger)
+            );
+            await variablesService.setVariable(
+                this.connectionId,
+                scope === 'global' ? 'GLOBAL' : 'SESSION',
+                name,
+                value,
+                {
+                    allowGlobalInProd,
+                    reason
+                }
+            );
 
             // Success - reload variables
             await this.loadVariables();
@@ -694,11 +743,6 @@ Focus on practical, production-ready advice based on real-world DBA experience. 
         VariablesPanel.currentPanel = undefined;
         this.panel.dispose();
 
-        while (this.disposables.length) {
-            const disposable = this.disposables.pop();
-            if (disposable) {
-                disposable.dispose();
-            }
-        }
+        this.disposables.disposeAll();
     }
 }

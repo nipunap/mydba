@@ -45,6 +45,12 @@ export class Uri {
         return { fsPath: value } as Uri;
     }
 
+    static joinPath(base: Uri, ...paths: string[]): Uri {
+        const basePath = base.fsPath || '';
+        const joined = [basePath, ...paths].join('/').replace(/\/+/g, '/');
+        return { fsPath: joined } as Uri;
+    }
+
     fsPath: string = '';
 }
 
