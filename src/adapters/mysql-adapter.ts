@@ -78,16 +78,27 @@ export class MySQLAdapter {
         return this.isConnectedState;
     }
 
-    async connect(config: ConnectionConfig): Promise<void> {
-        this.logger.info(`Connecting to MySQL/MariaDB: ${config.host}:${config.port}`);
+    async connect(config: ConnectionConfig, tunnelLocalPort?: number, iamToken?: string): Promise<void> {
+        // Determine actual host and port (may be localhost if using SSH tunnel)
+        const actualHost = tunnelLocalPort ? '127.0.0.1' : config.host;
+        const actualPort = tunnelLocalPort || config.port;
+
+        // Use IAM token as password if provided, otherwise use config password
+        const actualPassword = iamToken || config.password || '';
+
+        const logHost = tunnelLocalPort
+            ? `${config.host}:${config.port} via SSH tunnel (localhost:${tunnelLocalPort})`
+            : `${config.host}:${config.port}`;
+
+        this.logger.info(`Connecting to MySQL/MariaDB: ${logHost}`);
 
         try {
             // Create connection pool
             this.pool = mysql.createPool({
-                host: config.host,
-                port: config.port,
+                host: actualHost,
+                port: actualPort,
                 user: config.user,
-                password: config.password || '',
+                password: actualPassword,
                 database: config.database,
                 connectionLimit: 10,
                 queueLimit: 0,
@@ -118,7 +129,8 @@ export class MySQLAdapter {
 
             this.isConnectedState = true;
             const dbType = this.isMariaDBFlag ? 'MariaDB' : 'MySQL';
-            this.logger.info(`Connected to ${dbType} ${this.versionString}`);
+            const connType = tunnelLocalPort ? ' (via SSH tunnel)' : (iamToken ? ' (IAM auth)' : '');
+            this.logger.info(`Connected to ${dbType} ${this.versionString}${connType}`);
 
         } catch (error) {
             this.logger.error('Failed to connect to MySQL:', error as Error);

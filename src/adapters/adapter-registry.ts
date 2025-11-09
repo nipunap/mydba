@@ -18,9 +18,14 @@ export class AdapterRegistry {
     }
 
     private registerDefaults(): void {
-        // Register MySQL adapter
-        this.register('mysql', (config, logger, eventBus, auditLogger) => new MySQLAdapter(config, logger, eventBus, auditLogger));
-        this.register('mariadb', (config, logger, eventBus, auditLogger) => new MySQLAdapter(config, logger, eventBus, auditLogger));
+        // Register MySQL adapter for MySQL and MariaDB (including AWS RDS variants)
+        const mysqlFactory = (config: ConnectionConfig, logger: Logger, eventBus?: EventBus, auditLogger?: AuditLogger) =>
+            new MySQLAdapter(config, logger, eventBus, auditLogger);
+
+        this.register('mysql', mysqlFactory);
+        this.register('mariadb', mysqlFactory);
+        this.register('aws-rds-mysql', mysqlFactory);
+        this.register('aws-rds-mariadb', mysqlFactory);
 
         this.logger.info('Registered default database adapters');
     }

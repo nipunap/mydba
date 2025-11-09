@@ -378,6 +378,10 @@ Focus on practical, production-ready advice based on real-world DBA experience. 
             description = description.replace(/^DESCRIPTION:\s*/i, '').trim();
             recommendation = recommendation.replace(/^RECOMMENDATION:\s*/i, '').trim();
 
+            // Clean markdown formatting from content
+            description = this.cleanMarkdown(description);
+            recommendation = this.cleanMarkdown(recommendation);
+
             return {
                 description,
                 recommendation
@@ -388,16 +392,64 @@ Focus on practical, production-ready advice based on real-world DBA experience. 
         const sentences = response.split(/\n\n+|\. (?=[A-Z])/);
         if (sentences.length >= 2) {
             // First part is description, rest is recommendation
-            const description = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim();
-            const recommendation = sentences.slice(Math.ceil(sentences.length / 2)).join('. ').trim();
+            const description = this.cleanMarkdown(sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim());
+            const recommendation = this.cleanMarkdown(sentences.slice(Math.ceil(sentences.length / 2)).join('. ').trim());
             return { description, recommendation };
         }
 
         // Last resort: Use full response as description with generic recommendation
         return {
-            description: response.trim(),
+            description: this.cleanMarkdown(response.trim()),
             recommendation: `Review ${variableName} documentation and test changes in a non-production environment before applying.`
         };
+    }
+
+    /**
+     * Clean markdown formatting from text
+     * Removes common markdown syntax while preserving the text content
+     */
+    private cleanMarkdown(text: string): string {
+        if (!text) return '';
+
+        let cleaned = text;
+
+        // Remove bold markers (**text** or __text__)
+        cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+        cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
+
+        // Remove italic markers (*text* or _text_)
+        cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
+        cleaned = cleaned.replace(/_([^_]+)_/g, '$1');
+
+        // Remove inline code markers (`code`)
+        cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+
+        // Remove strikethrough (~~text~~)
+        cleaned = cleaned.replace(/~~([^~]+)~~/g, '$1');
+
+        // Remove markdown links [text](url) -> text
+        cleaned = cleaned.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+        // Remove markdown headers (## Header -> Header)
+        cleaned = cleaned.replace(/^#+\s+/gm, '');
+
+        // Remove markdown list markers (- item, * item, 1. item)
+        cleaned = cleaned.replace(/^[\s]*[-*+]\s+/gm, '');
+        cleaned = cleaned.replace(/^[\s]*\d+\.\s+/gm, '');
+
+        // Remove blockquote markers (> text)
+        cleaned = cleaned.replace(/^>\s+/gm, '');
+
+        // Remove code block markers (```language or ```)
+        cleaned = cleaned.replace(/```[\w]*\n?/g, '');
+
+        // Remove horizontal rules (---, ***, ___)
+        cleaned = cleaned.replace(/^[\s]*[-*_]{3,}[\s]*$/gm, '');
+
+        // Clean up multiple spaces and trim
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+        return cleaned;
     }
 
     private getVariableMetadata(name: string): VariableMetadata {

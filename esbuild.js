@@ -33,12 +33,18 @@ async function main() {
     sourcesContent: false,
     platform: 'node',
     outfile: 'dist/extension.js',
-    external: ['vscode'],
+    external: [
+      'vscode',
+      'cpu-features',
+      'ssh2',
+      '@aws-sdk/*'
+    ],
     logLevel: 'silent',
     plugins: [esbuildProblemMatcherPlugin],
-    // Add this to handle JSON imports
+    // Add this to handle JSON and node files
     loader: {
       '.json': 'json',
+      '.node': 'copy'
     },
     // Tree shaking and optimization
     treeShaking: true,
