@@ -36,8 +36,7 @@ async function main() {
     external: [
       'vscode',
       'cpu-features',
-      'ssh2',
-      '@aws-sdk/*'
+      'ssh2'
     ],
     logLevel: 'silent',
     plugins: [esbuildProblemMatcherPlugin],
