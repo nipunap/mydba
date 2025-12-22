@@ -38,6 +38,13 @@ export class LockAnalysisService {
             return [];
         }
 
+        // Check if we've already determined locks are unavailable for this connection
+        const unavailableKey = `unavailable:${connectionId}`;
+        if (this.cache.has(unavailableKey)) {
+            return [];
+        }
+
+        // Try MySQL 8.0+ performance_schema approach first
         try {
             const psQuery = `
                 SELECT
@@ -51,9 +58,11 @@ export class LockAnalysisService {
                 INNER JOIN information_schema.INNODB_TRX t
                     ON t.trx_id = l.ENGINE_TRANSACTION_ID
                 LEFT JOIN performance_schema.data_lock_waits w
-                    ON l.ENGINE_LOCK_ID = w.REQUESTED_LOCK_ID
+                    ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
+                LEFT JOIN performance_schema.data_locks l2
+                    ON w.BLOCKING_ENGINE_LOCK_ID = l2.ENGINE_LOCK_ID
                 LEFT JOIN information_schema.INNODB_TRX t2
-                    ON t2.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+                    ON l2.ENGINE_TRANSACTION_ID = t2.trx_id
                 WHERE t.trx_mysql_thread_id IS NOT NULL
             `;
             const res = await adapter.query(psQuery);
@@ -77,8 +86,13 @@ export class LockAnalysisService {
 
             this.cache.set(connectionId, { at: now, data });
             return data;
-        } catch {
-            this.logger.warn('LockAnalysisService: performance_schema query failed, falling back to INFORMATION_SCHEMA');
+        } catch (err) {
+            // Only log the first time to avoid flooding logs
+            if (!this.cache.has(unavailableKey)) {
+                this.logger.debug(`LockAnalysisService: performance_schema not available (${(err as Error).message}), falling back to legacy INFORMATION_SCHEMA`);
+            }
+
+            // Try legacy MySQL 5.7/MariaDB approach with INNODB_LOCKS
             try {
                 const legacyQuery = `
                     SELECT
@@ -116,8 +130,14 @@ export class LockAnalysisService {
                 });
                 this.cache.set(connectionId, { at: now, data });
                 return data;
-            } catch {
-                this.logger.warn('LockAnalysisService: unable to retrieve lock information (no performance_schema/INNODB_* views available)');
+            } catch (legacyErr) {
+                // Mark as unavailable and only log once
+                if (!this.cache.has(unavailableKey)) {
+                    this.logger.debug(`LockAnalysisService: legacy INNODB_LOCKS not available (${(legacyErr as Error).message}). Lock information will not be displayed.`);
+                    this.logger.info('LockAnalysisService: Lock monitoring requires MySQL 8.0+ with performance_schema enabled, or MySQL 5.7 with INNODB_LOCKS tables');
+                }
+                // Mark as permanently unavailable for this connection
+                this.cache.set(unavailableKey, { at: now, data: [] });
                 this.cache.set(connectionId, { at: now, data: [] });
                 return [];
             }
