@@ -166,6 +166,10 @@ export class ConnectionDialogPanel {
                     ? `Connection successful! (${result.version})`
                     : 'Connection successful!';
 
+                // Show VS Code notification
+                vscode.window.showInformationMessage(message);
+
+                // Also send to webview for inline status
                 this.panel.webview.postMessage({
                     type: 'testResult',
                     success: true,
@@ -173,19 +177,31 @@ export class ConnectionDialogPanel {
                 });
             } else {
                 // Test failed
+                const errorMessage = result.error || 'Connection test failed';
+
+                // Show VS Code error notification
+                vscode.window.showErrorMessage(`Connection test failed: ${errorMessage}`);
+
+                // Also send to webview for inline status
                 this.panel.webview.postMessage({
                     type: 'testResult',
                     success: false,
-                    message: result.error || 'Connection test failed'
+                    message: errorMessage
                 });
             }
 
         } catch (error) {
             this.logger.error('Connection test failed:', error as Error);
+            const errorMessage = (error as Error).message;
+
+            // Show VS Code error notification
+            vscode.window.showErrorMessage(`Connection test failed: ${errorMessage}`);
+
+            // Also send to webview for inline status
             this.panel.webview.postMessage({
                 type: 'testResult',
                 success: false,
-                message: (error as Error).message
+                message: errorMessage
             });
         }
     }

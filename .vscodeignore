@@ -19,6 +19,23 @@ eslint.config.mjs
 coverage/**
 .nyc_output/**
 node_modules/**
+# Include modules with native bindings that cannot be bundled
+!node_modules/ssh2
+!node_modules/ssh2/**
+!node_modules/asn1
+!node_modules/asn1/**
+!node_modules/bcrypt-pbkdf
+!node_modules/bcrypt-pbkdf/**
+!node_modules/safer-buffer
+!node_modules/safer-buffer/**
+!node_modules/tweetnacl
+!node_modules/tweetnacl/**
+!node_modules/cpu-features
+!node_modules/cpu-features/**
+# Include webview UI toolkit (webviews load files directly, can't use bundled code)
+!node_modules/@vscode
+!node_modules/@vscode/**
+# Note: AWS SDK will be bundled by esbuild, not included as external modules
 *.log
 .DS_Store
 .env
