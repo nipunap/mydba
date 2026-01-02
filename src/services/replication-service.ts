@@ -41,10 +41,22 @@ export class ReplicationService {
 
             // Determine which command to use based on version
             const command = this.getReplicationStatusCommand(adapter.version);
+            const useReplicaCommand = command.includes('REPLICA');
 
-            // Execute replication status command
+            // Execute replication status command with fallback
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const result = await adapter.query<any>(command);
+            let result: any[];
+            try {
+                result = await adapter.query<any>(command); // eslint-disable-line @typescript-eslint/no-explicit-any
+            } catch (error) {
+                // If REPLICA command failed, try SLAVE fallback
+                if (useReplicaCommand && (error as Error).message.includes('syntax error')) {
+                    this.logger.debug('SHOW REPLICA STATUS failed, falling back to SHOW SLAVE STATUS');
+                    result = await adapter.query<any>('SHOW SLAVE STATUS'); // eslint-disable-line @typescript-eslint/no-explicit-any
+                } else {
+                    throw error;
+                }
+            }
 
             if (!result || result.length === 0) {
                 throw new Error('No replication configured on this server');
@@ -217,7 +229,9 @@ export class ReplicationService {
             }
 
             // Execute command (works for both SLAVE and REPLICA terminology)
-            await adapter.execute(this.getStartIOCommand(adapter.version));
+            // Fallback is already in getReplicationStatus
+            const command = this.getStartIOCommand(adapter.type || 'mysql');
+            await adapter.execute(command);
 
             // Wait a moment for status to update
             await this.sleep(1000);
@@ -263,7 +277,8 @@ export class ReplicationService {
                 );
             }
 
-            await adapter.execute(this.getStopIOCommand(adapter.version));
+            const command = this.getStopIOCommand(adapter.type || 'mysql');
+            await adapter.execute(command);
             await this.sleep(1000);
 
             this.statusCache.delete(connectionId);
@@ -306,7 +321,8 @@ export class ReplicationService {
                 );
             }
 
-            await adapter.execute(this.getStartSQLCommand(adapter.version));
+            const command = this.getStartSQLCommand(adapter.type || 'mysql');
+            await adapter.execute(command);
             await this.sleep(1000);
 
             this.statusCache.delete(connectionId);
@@ -349,7 +365,8 @@ export class ReplicationService {
                 );
             }
 
-            await adapter.execute(this.getStopSQLCommand(adapter.version));
+            const command = this.getStopSQLCommand(adapter.type || 'mysql');
+            await adapter.execute(command);
             await this.sleep(1000);
 
             this.statusCache.delete(connectionId);
