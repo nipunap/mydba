@@ -42,12 +42,12 @@ export class InnoDBStatusService {
             const result = await adapter.query<any>('SHOW ENGINE INNODB STATUS');
 
             // Debug: Log the result structure
-            this.logger.debug(`SHOW ENGINE INNODB STATUS result type: ${typeof result}`);
-            this.logger.debug(`Result is array: ${Array.isArray(result)}`);
-            this.logger.debug(`Result length: ${result?.length}`);
-            this.logger.debug(`First element exists: ${result?.[0] !== undefined}`);
-            if (result && result.length > 0) {
-                this.logger.debug(`First element keys: ${Object.keys(result[0] || {}).join(', ')}`);
+            this.logger.info(`[DEBUG] SHOW ENGINE INNODB STATUS result type: ${typeof result}`);
+            this.logger.info(`[DEBUG] Result is array: ${Array.isArray(result)}`);
+            this.logger.info(`[DEBUG] Result length: ${result?.length}`);
+            this.logger.info(`[DEBUG] First element exists: ${result?.[0] !== undefined}`);
+            if (result && result.length > 0 && result[0]) {
+                this.logger.info(`[DEBUG] First element keys: ${Object.keys(result[0]).join(', ')}`);
             }
 
             if (!result || result.length === 0 || result[0] === undefined) {
