@@ -46,37 +46,38 @@ export class StorageEngineParser {
         const sections: Record<string, string> = {};
 
         // Match section headers and content
-        const transactionsMatch = rawOutput.match(/TRANSACTIONS\s*-+\s*([\s\S]*?)(?=\n[A-Z]|$)/i);
+        // Look for section headers followed by dashes, capture until next section header
+        const transactionsMatch = rawOutput.match(/TRANSACTIONS\s*\n-+\s*\n([\s\S]*?)(?=\n[A-Z]{2,}.*\n-|$)/i);
         if (transactionsMatch) {
             sections.transactions = transactionsMatch[1];
         }
 
-        const deadlocksMatch = rawOutput.match(/LATEST DETECTED DEADLOCK\s*-+\s*([\s\S]*?)(?=\n[A-Z]{2,}|$)/i);
+        const deadlocksMatch = rawOutput.match(/LATEST DETECTED DEADLOCK\s*\n-+\s*\n([\s\S]*?)(?=\n[A-Z]{2,}.*\n-|$)/i);
         if (deadlocksMatch) {
             sections.deadlocks = deadlocksMatch[1];
         }
 
-        const bufferPoolMatch = rawOutput.match(/BUFFER POOL AND MEMORY\s*-+\s*([\s\S]*?)(?=\n[A-Z]|$)/i);
+        const bufferPoolMatch = rawOutput.match(/BUFFER POOL AND MEMORY\s*\n-+\s*\n([\s\S]*?)(?=\n[A-Z]{2,}.*\n-|$)/i);
         if (bufferPoolMatch) {
             sections.bufferPool = bufferPoolMatch[1];
         }
 
-        const ioMatch = rawOutput.match(/FILE I\/O\s*-+\s*([\s\S]*?)(?=\n[A-Z]|$)/i);
+        const ioMatch = rawOutput.match(/FILE I\/O\s*\n-+\s*\n([\s\S]*?)(?=\n[A-Z]{2,}.*\n-|$)/i);
         if (ioMatch) {
             sections.io = ioMatch[1];
         }
 
-        const logMatch = rawOutput.match(/LOG\s*-+\s*([\s\S]*?)(?=\n[A-Z]|$)/i);
+        const logMatch = rawOutput.match(/LOG\s*\n-+\s*\n([\s\S]*?)(?=\n[A-Z]{2,}.*\n-|$)/i);
         if (logMatch) {
             sections.log = logMatch[1];
         }
 
-        const rowOpsMatch = rawOutput.match(/ROW OPERATIONS\s*-+\s*([\s\S]*?)(?=\n[A-Z]|$)/i);
+        const rowOpsMatch = rawOutput.match(/ROW OPERATIONS\s*\n-+\s*\n([\s\S]*?)(?=\n[A-Z]{2,}.*\n-|$)/i);
         if (rowOpsMatch) {
             sections.rowOps = rowOpsMatch[1];
         }
 
-        const semaphoresMatch = rawOutput.match(/SEMAPHORES\s*-+\s*([\s\S]*?)(?=\n[A-Z]|$)/i);
+        const semaphoresMatch = rawOutput.match(/SEMAPHORES\s*\n-+\s*\n([\s\S]*?)(?=\n[A-Z]{2,}.*\n-|$)/i);
         if (semaphoresMatch) {
             sections.semaphores = semaphoresMatch[1];
         }
@@ -173,8 +174,17 @@ export class StorageEngineParser {
      * Parse BUFFER POOL AND MEMORY section
      */
     private parseBufferPool(section: string): BufferPoolSection {
-        const totalSizeMatch = section.match(/Total memory allocated (\d+)/);
-        const totalSize = totalSizeMatch ? parseInt(totalSizeMatch[1], 10) / 16384 : 0; // Convert to pages
+        // Try to match "Buffer pool size" first (in pages), fallback to "Total memory allocated" (in bytes)
+        let totalSize = 0;
+        const poolSizeMatch = section.match(/Buffer pool size\s+(\d+)/);
+        if (poolSizeMatch) {
+            totalSize = parseInt(poolSizeMatch[1], 10);
+        } else {
+            const totalMemMatch = section.match(/Total (?:large )?memory allocated\s+(\d+)/);
+            if (totalMemMatch) {
+                totalSize = Math.floor(parseInt(totalMemMatch[1], 10) / 16384); // Convert bytes to pages
+            }
+        }
 
         const freeMatch = section.match(/Free buffers\s+(\d+)/);
         const freePages = freeMatch ? parseInt(freeMatch[1], 10) : 0;

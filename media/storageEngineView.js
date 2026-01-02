@@ -379,7 +379,7 @@
     }
 
     // Helper functions
-    
+
     /**
      * Escape HTML to prevent XSS attacks
      */
@@ -394,7 +394,7 @@
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
-    
+
     function formatNumber(num) {
         if (num === undefined || num === null) {
             return 'N/A';

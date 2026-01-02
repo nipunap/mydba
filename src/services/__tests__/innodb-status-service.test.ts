@@ -274,8 +274,8 @@ END OF INNODB MONITOR OUTPUT
 
     describe('calculateHealthScore', () => {
         it('should return 100 for perfect health', () => {
-             
-             
+
+
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -301,8 +301,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should penalize high transaction history', () => {
-             
-             
+
+
             const status: any = {
                 transactions: {
                     historyListLength: 2000000, // Critical
@@ -329,8 +329,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should penalize low buffer pool hit rate', () => {
-             
-             
+
+
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -356,8 +356,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should not return negative scores', () => {
-             
-             
+
+
             const status: any = {
                 transactions: {
                     historyListLength: 5000000, // Critical
@@ -387,8 +387,8 @@ END OF INNODB MONITOR OUTPUT
 
     describe('getHealthAlerts', () => {
         it('should return no alerts for healthy status', () => {
-             
-             
+
+
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -414,8 +414,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should return critical alert for high transaction history', () => {
-             
-             
+
+
             const status: any = {
                 transactions: {
                     historyListLength: 2000000,
@@ -444,8 +444,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should return warning alert for low buffer pool hit rate', () => {
-             
-             
+
+
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -476,7 +476,7 @@ END OF INNODB MONITOR OUTPUT
 
     describe('compareSnapshots', () => {
         it('should calculate deltas correctly', () => {
-             
+
             const before: any = {
                 transactions: { historyListLength: 100000 },
                 bufferPool: { hitRate: 95, dirtyPages: 100 },
@@ -484,7 +484,7 @@ END OF INNODB MONITOR OUTPUT
                 healthScore: 90
             };
 
-             
+
             const after: any = {
                 transactions: { historyListLength: 150000 },
                 bufferPool: { hitRate: 92, dirtyPages: 200 },
@@ -503,7 +503,7 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should identify significant changes', () => {
-             
+
             const before: any = {
                 transactions: { historyListLength: 100000 },
                 bufferPool: { hitRate: 95, dirtyPages: 100 },
@@ -511,7 +511,7 @@ END OF INNODB MONITOR OUTPUT
                 healthScore: 90
             };
 
-             
+
             const after: any = {
                 transactions: { historyListLength: 200000 }, // 100% increase
                 bufferPool: { hitRate: 80, dirtyPages: 500 }, // Large increase
@@ -529,8 +529,10 @@ END OF INNODB MONITOR OUTPUT
     describe('cache management', () => {
         it('should clear cache for specific connection', async () => {
             mockAdapter.query
-                .mockResolvedValue([{ Status: sampleInnoDBStatus }])
-                .mockResolvedValue([{ version: '8.0.35' }]);
+                .mockResolvedValueOnce([{ Status: sampleInnoDBStatus }])
+                .mockResolvedValueOnce([{ version: '8.0.35' }])
+                .mockResolvedValueOnce([{ Status: sampleInnoDBStatus }])
+                .mockResolvedValueOnce([{ version: '8.0.35' }]);
 
             await service.getInnoDBStatus('conn-1', mockAdapter);
             service.clearCache('conn-1');
@@ -538,14 +540,20 @@ END OF INNODB MONITOR OUTPUT
             // Next call should not use cache
             await service.getInnoDBStatus('conn-1', mockAdapter);
 
-            // Should call adapter twice (no cache)
-            expect(mockAdapter.query).toHaveBeenCalled();
+            // Should call adapter twice (no cache) - 4 total calls (2x SHOW ENGINE + 2x SELECT VERSION)
+            expect(mockAdapter.query).toHaveBeenCalledTimes(4);
         });
 
         it('should clear all caches', async () => {
             mockAdapter.query
-                .mockResolvedValue([{ Status: sampleInnoDBStatus }])
-                .mockResolvedValue([{ version: '8.0.35' }]);
+                .mockResolvedValueOnce([{ Status: sampleInnoDBStatus }])
+                .mockResolvedValueOnce([{ version: '8.0.35' }])
+                .mockResolvedValueOnce([{ Status: sampleInnoDBStatus }])
+                .mockResolvedValueOnce([{ version: '8.0.35' }])
+                .mockResolvedValueOnce([{ Status: sampleInnoDBStatus }])
+                .mockResolvedValueOnce([{ version: '8.0.35' }])
+                .mockResolvedValueOnce([{ Status: sampleInnoDBStatus }])
+                .mockResolvedValueOnce([{ version: '8.0.35' }]);
 
             await service.getInnoDBStatus('conn-1', mockAdapter);
             await service.getInnoDBStatus('conn-2', mockAdapter);
@@ -555,6 +563,9 @@ END OF INNODB MONITOR OUTPUT
             // Both should require new queries
             await service.getInnoDBStatus('conn-1', mockAdapter);
             await service.getInnoDBStatus('conn-2', mockAdapter);
+
+            // Should call adapter 8 times total (4 connections x 2 queries each)
+            expect(mockAdapter.query).toHaveBeenCalledTimes(8);
         });
     });
 
