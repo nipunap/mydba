@@ -259,7 +259,7 @@ export class StorageEngineView {
     private async handleAIExplain(connectionId: string, adapter: IDatabaseAdapter, engine: 'innodb' | 'aria'): Promise<void> {
         try {
             this.logger.info(`Requesting AI explanation for ${engine} status`);
-            
+
             // Get the current status
             let status: InnoDBStatus | AriaStatus;
             if (engine === 'innodb') {

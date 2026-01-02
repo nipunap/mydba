@@ -472,27 +472,27 @@
                         <h3>Summary</h3>
                         <p>${escapeHtml(analysis.summary || 'No summary available')}</p>
                     </div>
+                    ${analysis.issues && analysis.issues.length > 0 ? `
+                        <div class="ai-section ai-concerns">
+                            <h3>⚠️ Issues</h3>
+                            <ul>
+                                ${analysis.issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
                     ${analysis.recommendations && analysis.recommendations.length > 0 ? `
                         <div class="ai-section">
-                            <h3>Recommendations</h3>
+                            <h3>💡 Recommendations</h3>
                             <ul>
                                 ${analysis.recommendations.map(rec => `<li>${escapeHtml(rec)}</li>`).join('')}
                             </ul>
                         </div>
                     ` : ''}
-                    ${analysis.concerns && analysis.concerns.length > 0 ? `
-                        <div class="ai-section ai-concerns">
-                            <h3>⚠️ Concerns</h3>
-                            <ul>
-                                ${analysis.concerns.map(concern => `<li>${escapeHtml(concern)}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                    ${analysis.optimizations && analysis.optimizations.length > 0 ? `
+                    ${analysis.configChanges && analysis.configChanges.length > 0 ? `
                         <div class="ai-section">
-                            <h3>💡 Optimizations</h3>
+                            <h3>⚙️ Configuration Changes</h3>
                             <ul>
-                                ${analysis.optimizations.map(opt => `<li>${escapeHtml(opt)}</li>`).join('')}
+                                ${analysis.configChanges.map(config => `<li>${escapeHtml(config)}</li>`).join('')}
                             </ul>
                         </div>
                     ` : ''}
