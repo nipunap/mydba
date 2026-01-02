@@ -295,10 +295,10 @@
 
     function renderAlerts(alerts) {
         return alerts.map(alert => `
-            <div class="alert alert-${alert.severity}">
-                <div class="alert-title">${alert.metric}: ${alert.message}</div>
-                ${alert.currentValue !== undefined ? `<div class="alert-message">Current: ${alert.currentValue}${alert.threshold ? ` (Threshold: ${alert.threshold})` : ''}</div>` : ''}
-                ${alert.recommendation ? `<div class="alert-recommendation">💡 ${alert.recommendation}</div>` : ''}
+            <div class="alert alert-${escapeHtml(alert.severity)}">
+                <div class="alert-title">${escapeHtml(alert.metric)}: ${escapeHtml(alert.message)}</div>
+                ${alert.currentValue !== undefined ? `<div class="alert-message">Current: ${escapeHtml(alert.currentValue)}${alert.threshold ? ` (Threshold: ${escapeHtml(alert.threshold)})` : ''}</div>` : ''}
+                ${alert.recommendation ? `<div class="alert-recommendation">💡 ${escapeHtml(alert.recommendation)}</div>` : ''}
             </div>
         `).join('');
     }
@@ -313,12 +313,12 @@
                 <h3>🤖 AI Analysis</h3>
                 <div class="ai-analysis">
                     <h4>Summary</h4>
-                    <p>${analysis.summary}</p>
+                    <p>${escapeHtml(analysis.summary)}</p>
 
                     ${analysis.recommendations && analysis.recommendations.length > 0 ? `
                         <h4>Recommendations</h4>
                         ${analysis.recommendations.map(rec => `
-                            <div class="recommendation">• ${rec}</div>
+                            <div class="recommendation">• ${escapeHtml(rec)}</div>
                         `).join('')}
                     ` : ''}
                 </div>
@@ -336,7 +336,7 @@
             <div class="status-grid">
                 ${comparison.deltas.map(delta => `
                     <div class="status-card">
-                        <h3>${delta.metric}</h3>
+                        <h3>${escapeHtml(delta.metric)}</h3>
                         <div class="metric">
                             <span class="metric-label">Before</span>
                             <span class="metric-value">${formatNumber(delta.before)}</span>
@@ -360,7 +360,7 @@
                 <div class="status-card">
                     <h3>Significant Changes</h3>
                     <ul>
-                        ${comparison.significantChanges.map(change => `<li>${change}</li>`).join('')}
+                        ${comparison.significantChanges.map(change => `<li>${escapeHtml(change)}</li>`).join('')}
                     </ul>
                 </div>
             ` : ''}
@@ -379,6 +379,22 @@
     }
 
     // Helper functions
+    
+    /**
+     * Escape HTML to prevent XSS attacks
+     */
+    function escapeHtml(unsafe) {
+        if (unsafe === undefined || unsafe === null) {
+            return '';
+        }
+        return String(unsafe)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+    
     function formatNumber(num) {
         if (num === undefined || num === null) {
             return 'N/A';
