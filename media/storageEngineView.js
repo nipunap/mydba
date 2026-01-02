@@ -25,6 +25,12 @@
             vscode.postMessage({ command: 'refresh' });
         });
 
+        // AI Explain button
+        document.getElementById('aiExplainBtn').addEventListener('click', () => {
+            const engine = currentTab === 'aria' ? 'aria' : 'innodb';
+            vscode.postMessage({ command: 'aiExplain', engine });
+        });
+
         // Export button
         document.getElementById('exportBtn').addEventListener('click', () => {
             const data = currentTab === 'innodb' ? innoDBStatus : ariaStatus;
@@ -108,6 +114,18 @@
             case 'aiAnalysis':
                 aiAnalysis = message.analysis;
                 renderAIAnalysis(message.analysis, message.type);
+                break;
+
+            case 'aiExplainProgress':
+                showMessage(escapeHtml(message.message), 'info');
+                break;
+
+            case 'aiExplainResult':
+                showAIExplanationModal(message.analysis, message.engine);
+                break;
+
+            case 'aiExplainError':
+                showMessage(`AI Explanation Error: ${escapeHtml(message.error)}`, 'error');
                 break;
 
             case 'snapshotComparison':
@@ -432,5 +450,62 @@
         if (percent < 70) return 'health-healthy';
         if (percent < 85) return 'health-warning';
         return 'health-critical';
+    }
+
+    function showMessage(text, type = 'info') {
+        // Simple notification (could be enhanced with a toast/notification component)
+        console.log(`[${type}] ${text}`);
+    }
+
+    function showAIExplanationModal(analysis, engine) {
+        // Create modal overlay
+        const modal = document.createElement('div');
+        modal.className = 'ai-modal';
+        modal.innerHTML = `
+            <div class="ai-modal-content">
+                <div class="ai-modal-header">
+                    <h2>🤖 AI Analysis - ${escapeHtml(engine.toUpperCase())}</h2>
+                    <button class="ai-modal-close" onclick="this.closest('.ai-modal').remove()">✕</button>
+                </div>
+                <div class="ai-modal-body">
+                    <div class="ai-section">
+                        <h3>Summary</h3>
+                        <p>${escapeHtml(analysis.summary || 'No summary available')}</p>
+                    </div>
+                    ${analysis.recommendations && analysis.recommendations.length > 0 ? `
+                        <div class="ai-section">
+                            <h3>Recommendations</h3>
+                            <ul>
+                                ${analysis.recommendations.map(rec => `<li>${escapeHtml(rec)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    ${analysis.concerns && analysis.concerns.length > 0 ? `
+                        <div class="ai-section ai-concerns">
+                            <h3>⚠️ Concerns</h3>
+                            <ul>
+                                ${analysis.concerns.map(concern => `<li>${escapeHtml(concern)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    ${analysis.optimizations && analysis.optimizations.length > 0 ? `
+                        <div class="ai-section">
+                            <h3>💡 Optimizations</h3>
+                            <ul>
+                                ${analysis.optimizations.map(opt => `<li>${escapeHtml(opt)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Close on overlay click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
     }
 })();

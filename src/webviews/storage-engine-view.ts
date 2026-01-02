@@ -122,6 +122,10 @@ export class StorageEngineView {
                     await this.handleRefresh(connectionId, adapter);
                     break;
 
+                case 'aiExplain':
+                    await this.handleAIExplain(connectionId, adapter, message.engine);
+                    break;
+
                 case 'compareSnapshots':
                     await this.handleCompareSnapshots(message.before, message.after);
                     break;
@@ -246,6 +250,50 @@ export class StorageEngineView {
 
         if (adapter.type === 'mariadb') {
             await this.handleGetAriaStatus(connectionId, adapter);
+        }
+    }
+
+    /**
+     * Handle AI Explain request
+     */
+    private async handleAIExplain(connectionId: string, adapter: IDatabaseAdapter, engine: 'innodb' | 'aria'): Promise<void> {
+        try {
+            this.logger.info(`Requesting AI explanation for ${engine} status`);
+            
+            // Get the current status
+            let status: InnoDBStatus | AriaStatus;
+            if (engine === 'innodb') {
+                status = await this.innoDBService.getInnoDBStatus(connectionId, adapter);
+            } else {
+                status = await this.ariaService.getAriaStatus(connectionId, adapter);
+            }
+
+            // Show progress
+            this.postMessage({
+                command: 'aiExplainProgress',
+                message: 'Analyzing status with AI...'
+            });
+
+            // Get AI analysis
+            const dbType = adapter.type === 'mariadb' ? 'mariadb' : 'mysql';
+            const analysis = engine === 'innodb'
+                ? await this.aiCoordinator.analyzeInnoDBStatus(status as InnoDBStatus, dbType)
+                : await this.aiCoordinator.analyzeAriaStatus(status as AriaStatus);
+
+            // Send analysis to frontend
+            this.postMessage({
+                command: 'aiExplainResult',
+                analysis,
+                engine
+            });
+
+            this.logger.info('AI explanation completed successfully');
+        } catch (error) {
+            this.logger.error('Failed to get AI explanation:', error as Error);
+            this.postMessage({
+                command: 'aiExplainError',
+                error: (error as Error).message
+            });
         }
     }
 
@@ -437,6 +485,7 @@ export class StorageEngineView {
             <h1>Storage Engine Monitor</h1>
             <div class="controls">
                 <button id="refreshBtn" class="btn">🔄 Refresh</button>
+                <button id="aiExplainBtn" class="btn">🤖 AI Explain</button>
                 <button id="exportBtn" class="btn">💾 Export</button>
                 <button id="compareBtn" class="btn">📊 Compare</button>
                 <label>
