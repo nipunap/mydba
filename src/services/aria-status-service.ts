@@ -41,7 +41,17 @@ export class AriaStatusService {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const result = await adapter.query<any>('SHOW ENGINE ARIA STATUS');
 
-            if (!result || result.length === 0) {
+            // Debug: Log the result structure
+            this.logger.debug(`SHOW ENGINE ARIA STATUS result type: ${typeof result}`);
+            this.logger.debug(`Result is array: ${Array.isArray(result)}`);
+            this.logger.debug(`Result length: ${result?.length}`);
+            this.logger.debug(`First element exists: ${result?.[0] !== undefined}`);
+            if (result && result.length > 0) {
+                this.logger.debug(`First element keys: ${Object.keys(result[0] || {}).join(', ')}`);
+            }
+
+            if (!result || result.length === 0 || result[0] === undefined) {
+                this.logger.error('Invalid Aria status result:', JSON.stringify({ result, length: result?.length }));
                 throw new Error('No Aria status data returned');
             }
 
