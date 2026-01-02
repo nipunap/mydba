@@ -74,8 +74,8 @@ export class QueriesWithoutIndexesService {
                     AND digest_text NOT LIKE 'SHOW%'
                     AND digest_text NOT LIKE 'SELECT @@%'
                     -- Exclude any queries that reference system schemas anywhere in the text.
-                    -- Using REGEXP with word boundaries to handle cases with backticks and/or whitespace around dots.
-                    AND digest_text NOT REGEXP '[[:<:]](performance_schema|information_schema|mysql|sys)[[:>:]]'
+                    -- Using REGEXP with \\\\b word boundaries (MySQL 8.0+ compatible)
+                    AND digest_text NOT REGEXP '\\\\b(performance_schema|information_schema|mysql|sys)\\\\b'
                     AND (
                         sum_no_index_used > 0
                         OR sum_no_good_index_used > 0
