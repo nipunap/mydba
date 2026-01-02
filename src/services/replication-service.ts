@@ -8,7 +8,14 @@ import { IDatabaseAdapter } from '../adapters/database-adapter';
 import { EventBus } from './event-bus';
 import { EventPriority } from '../core/interfaces';
 import { AuditLogger } from './audit-logger';
-import { ReplicationStatus, ReplicationAlert, ReplicationControlResult } from '../types/replication-types';
+import {
+    ReplicationStatus,
+    ReplicationAlert,
+    ReplicationControlResult,
+    MasterStatus,
+    ConnectedReplica,
+    ReplicationRole
+} from '../types/replication-types';
 import { ReplicationParser } from './replication-parser';
 
 export class ReplicationService {
@@ -463,5 +470,95 @@ export class ReplicationService {
      */
     clearAllCaches(): void {
         this.statusCache.clear();
+    }
+
+    /**
+     * Get master/primary status
+     */
+    async getMasterStatus(
+        connectionId: string,
+        adapter: IDatabaseAdapter
+    ): Promise<MasterStatus | null> {
+        try {
+            const result = await adapter.query<MasterStatus>('SHOW MASTER STATUS');
+            
+            if (!result || result.length === 0) {
+                return null; // Not configured as master
+            }
+
+            return {
+                file: result[0].file || result[0].File || '',
+                position: result[0].position || result[0].Position || 0,
+                binlogDoDb: result[0].binlogDoDb || result[0].Binlog_Do_DB || '',
+                binlogIgnoreDb: result[0].binlogIgnoreDb || result[0].Binlog_Ignore_DB || '',
+                executedGtidSet: result[0].executedGtidSet || result[0].Executed_Gtid_Set
+            };
+        } catch (error) {
+            this.logger.debug(`Failed to get master status for ${connectionId}:`, error as Error);
+            return null; // Not a master or binary logging not enabled
+        }
+    }
+
+    /**
+     * Get list of connected replicas (master only)
+     */
+    async getConnectedReplicas(
+        connectionId: string,
+        adapter: IDatabaseAdapter
+    ): Promise<ConnectedReplica[]> {
+        try {
+            // Use SHOW SLAVE HOSTS (works on both MySQL and MariaDB)
+            const result = await adapter.query<any>('SHOW SLAVE HOSTS'); // eslint-disable-line @typescript-eslint/no-explicit-any
+            
+            if (!result || result.length === 0) {
+                return [];
+            }
+
+            return result.map((row: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+                serverId: row.Server_id || row.server_id || 0,
+                host: row.Host || row.host || '',
+                port: row.Port || row.port || 3306,
+                masterLogFile: row.Master_Log_File || row.master_log_file || '',
+                readMasterLogPos: row.Read_Master_Log_Pos || row.read_master_log_pos || 0,
+                slaveIoRunning: row.Slave_IO_Running || row.slave_io_running || 'Unknown',
+                slaveSqlRunning: row.Slave_SQL_Running || row.slave_sql_running || 'Unknown',
+                secondsBehindMaster: row.Seconds_Behind_Master !== null 
+                    ? (row.Seconds_Behind_Master || row.seconds_behind_master) 
+                    : null,
+                lastIOError: row.Last_IO_Error || row.last_io_error || '',
+                lastSQLError: row.Last_SQL_Error || row.last_sql_error || ''
+            }));
+        } catch (error) {
+            this.logger.debug(`Failed to get connected replicas for ${connectionId}:`, error as Error);
+            return [];
+        }
+    }
+
+    /**
+     * Detect server replication role
+     */
+    async getReplicationRole(
+        connectionId: string,
+        adapter: IDatabaseAdapter
+    ): Promise<ReplicationRole> {
+        const masterStatus = await this.getMasterStatus(connectionId, adapter);
+        
+        let hasReplication = false;
+        try {
+            const replicationStatus = await this.getReplicationStatus(connectionId, adapter);
+            hasReplication = replicationStatus !== null;
+        } catch {
+            hasReplication = false;
+        }
+
+        if (masterStatus && hasReplication) {
+            return 'both'; // Multi-source or chained replication
+        } else if (masterStatus) {
+            return 'master';
+        } else if (hasReplication) {
+            return 'replica';
+        } else {
+            return 'standalone';
+        }
     }
 }

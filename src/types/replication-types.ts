@@ -120,3 +120,35 @@ export interface ReplicationControlResult {
     message: string;
     newStatus?: ReplicationStatus;
 }
+
+/**
+ * Master/Primary status
+ */
+export interface MasterStatus {
+    file: string;
+    position: number;
+    binlogDoDb: string;
+    binlogIgnoreDb: string;
+    executedGtidSet?: string;
+}
+
+/**
+ * Connected replica information
+ */
+export interface ConnectedReplica {
+    serverId: number;
+    host: string;
+    port: number;
+    masterLogFile: string;
+    readMasterLogPos: number;
+    slaveIoRunning: string;
+    slaveSqlRunning: string;
+    secondsBehindMaster: number | null;
+    lastIOError: string;
+    lastSQLError: string;
+}
+
+/**
+ * Server replication role
+ */
+export type ReplicationRole = 'master' | 'replica' | 'standalone' | 'both';
