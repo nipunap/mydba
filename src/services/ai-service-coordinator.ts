@@ -721,7 +721,7 @@ Provide your analysis in the following format:
 `;
 
             // Get AI analysis with RAG
-            const response = await this.getCompletion(
+            const response = await this.getSimpleCompletion(
                 prompt,
                 dbType,
                 true,
@@ -773,7 +773,7 @@ ${context}
 Provide actionable recommendations in structured format.
 `;
 
-            const response = await this.getCompletion(
+            const response = await this.getSimpleCompletion(
                 prompt,
                 'mariadb',
                 true,
@@ -996,7 +996,7 @@ Provide your analysis in structured format with:
 [Exact parameter changes to improve replication]
 `;
 
-            const response = await this.getCompletion(
+            const response = await this.getSimpleCompletion(
                 prompt,
                 dbType,
                 true,

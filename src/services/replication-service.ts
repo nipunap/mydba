@@ -208,12 +208,12 @@ export class ReplicationService {
 
             // Audit log the action
             if (this.auditLogger) {
-                await this.auditLogger.logDestructiveOperation({
-                    query: 'START SLAVE IO_THREAD',
-                    affectedTables: [],
+                await this.auditLogger.logDestructiveOperation(
                     connectionId,
-                    environment: 'unknown'
-                });
+                    'START SLAVE IO_THREAD',
+                    'system',
+                    { success: true }
+                );
             }
 
             // Execute command (works for both SLAVE and REPLICA terminology)
@@ -255,12 +255,12 @@ export class ReplicationService {
             this.logger.info(`Stopping I/O thread for connection ${connectionId}`);
 
             if (this.auditLogger) {
-                await this.auditLogger.logDestructiveOperation({
-                    query: 'STOP SLAVE IO_THREAD',
-                    affectedTables: [],
+                await this.auditLogger.logDestructiveOperation(
                     connectionId,
-                    environment: 'unknown'
-                });
+                    'STOP SLAVE IO_THREAD',
+                    'system',
+                    { success: true }
+                );
             }
 
             await adapter.execute(this.getStopIOCommand(adapter.version));
@@ -298,12 +298,12 @@ export class ReplicationService {
             this.logger.info(`Starting SQL thread for connection ${connectionId}`);
 
             if (this.auditLogger) {
-                await this.auditLogger.logDestructiveOperation({
-                    query: 'START SLAVE SQL_THREAD',
-                    affectedTables: [],
+                await this.auditLogger.logDestructiveOperation(
                     connectionId,
-                    environment: 'unknown'
-                });
+                    'START SLAVE SQL_THREAD',
+                    'system',
+                    { success: true }
+                );
             }
 
             await adapter.execute(this.getStartSQLCommand(adapter.version));
@@ -341,12 +341,12 @@ export class ReplicationService {
             this.logger.info(`Stopping SQL thread for connection ${connectionId}`);
 
             if (this.auditLogger) {
-                await this.auditLogger.logDestructiveOperation({
-                    query: 'STOP SLAVE SQL_THREAD',
-                    affectedTables: [],
+                await this.auditLogger.logDestructiveOperation(
                     connectionId,
-                    environment: 'unknown'
-                });
+                    'STOP SLAVE SQL_THREAD',
+                    'system',
+                    { success: true }
+                );
             }
 
             await adapter.execute(this.getStopSQLCommand(adapter.version));

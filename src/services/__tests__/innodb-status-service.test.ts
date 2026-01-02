@@ -274,8 +274,8 @@ END OF INNODB MONITOR OUTPUT
 
     describe('calculateHealthScore', () => {
         it('should return 100 for perfect health', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
+             
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -301,8 +301,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should penalize high transaction history', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
+             
             const status: any = {
                 transactions: {
                     historyListLength: 2000000, // Critical
@@ -329,8 +329,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should penalize low buffer pool hit rate', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
+             
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -356,8 +356,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should not return negative scores', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
+             
             const status: any = {
                 transactions: {
                     historyListLength: 5000000, // Critical
@@ -387,8 +387,8 @@ END OF INNODB MONITOR OUTPUT
 
     describe('getHealthAlerts', () => {
         it('should return no alerts for healthy status', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
+             
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -414,8 +414,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should return critical alert for high transaction history', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
+             
             const status: any = {
                 transactions: {
                     historyListLength: 2000000,
@@ -444,8 +444,8 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should return warning alert for low buffer pool hit rate', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
+             
             const status: any = {
                 transactions: {
                     historyListLength: 1000,
@@ -476,7 +476,7 @@ END OF INNODB MONITOR OUTPUT
 
     describe('compareSnapshots', () => {
         it('should calculate deltas correctly', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const before: any = {
                 transactions: { historyListLength: 100000 },
                 bufferPool: { hitRate: 95, dirtyPages: 100 },
@@ -484,7 +484,7 @@ END OF INNODB MONITOR OUTPUT
                 healthScore: 90
             };
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const after: any = {
                 transactions: { historyListLength: 150000 },
                 bufferPool: { hitRate: 92, dirtyPages: 200 },
@@ -503,7 +503,7 @@ END OF INNODB MONITOR OUTPUT
         });
 
         it('should identify significant changes', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const before: any = {
                 transactions: { historyListLength: 100000 },
                 bufferPool: { hitRate: 95, dirtyPages: 100 },
@@ -511,7 +511,7 @@ END OF INNODB MONITOR OUTPUT
                 healthScore: 90
             };
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const after: any = {
                 transactions: { historyListLength: 200000 }, // 100% increase
                 bufferPool: { hitRate: 80, dirtyPages: 500 }, // Large increase

@@ -46,6 +46,8 @@ export class CommandRegistry {
             vscode.commands.registerCommand('mydba.showProcessList', (connectionId: string) => this.showProcessList(connectionId)),
             vscode.commands.registerCommand('mydba.showVariables', (connectionId: string) => this.showVariables(connectionId)),
             vscode.commands.registerCommand('mydba.showMetricsDashboard', (connectionId: string) => this.showMetricsDashboard(connectionId)),
+            vscode.commands.registerCommand('mydba.showStorageEngineMonitor', (connectionId: string) => this.showStorageEngineMonitor(connectionId)),
+            vscode.commands.registerCommand('mydba.showReplicationMonitor', (connectionId: string) => this.showReplicationMonitor(connectionId)),
             vscode.commands.registerCommand('mydba.showQueryEditor', (connectionId: string) => this.showQueryEditor(connectionId)),
             vscode.commands.registerCommand('mydba.showQueryHistory', () => this.showQueryHistory()),
             vscode.commands.registerCommand('mydba.showQueriesWithoutIndexes', (connectionId: string) => this.showQueriesWithoutIndexes(connectionId)),
@@ -312,6 +314,28 @@ export class CommandRegistry {
         } catch (error) {
             this.logger.error('Failed to show metrics dashboard:', error as Error);
             vscode.window.showErrorMessage(`Failed to show metrics dashboard: ${(error as Error).message}`);
+        }
+    }
+
+    private async showStorageEngineMonitor(connectionId: string): Promise<void> {
+        try {
+            this.logger.info(`Opening storage engine monitor for connection: ${connectionId}`);
+            const storageEngineView = this.serviceContainer.get(SERVICE_TOKENS.StorageEngineView);
+            await storageEngineView.show(connectionId);
+        } catch (error) {
+            this.logger.error('Failed to show storage engine monitor:', error as Error);
+            vscode.window.showErrorMessage(`Failed to show storage engine monitor: ${(error as Error).message}`);
+        }
+    }
+
+    private async showReplicationMonitor(connectionId: string): Promise<void> {
+        try {
+            this.logger.info(`Opening replication monitor for connection: ${connectionId}`);
+            const replicationView = this.serviceContainer.get(SERVICE_TOKENS.ReplicationView);
+            await replicationView.show(connectionId);
+        } catch (error) {
+            this.logger.error('Failed to show replication monitor:', error as Error);
+            vscode.window.showErrorMessage(`Failed to show replication monitor: ${(error as Error).message}`);
         }
     }
 

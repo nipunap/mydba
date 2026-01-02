@@ -183,6 +183,31 @@ export class ServiceContainer {
                 c.get(SERVICE_TOKENS.Logger)
             )
         );
+
+        // InnoDB status service
+        this.register(SERVICE_TOKENS.InnoDBStatusService, (c) =>
+            new InnoDBStatusService(
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.EventBus)
+            )
+        );
+
+        // Aria status service
+        this.register(SERVICE_TOKENS.AriaStatusService, (c) =>
+            new AriaStatusService(
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.EventBus)
+            )
+        );
+
+        // Replication service
+        this.register(SERVICE_TOKENS.ReplicationService, (c) =>
+            new ReplicationService(
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.EventBus),
+                c.get(SERVICE_TOKENS.AuditLogger)
+            )
+        );
     }
 
     private registerProviders(): void {
@@ -212,6 +237,27 @@ export class ServiceContainer {
                 c.get(SERVICE_TOKENS.WebviewManager),
                 c.get(SERVICE_TOKENS.Logger),
                 c // Pass the service container itself
+            )
+        );
+
+        // Storage engine view
+        this.register(SERVICE_TOKENS.StorageEngineView, (c) =>
+            new StorageEngineView(
+                c.context.extensionUri,
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.InnoDBStatusService),
+                c.get(SERVICE_TOKENS.AriaStatusService),
+                c.get(SERVICE_TOKENS.AIServiceCoordinator)
+            )
+        );
+
+        // Replication view
+        this.register(SERVICE_TOKENS.ReplicationView, (c) =>
+            new ReplicationView(
+                c.context.extensionUri,
+                c.get(SERVICE_TOKENS.Logger),
+                c.get(SERVICE_TOKENS.ReplicationService),
+                c.get(SERVICE_TOKENS.AIServiceCoordinator)
             )
         );
     }
@@ -262,7 +308,12 @@ export const SERVICE_TOKENS = {
     PromptSanitizer: { name: 'PromptSanitizer' } as ServiceToken<PromptSanitizer>,
     SQLValidator: { name: 'SQLValidator' } as ServiceToken<SQLValidator>,
     QueryHistoryService: { name: 'QueryHistoryService' } as ServiceToken<QueryHistoryService>,
-    AuditLogger: { name: 'AuditLogger' } as ServiceToken<AuditLogger>
+    AuditLogger: { name: 'AuditLogger' } as ServiceToken<AuditLogger>,
+    InnoDBStatusService: { name: 'InnoDBStatusService' } as ServiceToken<InnoDBStatusService>,
+    AriaStatusService: { name: 'AriaStatusService' } as ServiceToken<AriaStatusService>,
+    ReplicationService: { name: 'ReplicationService' } as ServiceToken<ReplicationService>,
+    StorageEngineView: { name: 'StorageEngineView' } as ServiceToken<StorageEngineView>,
+    ReplicationView: { name: 'ReplicationView' } as ServiceToken<ReplicationView>
 };
 
 // Import service classes (will be implemented)
@@ -284,3 +335,8 @@ import { PromptSanitizer } from '../security/prompt-sanitizer';
 import { SQLValidator } from '../security/sql-validator';
 import { QueryHistoryService } from '../services/query-history-service';
 import { AuditLogger } from '../services/audit-logger';
+import { InnoDBStatusService } from '../services/innodb-status-service';
+import { AriaStatusService } from '../services/aria-status-service';
+import { ReplicationService } from '../services/replication-service';
+import { StorageEngineView } from '../webviews/storage-engine-view';
+import { ReplicationView } from '../webviews/replication-view';
