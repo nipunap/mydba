@@ -38,16 +38,19 @@ export class InnoDBStatusService {
             }
 
             // Execute SHOW ENGINE INNODB STATUS
-            const result = await adapter.query<{ Status: string }>('SHOW ENGINE INNODB STATUS');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await adapter.query<any>('SHOW ENGINE INNODB STATUS');
 
             if (!result || result.length === 0) {
                 throw new Error('No InnoDB status data returned');
             }
 
-            // Extract raw status text (it's in the "Status" column)
-            const rawStatus = result[0].Status;
+            // Extract raw status text (column name can be 'Status' or 'STATUS')
+            const row = result[0];
+            const rawStatus = row.Status || row.STATUS || row.status;
             if (!rawStatus) {
-                throw new Error('Invalid InnoDB status format');
+                this.logger.error('InnoDB status result structure:', JSON.stringify(result[0]));
+                throw new Error('Invalid InnoDB status format - Status column not found');
             }
 
             // Get server version

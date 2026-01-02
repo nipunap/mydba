@@ -38,15 +38,19 @@ export class AriaStatusService {
             }
 
             // Execute SHOW ENGINE ARIA STATUS
-            const result = await adapter.query<{ Status: string }>('SHOW ENGINE ARIA STATUS');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await adapter.query<any>('SHOW ENGINE ARIA STATUS');
 
             if (!result || result.length === 0) {
                 throw new Error('No Aria status data returned');
             }
 
-            const rawStatus = result[0].Status;
+            // Extract raw status text (column name can be 'Status' or 'STATUS')
+            const row = result[0];
+            const rawStatus = row.Status || row.STATUS || row.status;
             if (!rawStatus) {
-                throw new Error('Invalid Aria status format');
+                this.logger.error('Aria status result structure:', JSON.stringify(result[0]));
+                throw new Error('Invalid Aria status format - Status column not found');
             }
 
             // Get server version

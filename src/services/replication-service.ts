@@ -481,7 +481,7 @@ export class ReplicationService {
     ): Promise<MasterStatus | null> {
         try {
             const result = await adapter.query<MasterStatus>('SHOW MASTER STATUS');
-            
+
             if (!result || result.length === 0) {
                 return null; // Not configured as master
             }
@@ -509,7 +509,7 @@ export class ReplicationService {
         try {
             // Use SHOW SLAVE HOSTS (works on both MySQL and MariaDB)
             const result = await adapter.query<any>('SHOW SLAVE HOSTS'); // eslint-disable-line @typescript-eslint/no-explicit-any
-            
+
             if (!result || result.length === 0) {
                 return [];
             }
@@ -522,8 +522,8 @@ export class ReplicationService {
                 readMasterLogPos: row.Read_Master_Log_Pos || row.read_master_log_pos || 0,
                 slaveIoRunning: row.Slave_IO_Running || row.slave_io_running || 'Unknown',
                 slaveSqlRunning: row.Slave_SQL_Running || row.slave_sql_running || 'Unknown',
-                secondsBehindMaster: row.Seconds_Behind_Master !== null 
-                    ? (row.Seconds_Behind_Master || row.seconds_behind_master) 
+                secondsBehindMaster: row.Seconds_Behind_Master !== null
+                    ? (row.Seconds_Behind_Master || row.seconds_behind_master)
                     : null,
                 lastIOError: row.Last_IO_Error || row.last_io_error || '',
                 lastSQLError: row.Last_SQL_Error || row.last_sql_error || ''
@@ -542,7 +542,7 @@ export class ReplicationService {
         adapter: IDatabaseAdapter
     ): Promise<ReplicationRole> {
         const masterStatus = await this.getMasterStatus(connectionId, adapter);
-        
+
         let hasReplication = false;
         try {
             const replicationStatus = await this.getReplicationStatus(connectionId, adapter);
