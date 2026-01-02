@@ -96,6 +96,12 @@ export class ReplicationView {
             }
 
             switch (message.command) {
+                case 'ready':
+                    // Webview is ready, trigger initial data load
+                    this.logger.debug('Replication webview is ready, loading initial data');
+                    await this.handleGetStatus(connectionId, adapter);
+                    break;
+
                 case 'getStatus':
                     await this.handleGetStatus(connectionId, adapter);
                     break;
@@ -250,6 +256,11 @@ export class ReplicationView {
     </div>
     <script>
         const vscode = acquireVsCodeApi();
+
+        // Initialize - send ready message to trigger initial data load
+        document.addEventListener('DOMContentLoaded', () => {
+            vscode.postMessage({ command: 'ready' });
+        });
 
         function startIOThread() {
             vscode.postMessage({ command: 'startIOThread' });
