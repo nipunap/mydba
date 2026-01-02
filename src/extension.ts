@@ -37,24 +37,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         });
         context.subscriptions.push(treeView);
 
-        // Register storage engine webview provider
-        const storageEngineView = serviceContainer.get(SERVICE_TOKENS.StorageEngineView);
-        context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider(
-                'mydba.storageEngineView',
-                storageEngineView as any // eslint-disable-line @typescript-eslint/no-explicit-any
-            )
-        );
-
-        // Register replication webview provider
-        const replicationView = serviceContainer.get(SERVICE_TOKENS.ReplicationView);
-        context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider(
-                'mydba.replicationView',
-                replicationView as any // eslint-disable-line @typescript-eslint/no-explicit-any
-            )
-        );
-
         // Register tree view refresh command
         context.subscriptions.push(
             vscode.commands.registerCommand('mydba.treeView.refresh', () => treeViewProvider.refresh())

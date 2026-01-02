@@ -1,6 +1,6 @@
 /**
  * Replication View
- * Webview for monitoring and controlling MySQL/MariaDB replication
+ * Webview panel for monitoring and controlling MySQL/MariaDB replication
  */
 
 import * as vscode from 'vscode';
@@ -9,10 +9,10 @@ import { ReplicationService } from '../services/replication-service';
 import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 import { IDatabaseAdapter } from '../adapters/database-adapter';
 
-export class ReplicationView implements vscode.WebviewViewProvider {
+export class ReplicationView {
     public static readonly viewType = 'mydba.replicationView';
 
-    private view?: vscode.WebviewView;
+    private panel?: vscode.WebviewPanel;
     private currentConnectionId?: string;
     private disposables: vscode.Disposable[] = [];
     private autoRefreshInterval?: NodeJS.Timeout;
@@ -29,31 +29,48 @@ export class ReplicationView implements vscode.WebviewViewProvider {
      */
     public async show(connectionId: string): Promise<void> {
         this.currentConnectionId = connectionId;
-        if (this.view) {
-            this.view.webview.postMessage({
+
+        // If panel already exists, reveal it
+        if (this.panel) {
+            this.panel.reveal(vscode.ViewColumn.One);
+            this.panel.webview.postMessage({
                 command: 'setConnection',
                 connectionId
             });
+            return;
         }
-    }
 
-    public resolveWebviewView(
-        webviewView: vscode.WebviewView
-    ): void | Thenable<void> {
-        this.view = webviewView;
+        // Create new panel
+        this.panel = vscode.window.createWebviewPanel(
+            ReplicationView.viewType,
+            'Replication Monitor',
+            vscode.ViewColumn.One,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')]
+            }
+        );
 
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')]
-        };
+        this.panel.webview.html = this.getHtmlContent(this.panel.webview);
 
-        webviewView.webview.html = this.getHtmlContent(webviewView.webview);
-
-        webviewView.webview.onDidReceiveMessage(
+        this.panel.webview.onDidReceiveMessage(
             message => this.handleMessage(message),
             null,
             this.disposables
         );
+
+        // Handle panel disposal
+        this.panel.onDidDispose(() => {
+            this.dispose();
+            this.panel = undefined;
+        }, null, this.disposables);
+
+        // Send initial connection
+        this.panel.webview.postMessage({
+            command: 'setConnection',
+            connectionId
+        });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,7 +79,7 @@ export class ReplicationView implements vscode.WebviewViewProvider {
             // All commands need a connection - use current connection if not provided
             const connectionId = message.connectionId || this.currentConnectionId;
             if (!connectionId) {
-                this.view?.webview.postMessage({
+                this.panel?.webview.postMessage({
                     command: 'error',
                     error: 'No connection selected. Please select a connection from the tree view.'
                 });
@@ -179,7 +196,7 @@ export class ReplicationView implements vscode.WebviewViewProvider {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private postMessage(message: any): void {
-        this.view?.webview.postMessage(message);
+        this.panel?.webview.postMessage(message);
     }
 
     private getHtmlContent(_webview: vscode.Webview): string {

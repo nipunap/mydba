@@ -1,6 +1,6 @@
 /**
  * Storage Engine Status View
- * Webview for monitoring InnoDB and Aria storage engine status
+ * Webview panel for monitoring InnoDB and Aria storage engine status
  */
 
 import * as vscode from 'vscode';
@@ -11,10 +11,10 @@ import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 import { IDatabaseAdapter } from '../adapters/database-adapter';
 import { InnoDBStatus } from '../types/storage-engine-types';
 
-export class StorageEngineView implements vscode.WebviewViewProvider {
+export class StorageEngineView {
     public static readonly viewType = 'mydba.storageEngineView';
 
-    private view?: vscode.WebviewView;
+    private panel?: vscode.WebviewPanel;
     private currentConnectionId?: string;
     private disposables: vscode.Disposable[] = [];
     private autoRefreshInterval?: NodeJS.Timeout;
@@ -36,51 +36,52 @@ export class StorageEngineView implements vscode.WebviewViewProvider {
      */
     public async show(connectionId: string): Promise<void> {
         this.currentConnectionId = connectionId;
-        if (this.view) {
-            this.view.webview.postMessage({
+
+        // If panel already exists, reveal it
+        if (this.panel) {
+            this.panel.reveal(vscode.ViewColumn.One);
+            this.panel.webview.postMessage({
                 command: 'setConnection',
                 connectionId
             });
+            return;
         }
-    }
 
-    public resolveWebviewView(
-        webviewView: vscode.WebviewView,
-        _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken
-    ): void | Thenable<void> {
-        this.view = webviewView;
+        // Create new panel
+        this.panel = vscode.window.createWebviewPanel(
+            StorageEngineView.viewType,
+            'Storage Engine Monitor',
+            vscode.ViewColumn.One,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [
+                    vscode.Uri.joinPath(this.extensionUri, 'media'),
+                    vscode.Uri.joinPath(this.extensionUri, 'out')
+                ]
+            }
+        );
 
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [
-                vscode.Uri.joinPath(this.extensionUri, 'media'),
-                vscode.Uri.joinPath(this.extensionUri, 'out')
-            ]
-        };
-
-        webviewView.webview.html = this.getHtmlContent(webviewView.webview);
+        this.panel.webview.html = this.getHtmlContent(this.panel.webview);
 
         // Handle messages from the webview
-        webviewView.webview.onDidReceiveMessage(
+        this.panel.webview.onDidReceiveMessage(
             message => this.handleMessage(message),
             null,
             this.disposables
         );
 
-        // Handle visibility changes
-        webviewView.onDidChangeVisibility(() => {
-            if (webviewView.visible && this.autoRefreshEnabled) {
-                this.startAutoRefresh();
-            } else {
-                this.stopAutoRefresh();
-            }
+        // Handle panel disposal
+        this.panel.onDidDispose(() => {
+            this.dispose();
+            this.panel = undefined;
         }, null, this.disposables);
 
-        // Clean up on dispose
-        webviewView.onDidDispose(() => {
-            this.dispose();
-        }, null, this.disposables);
+        // Send initial connection
+        this.panel.webview.postMessage({
+            command: 'setConnection',
+            connectionId
+        });
     }
 
     /**
@@ -92,7 +93,7 @@ export class StorageEngineView implements vscode.WebviewViewProvider {
             // All commands need a connection - use current connection if not provided
             const connectionId = message.connectionId || this.currentConnectionId;
             if (!connectionId) {
-                this.view?.webview.postMessage({
+                this.panel?.webview.postMessage({
                     command: 'error',
                     error: 'No connection selected. Please select a connection from the tree view.'
                 });
@@ -406,7 +407,7 @@ export class StorageEngineView implements vscode.WebviewViewProvider {
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private postMessage(message: any): void {
-        this.view?.webview.postMessage(message);
+        this.panel?.webview.postMessage(message);
     }
 
     /**
