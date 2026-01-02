@@ -13,6 +13,7 @@ export class ReplicationView implements vscode.WebviewViewProvider {
     public static readonly viewType = 'mydba.replicationView';
 
     private view?: vscode.WebviewView;
+    private currentConnectionId?: string;
     private disposables: vscode.Disposable[] = [];
     private autoRefreshInterval?: NodeJS.Timeout;
 
@@ -22,6 +23,19 @@ export class ReplicationView implements vscode.WebviewViewProvider {
         private readonly replicationService: ReplicationService,
         private readonly aiCoordinator: AIServiceCoordinator
     ) {}
+
+    /**
+     * Show the view for a specific connection
+     */
+    public async show(connectionId: string): Promise<void> {
+        this.currentConnectionId = connectionId;
+        if (this.view) {
+            this.view.webview.postMessage({
+                command: 'setConnection',
+                connectionId
+            });
+        }
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView
@@ -45,25 +59,44 @@ export class ReplicationView implements vscode.WebviewViewProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async handleMessage(message: any): Promise<void> {
         try {
+            // All commands need a connection - use current connection if not provided
+            const connectionId = message.connectionId || this.currentConnectionId;
+            if (!connectionId) {
+                this.view?.webview.postMessage({
+                    command: 'error',
+                    error: 'No connection selected. Please select a connection from the tree view.'
+                });
+                return;
+            }
+
+            // Get adapter from connection manager via command
+            const adapter = await vscode.commands.executeCommand<IDatabaseAdapter>(
+                'mydba.internal.getAdapter',
+                connectionId
+            );
+            if (!adapter) {
+                throw new Error('Connection not found or not active');
+            }
+
             switch (message.command) {
                 case 'getStatus':
-                    await this.handleGetStatus(message.connectionId, message.adapter);
+                    await this.handleGetStatus(connectionId, adapter);
                     break;
 
                 case 'startIOThread':
-                    await this.handleStartIOThread(message.connectionId, message.adapter);
+                    await this.handleStartIOThread(connectionId, adapter);
                     break;
 
                 case 'stopIOThread':
-                    await this.handleStopIOThread(message.connectionId, message.adapter);
+                    await this.handleStopIOThread(connectionId, adapter);
                     break;
 
                 case 'startSQLThread':
-                    await this.handleStartSQLThread(message.connectionId, message.adapter);
+                    await this.handleStartSQLThread(connectionId, adapter);
                     break;
 
                 case 'stopSQLThread':
-                    await this.handleStopSQLThread(message.connectionId, message.adapter);
+                    await this.handleStopSQLThread(connectionId, adapter);
                     break;
             }
         } catch (error) {

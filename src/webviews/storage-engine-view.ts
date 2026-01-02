@@ -15,6 +15,7 @@ export class StorageEngineView implements vscode.WebviewViewProvider {
     public static readonly viewType = 'mydba.storageEngineView';
 
     private view?: vscode.WebviewView;
+    private currentConnectionId?: string;
     private disposables: vscode.Disposable[] = [];
     private autoRefreshInterval?: NodeJS.Timeout;
     private autoRefreshEnabled = false;
@@ -29,6 +30,19 @@ export class StorageEngineView implements vscode.WebviewViewProvider {
         private readonly ariaService: AriaStatusService,
         private readonly aiCoordinator: AIServiceCoordinator
     ) {}
+
+    /**
+     * Show the view for a specific connection
+     */
+    public async show(connectionId: string): Promise<void> {
+        this.currentConnectionId = connectionId;
+        if (this.view) {
+            this.view.webview.postMessage({
+                command: 'setConnection',
+                connectionId
+            });
+        }
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -75,17 +89,36 @@ export class StorageEngineView implements vscode.WebviewViewProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async handleMessage(message: any): Promise<void> {
         try {
+            // All commands need a connection - use current connection if not provided
+            const connectionId = message.connectionId || this.currentConnectionId;
+            if (!connectionId) {
+                this.view?.webview.postMessage({
+                    command: 'error',
+                    error: 'No connection selected. Please select a connection from the tree view.'
+                });
+                return;
+            }
+
+            // Get adapter from connection manager via command
+            const adapter = await vscode.commands.executeCommand<IDatabaseAdapter>(
+                'mydba.internal.getAdapter',
+                connectionId
+            );
+            if (!adapter) {
+                throw new Error('Connection not found or not active');
+            }
+
             switch (message.command) {
                 case 'getInnoDBStatus':
-                    await this.handleGetInnoDBStatus(message.connectionId, message.adapter);
+                    await this.handleGetInnoDBStatus(connectionId, adapter);
                     break;
 
                 case 'getAriaStatus':
-                    await this.handleGetAriaStatus(message.connectionId, message.adapter);
+                    await this.handleGetAriaStatus(connectionId, adapter);
                     break;
 
                 case 'refresh':
-                    await this.handleRefresh(message.connectionId, message.adapter);
+                    await this.handleRefresh(connectionId, adapter);
                     break;
 
                 case 'compareSnapshots':

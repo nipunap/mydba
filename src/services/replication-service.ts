@@ -230,7 +230,7 @@ export class ReplicationService {
 
             // Execute command (works for both SLAVE and REPLICA terminology)
             // Fallback is already in getReplicationStatus
-            const command = this.getStartIOCommand(adapter.type || 'mysql');
+            const command = this.getStartIOCommand(adapter.version || adapter.type || 'mysql');
             await adapter.execute(command);
 
             // Wait a moment for status to update
@@ -277,7 +277,7 @@ export class ReplicationService {
                 );
             }
 
-            const command = this.getStopIOCommand(adapter.type || 'mysql');
+            const command = this.getStopIOCommand(adapter.version || adapter.type || 'mysql');
             await adapter.execute(command);
             await this.sleep(1000);
 
@@ -321,7 +321,7 @@ export class ReplicationService {
                 );
             }
 
-            const command = this.getStartSQLCommand(adapter.type || 'mysql');
+            const command = this.getStartSQLCommand(adapter.version || adapter.type || 'mysql');
             await adapter.execute(command);
             await this.sleep(1000);
 
@@ -365,7 +365,7 @@ export class ReplicationService {
                 );
             }
 
-            const command = this.getStopSQLCommand(adapter.type || 'mysql');
+            const command = this.getStopSQLCommand(adapter.version || adapter.type || 'mysql');
             await adapter.execute(command);
             await this.sleep(1000);
 
