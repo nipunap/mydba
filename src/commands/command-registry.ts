@@ -4,6 +4,7 @@ import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 import { WebviewManager } from '../webviews/webview-manager';
 import { Logger } from '../utils/logger';
 import { ServiceContainer, SERVICE_TOKENS } from '../core/service-container';
+import { IDatabaseAdapter } from '../adapters/database-adapter';
 
 export class CommandRegistry {
     constructor(
@@ -48,6 +49,7 @@ export class CommandRegistry {
             vscode.commands.registerCommand('mydba.showMetricsDashboard', (connectionId: string) => this.showMetricsDashboard(connectionId)),
             vscode.commands.registerCommand('mydba.showStorageEngineMonitor', (connectionId: string) => this.showStorageEngineMonitor(connectionId)),
             vscode.commands.registerCommand('mydba.showReplicationMonitor', (connectionId: string) => this.showReplicationMonitor(connectionId)),
+            vscode.commands.registerCommand('mydba.internal.getAdapter', (connectionId: string) => this.getAdapter(connectionId)),
             vscode.commands.registerCommand('mydba.showQueryEditor', (connectionId: string) => this.showQueryEditor(connectionId)),
             vscode.commands.registerCommand('mydba.showQueryHistory', () => this.showQueryHistory()),
             vscode.commands.registerCommand('mydba.showQueriesWithoutIndexes', (connectionId: string) => this.showQueriesWithoutIndexes(connectionId)),
@@ -326,6 +328,10 @@ export class CommandRegistry {
             this.logger.error('Failed to show storage engine monitor:', error as Error);
             vscode.window.showErrorMessage(`Failed to show storage engine monitor: ${(error as Error).message}`);
         }
+    }
+
+    private getAdapter(connectionId: string): IDatabaseAdapter | undefined {
+        return this.connectionManager.getAdapter(connectionId);
     }
 
     private async showReplicationMonitor(connectionId: string): Promise<void> {
