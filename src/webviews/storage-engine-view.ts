@@ -141,7 +141,7 @@ export class StorageEngineView {
                 case 'ready':
                     // Webview is ready, trigger initial data load
                     this.logger.debug('Storage Engine webview is ready, loading initial data');
-                    await this.handleRefresh(connectionId);
+                    await this.handleRefresh(connectionId, adapter);
                     break;
             }
         } catch (error) {
