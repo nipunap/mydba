@@ -734,13 +734,21 @@ Provide your analysis in the following format:
                 this.logger.warn(`InnoDB AI analysis took ${duration}ms (exceeded 2s budget)`);
             }
 
-            return {
+            const analysis = {
                 summary: this.extractSummary(response),
                 issues: this.extractIssues(response),
                 recommendations: this.extractRecommendations(response),
                 configChanges: this.extractConfigChanges(response),
                 rawResponse: response
             };
+
+            // Debug log the extracted analysis
+            this.logger.debug(`AI Analysis extracted - Summary: ${analysis.summary.length} chars, Issues: ${analysis.issues.length}, Recommendations: ${analysis.recommendations.length}, Config: ${analysis.configChanges.length}`);
+
+            // Log first 500 chars of raw response for debugging
+            this.logger.debug(`AI Raw Response (first 500 chars): ${response.substring(0, 500)}`);
+
+            return analysis;
         } catch (error) {
             this.logger.error('Failed to analyze InnoDB status:', error as Error);
             throw error;
@@ -875,12 +883,25 @@ Provide actionable recommendations in structured format.
         // Look for summary section or use first paragraph
         const summaryMatch = response.match(/##\s*Summary\s*\n([\s\S]*?)(?=\n##|$)/i);
         if (summaryMatch) {
-            return summaryMatch[1].trim();
+            const summary = summaryMatch[1].trim();
+            // Make sure we didn't accidentally grab a section header
+            if (summary.length > 20 && !summary.startsWith('##')) {
+                return summary;
+            }
         }
 
-        // Fall back to first paragraph
-        const firstPara = response.split('\n\n')[0];
-        return firstPara.replace(/^#+\s*/, '').trim();
+        // Try to find any paragraph before the first ## section
+        const beforeSections = response.split(/\n##/)[0];
+        const lines = beforeSections.split('\n')
+            .filter(line => line.trim().length > 0 && !line.startsWith('#'))
+            .filter(line => !line.match(/^\*\*.*?\*\*:/)); // Skip bold headers
+
+        if (lines.length > 0) {
+            return lines.join(' ').trim();
+        }
+
+        // Last resort: create a generic summary
+        return 'InnoDB storage engine analysis completed. Review the issues and recommendations below.';
     }
 
     /**
@@ -888,24 +909,54 @@ Provide actionable recommendations in structured format.
      */
     private extractIssues(response: string): Array<{ severity: string; description: string }> {
         const issues: Array<{ severity: string; description: string }> = [];
-        const issuesSection = response.match(/##\s*Critical Issues\s*\n([\s\S]*?)(?=\n##|$)/i);
+
+        // Try multiple patterns for the issues section
+        let issuesSection = response.match(/##\s*Critical Issues\s*\n([\s\S]*?)(?=\n##|$)/i);
+        if (!issuesSection) {
+            issuesSection = response.match(/##\s*Issues\s*\n([\s\S]*?)(?=\n##|$)/i);
+        }
 
         if (issuesSection) {
             const lines = issuesSection[1].split('\n');
             for (const line of lines) {
-                const match = line.match(/[-*]\s*\*\*(.*?)\*\*:\s*(.*)/);
-                if (match) {
+                // Skip empty lines and section markers
+                if (!line.trim() || line.trim().startsWith('#')) {
+                    continue;
+                }
+
+                // Try different formats:
+                // 1. **Severity**: Description
+                const match1 = line.match(/[-*]\s*\*\*(.*?)\*\*:\s*(.*)/);
+                if (match1 && match1[2].trim().length > 2) { // Ensure description has content
                     issues.push({
-                        severity: match[1],
-                        description: match[2]
+                        severity: match1[1].toLowerCase(),
+                        description: match1[2].trim()
                     });
-                } else if (line.trim().startsWith('-') || line.trim().startsWith('*')) {
-                    issues.push({
-                        severity: 'warning',
-                        description: line.replace(/^[-*]\s*/, '').trim()
-                    });
+                    continue;
+                }
+
+                // 2. Just bullet points with content
+                if (line.trim().startsWith('-') || line.trim().startsWith('*')) {
+                    let desc = line.replace(/^[-*]\s*/, '').trim();
+                    // Skip lines that are just punctuation or very short
+                    if (desc.length > 5 && !desc.match(/^[-–—]+$/)) {
+                        // Remove markdown bold
+                        desc = desc.replace(/\*\*/g, '');
+                        issues.push({
+                            severity: 'warning',
+                            description: desc
+                        });
+                    }
                 }
             }
+        }
+
+        // If no issues found, provide a default positive message
+        if (issues.length === 0) {
+            issues.push({
+                severity: 'info',
+                description: 'No critical issues detected. System appears to be running within normal parameters.'
+            });
         }
 
         return issues;
@@ -921,8 +972,27 @@ Provide actionable recommendations in structured format.
         if (recsSection) {
             const lines = recsSection[1].split('\n');
             for (const line of lines) {
-                if (line.trim().startsWith('-') || line.trim().startsWith('*') || line.trim().match(/^\d+\./)) {
-                    recommendations.push(line.replace(/^[-*\d.]\s*/, '').trim());
+                // Skip empty lines and section markers
+                if (!line.trim() || line.trim().startsWith('#')) {
+                    continue;
+                }
+
+                // Match bullets (-, *, or numbered lists), with more flexible pattern
+                const match = line.match(/^[\s]*[-*•]\s*\.?\s*(.*?)$/);
+                if (match && match[1].trim().length > 0) {
+                    // Remove any markdown bold markers and leading punctuation
+                    const cleaned = match[1].replace(/\*\*/g, '').trim().replace(/^[.\-:]+\s*/, '');
+                    if (cleaned.length > 5) { // Only add substantial recommendations
+                        recommendations.push(cleaned);
+                    }
+                    continue;
+                }
+
+                // Also try numbered lists
+                const numberedMatch = line.match(/^\s*\d+\.\s+(.*?)$/);
+                if (numberedMatch && numberedMatch[1].trim().length > 5) {
+                    const cleaned = numberedMatch[1].replace(/\*\*/g, '').trim();
+                    recommendations.push(cleaned);
                 }
             }
         }
@@ -941,14 +1011,33 @@ Provide actionable recommendations in structured format.
             const lines = configSection[1].split('\n');
 
             for (const line of lines) {
-                // Match pattern like: innodb_buffer_pool_size: 128M → 4G (Increase for better caching)
-                const match = line.match(/[-*]\s*`?(\w+)`?\s*[:=]\s*(\S+)\s*[→>-]+\s*(\S+)\s*\((.*?)\)/);
+                // Skip empty lines and section markers
+                if (!line.trim() || line.trim().startsWith('#')) {
+                    continue;
+                }
+
+                // Try multiple patterns:
+                // 1. parameter: current → recommended (reason)
+                let match = line.match(/[-*]\s*`?(\w+)`?\s*[:=]\s*(\S+)\s*[→>]+\s*(\S+)\s*\((.*?)\)/);
                 if (match) {
                     changes.push({
                         parameter: match[1],
                         current: match[2],
                         recommended: match[3],
-                        reason: match[4]
+                        reason: match[4].trim()
+                    });
+                    continue;
+                }
+
+                // 2. **parameter** (without specific values, extract from text)
+                match = line.match(/[-*]\s*\*\*([^*]+)\*\*/);
+                if (match) {
+                    const fullText = line.replace(/^[-*]\s*/, '').trim();
+                    changes.push({
+                        parameter: match[1].trim(),
+                        current: 'current',
+                        recommended: 'optimized',
+                        reason: fullText.replace(/\*\*/g, '')
                     });
                 }
             }

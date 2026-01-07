@@ -9,18 +9,20 @@ import { InnoDBStatusService } from '../services/innodb-status-service';
 import { AriaStatusService } from '../services/aria-status-service';
 import { AIServiceCoordinator } from '../services/ai-service-coordinator';
 import { IDatabaseAdapter } from '../adapters/database-adapter';
-import { InnoDBStatus } from '../types/storage-engine-types';
+import { InnoDBStatus, AriaStatus } from '../types/storage-engine-types';
 
 export class StorageEngineView {
     public static readonly viewType = 'mydba.storageEngineView';
 
-    private panel?: vscode.WebviewPanel;
-    private currentConnectionId?: string;
+    // Track panels per connection - allows multiple connections to have their own monitors
+    private panels = new Map<string, vscode.WebviewPanel>();
     private disposables: vscode.Disposable[] = [];
-    private autoRefreshInterval?: NodeJS.Timeout;
-    private autoRefreshEnabled = false;
-    private refreshIntervalSeconds = 10;
-    private failureCount = 0;
+
+    // Per-connection state
+    private autoRefreshIntervals = new Map<string, NodeJS.Timeout>();
+    private autoRefreshEnabled = new Map<string, boolean>();
+    private refreshIntervalSeconds = new Map<string, number>();
+    private failureCounts = new Map<string, number>();
     private readonly MAX_FAILURES = 3;
 
     constructor(
@@ -35,22 +37,25 @@ export class StorageEngineView {
      * Show the view for a specific connection
      */
     public async show(connectionId: string): Promise<void> {
-        this.currentConnectionId = connectionId;
+        // Get connection name for panel title
+        const connection = await vscode.commands.executeCommand('mydba.internal.getAdapter', connectionId);
+        const connectionName = connection ? `Storage Engine Monitor - ${connectionId.substring(0, 8)}` : 'Storage Engine Monitor';
 
-        // If panel already exists, reveal it
-        if (this.panel) {
-            this.panel.reveal(vscode.ViewColumn.One);
-            this.panel.webview.postMessage({
+        // If panel already exists for this connection, reveal it
+        const existingPanel = this.panels.get(connectionId);
+        if (existingPanel) {
+            existingPanel.reveal(vscode.ViewColumn.One);
+            existingPanel.webview.postMessage({
                 command: 'setConnection',
                 connectionId
             });
             return;
         }
 
-        // Create new panel
-        this.panel = vscode.window.createWebviewPanel(
-            StorageEngineView.viewType,
-            'Storage Engine Monitor',
+        // Create new panel for this connection
+        const panel = vscode.window.createWebviewPanel(
+            `${StorageEngineView.viewType}-${connectionId}`,
+            connectionName,
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -62,23 +67,29 @@ export class StorageEngineView {
             }
         );
 
-        this.panel.webview.html = this.getHtmlContent(this.panel.webview);
+        panel.webview.html = this.getHtmlContent(panel.webview);
+
+        // Store panel
+        this.panels.set(connectionId, panel);
+
+        // Initialize per-connection state
+        this.refreshIntervalSeconds.set(connectionId, 10);
+        this.failureCounts.set(connectionId, 0);
 
         // Handle messages from the webview
-        this.panel.webview.onDidReceiveMessage(
-            message => this.handleMessage(message),
+        panel.webview.onDidReceiveMessage(
+            message => this.handleMessage(message, connectionId),
             null,
             this.disposables
         );
 
         // Handle panel disposal
-        this.panel.onDidDispose(() => {
-            this.dispose();
-            this.panel = undefined;
+        panel.onDidDispose(() => {
+            this.disposeConnection(connectionId);
         }, null, this.disposables);
 
         // Send initial connection
-        this.panel.webview.postMessage({
+        panel.webview.postMessage({
             command: 'setConnection',
             connectionId
         });
@@ -88,15 +99,11 @@ export class StorageEngineView {
      * Handle messages from the webview
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private async handleMessage(message: any): Promise<void> {
+    private async handleMessage(message: any, connectionId: string): Promise<void> {
         try {
-            // All commands need a connection - use current connection if not provided
-            const connectionId = message.connectionId || this.currentConnectionId;
-            if (!connectionId) {
-                this.panel?.webview.postMessage({
-                    command: 'error',
-                    error: 'No connection selected. Please select a connection from the tree view.'
-                });
+            const panel = this.panels.get(connectionId);
+            if (!panel) {
+                this.logger.error(`No panel found for connection ${connectionId}`);
                 return;
             }
 
@@ -127,15 +134,15 @@ export class StorageEngineView {
                     break;
 
                 case 'compareSnapshots':
-                    await this.handleCompareSnapshots(message.before, message.after);
+                    await this.handleCompareSnapshots(connectionId, message.before, message.after);
                     break;
 
                 case 'export':
-                    await this.handleExport(message.data, message.format);
+                    await this.handleExport(connectionId, message.data, message.format);
                     break;
 
                 case 'setAutoRefresh':
-                    this.handleSetAutoRefresh(message.enabled, message.interval);
+                    this.handleSetAutoRefresh(connectionId, message.enabled, message.interval);
                     break;
 
                 case 'ready':
@@ -146,7 +153,7 @@ export class StorageEngineView {
             }
         } catch (error) {
             this.logger.error('Error handling webview message:', error as Error);
-            this.postMessage({
+            this.postMessage(connectionId, {
                 command: 'error',
                 error: (error as Error).message
             });
@@ -164,7 +171,7 @@ export class StorageEngineView {
             // Get AI analysis (async, don't block)
             this.aiCoordinator.analyzeInnoDBStatus(status, adapter.type === 'mariadb' ? 'mariadb' : 'mysql')
                 .then(aiAnalysis => {
-                    this.postMessage({
+                    this.postMessage(connectionId, {
                         command: 'aiAnalysis',
                         type: 'innodb',
                         analysis: aiAnalysis
@@ -174,22 +181,24 @@ export class StorageEngineView {
                     this.logger.warn('AI analysis failed:', error);
                 });
 
-            this.postMessage({
+            this.postMessage(connectionId, {
                 command: 'innoDBStatus',
                 status,
                 alerts
             });
 
-            this.failureCount = 0; // Reset on success
+            this.failureCounts.set(connectionId, 0); // Reset on success
         } catch (error) {
-            this.failureCount++;
+            const currentFailures = (this.failureCounts.get(connectionId) || 0) + 1;
+            this.failureCounts.set(connectionId, currentFailures);
             this.logger.error('Failed to get InnoDB status:', error as Error);
 
             // Disable auto-refresh after multiple failures
-            if (this.failureCount >= this.MAX_FAILURES && this.autoRefreshEnabled) {
+            const autoRefreshEnabled = this.autoRefreshEnabled.get(connectionId);
+            if (currentFailures >= this.MAX_FAILURES && autoRefreshEnabled) {
                 this.logger.warn(`Auto-refresh disabled after ${this.MAX_FAILURES} failures`);
-                this.stopAutoRefresh();
-                this.postMessage({
+                this.stopAutoRefresh(connectionId);
+                this.postMessage(connectionId, {
                     command: 'autoRefreshDisabled',
                     reason: 'Multiple fetch failures'
                 });
@@ -214,7 +223,7 @@ export class StorageEngineView {
             // Get AI analysis
             this.aiCoordinator.analyzeAriaStatus(status)
                 .then(aiAnalysis => {
-                    this.postMessage({
+                    this.postMessage(connectionId, {
                         command: 'aiAnalysis',
                         type: 'aria',
                         analysis: aiAnalysis
@@ -224,15 +233,16 @@ export class StorageEngineView {
                     this.logger.warn('Aria AI analysis failed:', error);
                 });
 
-            this.postMessage({
+            this.postMessage(connectionId, {
                 command: 'ariaStatus',
                 status,
                 alerts
             });
 
-            this.failureCount = 0;
+            this.failureCounts.set(connectionId, 0);
         } catch (error) {
-            this.failureCount++;
+            const currentFailures = (this.failureCounts.get(connectionId) || 0) + 1;
+            this.failureCounts.set(connectionId, currentFailures);
             this.logger.error('Failed to get Aria status:', error as Error);
             throw error;
         }
@@ -269,7 +279,7 @@ export class StorageEngineView {
             }
 
             // Show progress
-            this.postMessage({
+            this.postMessage(connectionId, {
                 command: 'aiExplainProgress',
                 message: 'Analyzing status with AI...'
             });
@@ -281,7 +291,7 @@ export class StorageEngineView {
                 : await this.aiCoordinator.analyzeAriaStatus(status as AriaStatus);
 
             // Send analysis to frontend
-            this.postMessage({
+            this.postMessage(connectionId, {
                 command: 'aiExplainResult',
                 analysis,
                 engine
@@ -290,7 +300,7 @@ export class StorageEngineView {
             this.logger.info('AI explanation completed successfully');
         } catch (error) {
             this.logger.error('Failed to get AI explanation:', error as Error);
-            this.postMessage({
+            this.postMessage(connectionId, {
                 command: 'aiExplainError',
                 error: (error as Error).message
             });
@@ -301,10 +311,10 @@ export class StorageEngineView {
      * Compare two status snapshots
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private async handleCompareSnapshots(before: any, after: any): Promise<void> {
+    private async handleCompareSnapshots(connectionId: string, before: any, after: any): Promise<void> {
         const comparison = this.innoDBService.compareSnapshots(before as InnoDBStatus, after as InnoDBStatus);
 
-        this.postMessage({
+        this.postMessage(connectionId, {
             command: 'snapshotComparison',
             comparison
         });
@@ -314,7 +324,7 @@ export class StorageEngineView {
      * Export data
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private async handleExport(data: any, format: 'json' | 'csv' | 'html'): Promise<void> {
+    private async handleExport(connectionId: string, data: any, format: 'json' | 'csv' | 'html'): Promise<void> {
         try {
             let content: string;
             let fileExtension: string;
@@ -359,43 +369,48 @@ export class StorageEngineView {
     /**
      * Set auto-refresh settings
      */
-    private handleSetAutoRefresh(enabled: boolean, interval?: number): void {
-        this.autoRefreshEnabled = enabled;
+    private handleSetAutoRefresh(connectionId: string, enabled: boolean, interval?: number): void {
+        this.autoRefreshEnabled.set(connectionId, enabled);
 
         if (interval && interval >= 5) {
-            this.refreshIntervalSeconds = interval;
+            this.refreshIntervalSeconds.set(connectionId, interval);
         }
 
-        if (enabled && this.view?.visible) {
-            this.startAutoRefresh();
+        const panel = this.panels.get(connectionId);
+        if (enabled && panel?.visible) {
+            this.startAutoRefresh(connectionId);
         } else {
-            this.stopAutoRefresh();
+            this.stopAutoRefresh(connectionId);
         }
     }
 
     /**
      * Start auto-refresh
      */
-    private startAutoRefresh(): void {
-        if (this.autoRefreshInterval) {
+    private startAutoRefresh(connectionId: string): void {
+        const existingInterval = this.autoRefreshIntervals.get(connectionId);
+        if (existingInterval) {
             return; // Already running
         }
 
-        this.autoRefreshInterval = setInterval(() => {
-            this.postMessage({ command: 'autoRefresh' });
-        }, this.refreshIntervalSeconds * 1000);
+        const intervalSeconds = this.refreshIntervalSeconds.get(connectionId) || 10;
+        const interval = setInterval(() => {
+            this.postMessage(connectionId, { command: 'autoRefresh' });
+        }, intervalSeconds * 1000);
 
-        this.logger.debug(`Auto-refresh started (interval: ${this.refreshIntervalSeconds}s)`);
+        this.autoRefreshIntervals.set(connectionId, interval);
+        this.logger.debug(`Auto-refresh started for ${connectionId} (interval: ${intervalSeconds}s)`);
     }
 
     /**
      * Stop auto-refresh
      */
-    private stopAutoRefresh(): void {
-        if (this.autoRefreshInterval) {
-            clearInterval(this.autoRefreshInterval);
-            this.autoRefreshInterval = undefined;
-            this.logger.debug('Auto-refresh stopped');
+    private stopAutoRefresh(connectionId: string): void {
+        const interval = this.autoRefreshIntervals.get(connectionId);
+        if (interval) {
+            clearInterval(interval);
+            this.autoRefreshIntervals.delete(connectionId);
+            this.logger.debug(`Auto-refresh stopped for ${connectionId}`);
         }
     }
 
@@ -455,8 +470,9 @@ export class StorageEngineView {
      * Post message to webview
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private postMessage(message: any): void {
-        this.panel?.webview.postMessage(message);
+    private postMessage(connectionId: string, message: any): void {
+        const panel = this.panels.get(connectionId);
+        panel?.webview.postMessage(message);
     }
 
     /**
@@ -519,9 +535,27 @@ export class StorageEngineView {
         </div>
 
         <div id="comparison-tab" class="tab-content">
-            <div id="comparison-view">
-                <p>Take snapshots to compare status over time</p>
-                <button id="takeSnapshotBtn" class="btn">📸 Take Snapshot</button>
+            <div id="comparison-view" style="padding: 24px;">
+                <h3 style="margin-top: 0;">📊 Compare Storage Engine Status</h3>
+                <p style="margin-bottom: 16px; line-height: 1.6;">
+                    Track how InnoDB or Aria storage engine metrics change over time by taking snapshots.
+                </p>
+                <ol style="margin-bottom: 20px; line-height: 1.8;">
+                    <li><strong>First</strong>: Visit the <strong>InnoDB</strong> or <strong>Aria</strong> tab to load the current status</li>
+                    <li><strong>Then</strong>: Return here and click <strong>"Take Snapshot"</strong> below</li>
+                    <li>Wait for metrics to change (or refresh the status from the InnoDB/Aria tab)</li>
+                    <li>Come back and take another snapshot</li>
+                    <li>Click the <strong>"Compare"</strong> button in the header to see the differences</li>
+                </ol>
+                <div style="background: var(--vscode-textBlockQuote-background); padding: 12px; border-left: 3px solid var(--vscode-focusBorder); margin-bottom: 20px; border-radius: 4px;">
+                    <strong>💡 Tip:</strong> The snapshot button captures whichever engine data you last viewed (InnoDB or Aria).
+                </div>
+                <button id="takeSnapshotBtn" class="btn" style="font-size: 14px; padding: 8px 16px;">
+                    📸 Take Snapshot
+                </button>
+                <p id="snapshotCount" style="margin-top: 16px; opacity: 0.8; font-size: 13px;">
+                    Snapshots taken: <strong>0</strong>
+                </p>
             </div>
         </div>
     </div>
@@ -531,11 +565,33 @@ export class StorageEngineView {
     }
 
     /**
-     * Dispose resources
+     * Dispose resources for a specific connection
+     */
+    private disposeConnection(connectionId: string): void {
+        this.stopAutoRefresh(connectionId);
+        this.panels.delete(connectionId);
+        this.autoRefreshEnabled.delete(connectionId);
+        this.refreshIntervalSeconds.delete(connectionId);
+        this.failureCounts.delete(connectionId);
+        this.logger.debug(`Disposed storage engine monitor for connection: ${connectionId}`);
+    }
+
+    /**
+     * Dispose all resources
      */
     public dispose(): void {
-        this.stopAutoRefresh();
+        // Stop all auto-refresh intervals
+        for (const connectionId of this.panels.keys()) {
+            this.stopAutoRefresh(connectionId);
+        }
 
+        // Clear all panels
+        this.panels.clear();
+        this.autoRefreshEnabled.clear();
+        this.refreshIntervalSeconds.clear();
+        this.failureCounts.clear();
+
+        // Dispose all event listeners
         while (this.disposables.length) {
             const disposable = this.disposables.pop();
             disposable?.dispose();

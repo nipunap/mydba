@@ -118,7 +118,7 @@ export interface ReplicationControlResult {
     success: boolean;
     action: 'start_io' | 'stop_io' | 'start_sql' | 'stop_sql';
     message: string;
-    newStatus?: ReplicationStatus;
+    newStatus?: ReplicationStatus | null;
 }
 
 /**
@@ -139,6 +139,7 @@ export interface ConnectedReplica {
     serverId: number;
     host: string;
     port: number;
+    replicaUuid?: string;
     masterLogFile: string;
     readMasterLogPos: number;
     slaveIoRunning: string;
@@ -152,3 +153,41 @@ export interface ConnectedReplica {
  * Server replication role
  */
 export type ReplicationRole = 'master' | 'replica' | 'standalone' | 'both';
+
+/**
+ * Replication worker details from performance_schema
+ */
+export interface ReplicationWorker {
+    workerId: number;
+    channelName: string;
+    threadId: number | null;
+    serviceState: string;
+    lastErrorNumber: number;
+    lastErrorMessage: string;
+    lastErrorTimestamp: Date | null;
+    lastAppliedTransaction: string;
+    lastAppliedTransactionOriginalCommitTimestamp: Date | null;
+    lastAppliedTransactionImmediateCommitTimestamp: Date | null;
+    lastAppliedTransactionStartApplyTimestamp: Date | null;
+    lastAppliedTransactionEndApplyTimestamp: Date | null;
+    applyingTransaction: string;
+    applyingTransactionOriginalCommitTimestamp: Date | null;
+    applyingTransactionImmediateCommitTimestamp: Date | null;
+    applyingTransactionStartApplyTimestamp: Date | null;
+}
+
+/**
+ * Topology node for visualization
+ */
+export interface TopologyNode {
+    id: string;
+    serverId: number;
+    host: string;
+    port: number;
+    role: 'master' | 'replica';
+    readOnly: boolean;
+    lag: number | null;
+    uuid?: string;
+    binlogFile?: string;
+    binlogPos?: number;
+}

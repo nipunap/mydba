@@ -38,30 +38,32 @@ export class InnoDBStatusService {
             }
 
             // Execute SHOW ENGINE INNODB STATUS
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const result = await adapter.query<any>('SHOW ENGINE INNODB STATUS');
+            const result = await adapter.query<unknown>('SHOW ENGINE INNODB STATUS');
 
             // Handle different result formats from mysql2 driver
             // Format 1: {rows: [{...}], fields: [...]} (OkPacket-style)
             // Format 2: [{...}] (plain array)
-            let rows: any[];
+            type StatusRow = { Status?: string; STATUS?: string; status?: string };
+            let rows: StatusRow[];
             if (result && typeof result === 'object' && 'rows' in result && Array.isArray(result.rows)) {
                 this.logger.info(`[DEBUG] Detected OkPacket format with 'rows' property`);
-                rows = result.rows;
+                rows = result.rows as StatusRow[];
             } else if (Array.isArray(result)) {
                 this.logger.info(`[DEBUG] Detected plain array format`);
-                rows = result;
+                rows = result as StatusRow[];
             } else {
-                this.logger.error('Invalid InnoDB status result format:', JSON.stringify({ 
-                    type: typeof result, 
-                    constructor: result?.constructor?.name,
-                    keys: result ? Object.keys(result) : 'N/A'
-                }));
+                const errorMsg = JSON.stringify({
+                    type: typeof result,
+                    constructor: (result as { constructor?: { name: string } })?.constructor?.name,
+                    keys: result && typeof result === 'object' ? Object.keys(result) : 'N/A'
+                });
+                this.logger.error('Invalid InnoDB status result format:', new Error(errorMsg));
                 throw new Error('No InnoDB status data returned');
             }
 
             if (!rows || rows.length === 0 || !rows[0]) {
-                this.logger.error('Invalid InnoDB status result - no rows:', JSON.stringify({ rows, length: rows?.length }));
+                const errorMsg = JSON.stringify({ rows, length: rows?.length });
+                this.logger.error('Invalid InnoDB status result - no rows:', new Error(errorMsg));
                 throw new Error('No InnoDB status data returned');
             }
 
@@ -69,13 +71,17 @@ export class InnoDBStatusService {
             const row = rows[0];
             const rawStatus = row.Status || row.STATUS || row.status;
             if (!rawStatus) {
-                this.logger.error('InnoDB status result structure:', JSON.stringify(result[0]));
+                const errorMsg = JSON.stringify((result as StatusRow[])[0]);
+                this.logger.error('InnoDB status result structure:', new Error(errorMsg));
                 throw new Error('Invalid InnoDB status format - Status column not found');
             }
 
             // Get server version
-            const versionResult = await adapter.query<any>('SELECT VERSION() as version');
-            const versionRows = (versionResult && 'rows' in versionResult) ? versionResult.rows : versionResult;
+            type VersionRow = { version: string };
+            const versionResult = await adapter.query<unknown>('SELECT VERSION() as version');
+            const versionRows = (versionResult && typeof versionResult === 'object' && 'rows' in versionResult)
+                ? (versionResult.rows as VersionRow[])
+                : (versionResult as VersionRow[]);
             const version = versionRows[0].version;
 
             // Parse the status

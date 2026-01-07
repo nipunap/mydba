@@ -14,7 +14,8 @@ import {
     ReplicationControlResult,
     MasterStatus,
     ConnectedReplica,
-    ReplicationRole
+    ReplicationRole,
+    ReplicationWorker
 } from '../types/replication-types';
 import { ReplicationParser } from './replication-parser';
 
@@ -37,7 +38,7 @@ export class ReplicationService {
     async getReplicationStatus(
         connectionId: string,
         adapter: IDatabaseAdapter
-    ): Promise<ReplicationStatus> {
+    ): Promise<ReplicationStatus | null> {
         try {
             // Check cache first
             const cached = this.statusCache.get(connectionId);
@@ -65,13 +66,24 @@ export class ReplicationService {
                 }
             }
 
-            if (!result || result.length === 0) {
-                throw new Error('No replication configured on this server');
-            }
+            // Get server version first (needed for parsing)
+            const versionQueryResult = await adapter.query<{ version: string }>('SELECT VERSION() as version');
+            // Handle mysql2 driver OkPacket format
+            const versionRows = Array.isArray(versionQueryResult)
+                ? versionQueryResult
+                : (versionQueryResult as { rows?: Array<{ version: string }> }).rows || [];
 
-            // Get server version
-            const versionResult = await adapter.query<{ version: string }>('SELECT VERSION() as version');
-            const version = versionResult[0].version;
+            if (!versionRows || versionRows.length === 0) {
+                throw new Error('Failed to get database version');
+            }
+            const version = versionRows[0].version;
+
+            // Check if replication is configured
+            if (!result || result.length === 0) {
+                // This is not an error - server is simply not configured as a replica
+                this.logger.debug(`No replication configured on server ${connectionId} (not a replica)`);
+                return null;
+            }
 
             // Parse the status
             const status = this.parser.parseReplicationStatus(result, version);
@@ -96,6 +108,13 @@ export class ReplicationService {
             return status;
 
         } catch (error) {
+            // Log as debug instead of error for common cases
+            const errorMsg = (error as Error).message;
+            if (errorMsg.includes('No replication configured') || errorMsg.includes('Retrieved_Gtid_Set')) {
+                this.logger.debug(`Server ${connectionId} is not a replica: ${errorMsg}`);
+                return null;
+            }
+            // Real errors get logged as error
             this.logger.error(`Failed to get replication status for connection ${connectionId}:`, error as Error);
             throw error;
         }
@@ -247,6 +266,14 @@ export class ReplicationService {
             this.statusCache.delete(connectionId);
             const newStatus = await this.getReplicationStatus(connectionId, adapter);
 
+            if (!newStatus) {
+                return {
+                    success: false,
+                    action: 'start_io',
+                    message: 'Server is not configured as a replica'
+                };
+            }
+
             return {
                 success: newStatus.ioThread.running,
                 action: 'start_io',
@@ -290,6 +317,14 @@ export class ReplicationService {
 
             this.statusCache.delete(connectionId);
             const newStatus = await this.getReplicationStatus(connectionId, adapter);
+
+            if (!newStatus) {
+                return {
+                    success: false,
+                    action: 'stop_io',
+                    message: 'Server is not configured as a replica'
+                };
+            }
 
             return {
                 success: !newStatus.ioThread.running,
@@ -335,6 +370,14 @@ export class ReplicationService {
             this.statusCache.delete(connectionId);
             const newStatus = await this.getReplicationStatus(connectionId, adapter);
 
+            if (!newStatus) {
+                return {
+                    success: false,
+                    action: 'start_sql',
+                    message: 'Server is not configured as a replica'
+                };
+            }
+
             return {
                 success: newStatus.sqlThread.running,
                 action: 'start_sql',
@@ -378,6 +421,14 @@ export class ReplicationService {
 
             this.statusCache.delete(connectionId);
             const newStatus = await this.getReplicationStatus(connectionId, adapter);
+
+            if (!newStatus) {
+                return {
+                    success: false,
+                    action: 'stop_sql',
+                    message: 'Server is not configured as a replica'
+                };
+            }
 
             return {
                 success: !newStatus.sqlThread.running,
@@ -480,19 +531,45 @@ export class ReplicationService {
         adapter: IDatabaseAdapter
     ): Promise<MasterStatus | null> {
         try {
-            const result = await adapter.query<MasterStatus>('SHOW MASTER STATUS');
+            const queryResult = await adapter.query<MasterStatus>('SHOW MASTER STATUS');
+
+            // Handle mysql2 driver OkPacket format
+            const result = Array.isArray(queryResult)
+                ? queryResult
+                : (queryResult as { rows?: MasterStatus[] }).rows || [];
+
+            this.logger.debug(`Master status query returned ${result.length} rows for ${connectionId}`);
 
             if (!result || result.length === 0) {
+                this.logger.debug(`No master status - server is not configured as master for ${connectionId}`);
                 return null; // Not configured as master
             }
 
-            return {
-                file: result[0].file || result[0].File || '',
-                position: result[0].position || result[0].Position || 0,
-                binlogDoDb: result[0].binlogDoDb || result[0].Binlog_Do_DB || '',
-                binlogIgnoreDb: result[0].binlogIgnoreDb || result[0].Binlog_Ignore_DB || '',
-                executedGtidSet: result[0].executedGtidSet || result[0].Executed_Gtid_Set
+            // Type the result row to avoid TS errors
+            type MasterStatusRow = {
+                file?: string;
+                File?: string;
+                position?: number;
+                Position?: number;
+                binlogDoDb?: string;
+                Binlog_Do_DB?: string;
+                binlogIgnoreDb?: string;
+                Binlog_Ignore_DB?: string;
+                executedGtidSet?: string;
+                Executed_Gtid_Set?: string;
             };
+
+            const row = result[0] as MasterStatusRow;
+            const masterStatus = {
+                file: row.file || row.File || '',
+                position: row.position || row.Position || 0,
+                binlogDoDb: row.binlogDoDb || row.Binlog_Do_DB || '',
+                binlogIgnoreDb: row.binlogIgnoreDb || row.Binlog_Ignore_DB || '',
+                executedGtidSet: row.executedGtidSet || row.Executed_Gtid_Set
+            };
+
+            this.logger.debug(`Master status for ${connectionId}: ${masterStatus.file} @ ${masterStatus.position}`);
+            return masterStatus;
         } catch (error) {
             this.logger.debug(`Failed to get master status for ${connectionId}:`, error as Error);
             return null; // Not a master or binary logging not enabled
@@ -507,23 +584,52 @@ export class ReplicationService {
         adapter: IDatabaseAdapter
     ): Promise<ConnectedReplica[]> {
         try {
-            // Use SHOW SLAVE HOSTS (works on both MySQL and MariaDB)
-            const result = await adapter.query<any>('SHOW SLAVE HOSTS'); // eslint-disable-line @typescript-eslint/no-explicit-any
+            // Determine which command to use based on version
+            // MySQL 8.0.22+ uses SHOW REPLICAS
+            // Older MySQL and MariaDB use SHOW SLAVE HOSTS
+            const version = adapter.version || '';
+            const useReplicasCommand = this.shouldUseReplicasCommand(version);
+
+            let queryResult;
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                queryResult = await adapter.query<any>(
+                    useReplicasCommand ? 'SHOW REPLICAS' : 'SHOW SLAVE HOSTS'
+                );
+            } catch (error) {
+                // If SHOW REPLICAS failed, fallback to SHOW SLAVE HOSTS
+                if (useReplicasCommand && (error as Error).message.includes('syntax error')) {
+                    this.logger.debug('SHOW REPLICAS failed, falling back to SHOW SLAVE HOSTS');
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    queryResult = await adapter.query<any>('SHOW SLAVE HOSTS');
+                } else {
+                    throw error;
+                }
+            }
+
+            // Handle mysql2 driver OkPacket format
+            const result = Array.isArray(queryResult)
+                ? queryResult
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                : (queryResult as { rows?: any[] }).rows || [];
+
+            this.logger.debug(`Found ${result.length} connected replicas for ${connectionId}`);
 
             if (!result || result.length === 0) {
                 return [];
             }
 
             return result.map((row: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-                serverId: row.Server_id || row.server_id || 0,
+                serverId: row.Server_id || row.server_id || row.Server_Id || 0,
                 host: row.Host || row.host || '',
                 port: row.Port || row.port || 3306,
-                masterLogFile: row.Master_Log_File || row.master_log_file || '',
-                readMasterLogPos: row.Read_Master_Log_Pos || row.read_master_log_pos || 0,
-                slaveIoRunning: row.Slave_IO_Running || row.slave_io_running || 'Unknown',
-                slaveSqlRunning: row.Slave_SQL_Running || row.slave_sql_running || 'Unknown',
-                secondsBehindMaster: row.Seconds_Behind_Master !== null
-                    ? (row.Seconds_Behind_Master || row.seconds_behind_master)
+                replicaUuid: row.Replica_UUID || row.replica_uuid || row.Slave_UUID || row.slave_uuid,
+                masterLogFile: row.Master_Log_File || row.master_log_file || row.Source_Log_File || row.source_log_file || '',
+                readMasterLogPos: row.Read_Master_Log_Pos || row.read_master_log_pos || row.Source_Log_Pos || row.source_log_pos || 0,
+                slaveIoRunning: row.Slave_IO_Running || row.slave_io_running || row.Replica_IO_Running || row.replica_io_running || 'Unknown',
+                slaveSqlRunning: row.Slave_SQL_Running || row.slave_sql_running || row.Replica_SQL_Running || row.replica_sql_running || 'Unknown',
+                secondsBehindMaster: row.Seconds_Behind_Master !== null || row.Seconds_Behind_Source !== null
+                    ? (row.Seconds_Behind_Master || row.seconds_behind_master || row.Seconds_Behind_Source || row.seconds_behind_source)
                     : null,
                 lastIOError: row.Last_IO_Error || row.last_io_error || '',
                 lastSQLError: row.Last_SQL_Error || row.last_sql_error || ''
@@ -535,6 +641,29 @@ export class ReplicationService {
     }
 
     /**
+     * Determine if we should use SHOW REPLICAS command
+     */
+    private shouldUseReplicasCommand(version: string): boolean {
+        // Check if MariaDB - always use SLAVE terminology
+        if (version.toLowerCase().includes('mariadb')) {
+            return false;
+        }
+
+        // MySQL 8.0.22+ uses SHOW REPLICAS
+        const [major, minor, patch] = version.split('.').map(v => parseInt(v, 10));
+        if (major === 8 && minor === 0 && patch >= 22) {
+            return true;
+        }
+
+        // For newer versions (9.0+), also use REPLICAS
+        if (major >= 9) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Detect server replication role
      */
     async getReplicationRole(
@@ -542,23 +671,100 @@ export class ReplicationService {
         adapter: IDatabaseAdapter
     ): Promise<ReplicationRole> {
         const masterStatus = await this.getMasterStatus(connectionId, adapter);
+        this.logger.debug(`Master status exists for ${connectionId}: ${!!masterStatus}`);
 
         let hasReplication = false;
         try {
             const replicationStatus = await this.getReplicationStatus(connectionId, adapter);
             hasReplication = replicationStatus !== null;
-        } catch {
+            this.logger.debug(`Replica status exists for ${connectionId}: ${hasReplication}`);
+        } catch (error) {
+            this.logger.debug(`No replica status for ${connectionId}: ${(error as Error).message}`);
             hasReplication = false;
         }
 
+        let role: ReplicationRole;
         if (masterStatus && hasReplication) {
-            return 'both'; // Multi-source or chained replication
+            role = 'both'; // Multi-source or chained replication
         } else if (masterStatus) {
-            return 'master';
+            role = 'master';
         } else if (hasReplication) {
-            return 'replica';
+            role = 'replica';
         } else {
-            return 'standalone';
+            role = 'standalone';
+        }
+
+        this.logger.info(`Detected replication role for ${connectionId}: ${role}`);
+        return role;
+    }
+
+    /**
+     * Get replication worker details from performance_schema
+     */
+    async getReplicationWorkers(
+        connectionId: string,
+        adapter: IDatabaseAdapter
+    ): Promise<ReplicationWorker[]> {
+        try {
+            const query = `
+                SELECT
+                    WORKER_ID as workerId,
+                    CHANNEL_NAME as channelName,
+                    THREAD_ID as threadId,
+                    SERVICE_STATE as serviceState,
+                    LAST_ERROR_NUMBER as lastErrorNumber,
+                    LAST_ERROR_MESSAGE as lastErrorMessage,
+                    LAST_ERROR_TIMESTAMP as lastErrorTimestamp,
+                    LAST_APPLIED_TRANSACTION as lastAppliedTransaction,
+                    LAST_APPLIED_TRANSACTION_ORIGINAL_COMMIT_TIMESTAMP as lastAppliedTransactionOriginalCommitTimestamp,
+                    LAST_APPLIED_TRANSACTION_IMMEDIATE_COMMIT_TIMESTAMP as lastAppliedTransactionImmediateCommitTimestamp,
+                    LAST_APPLIED_TRANSACTION_START_APPLY_TIMESTAMP as lastAppliedTransactionStartApplyTimestamp,
+                    LAST_APPLIED_TRANSACTION_END_APPLY_TIMESTAMP as lastAppliedTransactionEndApplyTimestamp,
+                    APPLYING_TRANSACTION as applyingTransaction,
+                    APPLYING_TRANSACTION_ORIGINAL_COMMIT_TIMESTAMP as applyingTransactionOriginalCommitTimestamp,
+                    APPLYING_TRANSACTION_IMMEDIATE_COMMIT_TIMESTAMP as applyingTransactionImmediateCommitTimestamp,
+                    APPLYING_TRANSACTION_START_APPLY_TIMESTAMP as applyingTransactionStartApplyTimestamp
+                FROM performance_schema.replication_applier_status_by_worker
+                ORDER BY WORKER_ID
+            `;
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const queryResult = await adapter.query<any>(query);
+
+            // Handle mysql2 driver OkPacket format
+            const result = Array.isArray(queryResult)
+                ? queryResult
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                : (queryResult as { rows?: any[] }).rows || [];
+
+            this.logger.debug(`Found ${result.length} replication workers for ${connectionId}`);
+
+            if (!result || result.length === 0) {
+                return [];
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return result.map((row: any) => ({
+                workerId: row.workerId || row.WORKER_ID || 0,
+                channelName: row.channelName || row.CHANNEL_NAME || '',
+                threadId: row.threadId || row.THREAD_ID || null,
+                serviceState: row.serviceState || row.SERVICE_STATE || 'UNKNOWN',
+                lastErrorNumber: row.lastErrorNumber || row.LAST_ERROR_NUMBER || 0,
+                lastErrorMessage: row.lastErrorMessage || row.LAST_ERROR_MESSAGE || '',
+                lastErrorTimestamp: row.lastErrorTimestamp || row.LAST_ERROR_TIMESTAMP || null,
+                lastAppliedTransaction: row.lastAppliedTransaction || row.LAST_APPLIED_TRANSACTION || '',
+                lastAppliedTransactionOriginalCommitTimestamp: row.lastAppliedTransactionOriginalCommitTimestamp || row.LAST_APPLIED_TRANSACTION_ORIGINAL_COMMIT_TIMESTAMP || null,
+                lastAppliedTransactionImmediateCommitTimestamp: row.lastAppliedTransactionImmediateCommitTimestamp || row.LAST_APPLIED_TRANSACTION_IMMEDIATE_COMMIT_TIMESTAMP || null,
+                lastAppliedTransactionStartApplyTimestamp: row.lastAppliedTransactionStartApplyTimestamp || row.LAST_APPLIED_TRANSACTION_START_APPLY_TIMESTAMP || null,
+                lastAppliedTransactionEndApplyTimestamp: row.lastAppliedTransactionEndApplyTimestamp || row.LAST_APPLIED_TRANSACTION_END_APPLY_TIMESTAMP || null,
+                applyingTransaction: row.applyingTransaction || row.APPLYING_TRANSACTION || '',
+                applyingTransactionOriginalCommitTimestamp: row.applyingTransactionOriginalCommitTimestamp || row.APPLYING_TRANSACTION_ORIGINAL_COMMIT_TIMESTAMP || null,
+                applyingTransactionImmediateCommitTimestamp: row.applyingTransactionImmediateCommitTimestamp || row.APPLYING_TRANSACTION_IMMEDIATE_COMMIT_TIMESTAMP || null,
+                applyingTransactionStartApplyTimestamp: row.applyingTransactionStartApplyTimestamp || row.APPLYING_TRANSACTION_START_APPLY_TIMESTAMP || null
+            }));
+        } catch (error) {
+            this.logger.debug(`Failed to get replication workers for ${connectionId}:`, error as Error);
+            return []; // performance_schema might not be enabled or table doesn't exist
         }
     }
 }

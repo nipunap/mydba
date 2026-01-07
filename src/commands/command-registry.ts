@@ -331,7 +331,7 @@ export class CommandRegistry {
     }
 
     private getAdapter(connectionId: string): IDatabaseAdapter | undefined {
-        return this.connectionManager.getAdapter(connectionId);
+        return this.connectionManager.getAdapter(connectionId) as IDatabaseAdapter | undefined;
     }
 
     private async showReplicationMonitor(connectionId: string): Promise<void> {
