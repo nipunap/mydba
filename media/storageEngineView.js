@@ -11,6 +11,7 @@
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
         setupEventListeners();
+        updateCompareButtonState(); // Initialize button state
         vscode.postMessage({ command: 'ready' });
     });
 
@@ -49,6 +50,8 @@
                     before: snapshots[snapshots.length - 2],
                     after: snapshots[snapshots.length - 1]
                 });
+            } else {
+                showMessage(`Need at least 2 snapshots to compare. Current: ${snapshots.length}. Go to Comparison tab and click "Take Snapshot".`, 'warning');
             }
         });
 
@@ -86,12 +89,46 @@
     }
 
     function takeSnapshot() {
-        if (currentTab === 'innodb' && innoDBStatus) {
-            snapshots.push({...innoDBStatus, timestamp: new Date()});
-            showMessage(`Snapshot ${snapshots.length} taken`);
-        } else if (currentTab === 'aria' && ariaStatus) {
-            snapshots.push({...ariaStatus, timestamp: new Date()});
-            showMessage(`Snapshot ${snapshots.length} taken`);
+        // Snapshot based on available data, not current tab
+        // This allows taking snapshots from the Comparison tab after viewing InnoDB/Aria
+        if (innoDBStatus) {
+            snapshots.push({
+                ...innoDBStatus,
+                timestamp: new Date(),
+                engine: 'innodb'
+            });
+            showMessage(`InnoDB snapshot ${snapshots.length} taken`, 'info');
+            updateCompareButtonState();
+        } else if (ariaStatus) {
+            snapshots.push({
+                ...ariaStatus,
+                timestamp: new Date(),
+                engine: 'aria'
+            });
+            showMessage(`Aria snapshot ${snapshots.length} taken`, 'info');
+            updateCompareButtonState();
+        } else {
+            showMessage('No status data available. Please visit the InnoDB or Aria tab first to load data, then return here to take a snapshot.', 'warning');
+        }
+    }
+
+    function updateCompareButtonState() {
+        const compareBtn = document.getElementById('compareBtn');
+        const snapshotCount = document.getElementById('snapshotCount');
+
+        if (snapshots.length >= 2) {
+            compareBtn.textContent = `📊 Compare (${snapshots.length})`;
+            compareBtn.disabled = false;
+            compareBtn.style.opacity = '1';
+        } else {
+            compareBtn.textContent = `📊 Compare (${snapshots.length}/2)`;
+            compareBtn.disabled = false; // Keep enabled to show warning message
+            compareBtn.style.opacity = '0.6';
+        }
+
+        // Update snapshot count in Comparison tab
+        if (snapshotCount) {
+            snapshotCount.innerHTML = `Snapshots taken: <strong>${snapshots.length}</strong>`;
         }
     }
 
@@ -465,7 +502,7 @@
             <div class="ai-modal-content">
                 <div class="ai-modal-header">
                     <h2>🤖 AI Analysis - ${escapeHtml(engine.toUpperCase())}</h2>
-                    <button class="ai-modal-close" onclick="this.closest('.ai-modal').remove()">✕</button>
+                    <button class="ai-modal-close">✕</button>
                 </div>
                 <div class="ai-modal-body">
                     <div class="ai-section">
@@ -474,9 +511,17 @@
                     </div>
                     ${analysis.issues && analysis.issues.length > 0 ? `
                         <div class="ai-section ai-concerns">
-                            <h3>⚠️ Issues</h3>
+                            <h3>⚠️ Critical Issues</h3>
                             <ul>
-                                ${analysis.issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}
+                                ${analysis.issues.map(issue => {
+                                    // Handle both object format {severity, description} and string format
+                                    if (typeof issue === 'string') {
+                                        return `<li>${escapeHtml(issue)}</li>`;
+                                    }
+                                    const severity = issue.severity || 'warning';
+                                    const desc = issue.description || issue;
+                                    return `<li><strong>[${escapeHtml(severity)}]</strong> ${escapeHtml(desc)}</li>`;
+                                }).join('')}
                             </ul>
                         </div>
                     ` : ''}
@@ -492,7 +537,17 @@
                         <div class="ai-section">
                             <h3>⚙️ Configuration Changes</h3>
                             <ul>
-                                ${analysis.configChanges.map(config => `<li>${escapeHtml(config)}</li>`).join('')}
+                                ${analysis.configChanges.map(config => {
+                                    // Handle both object format {parameter, current, recommended, reason} and string format
+                                    if (typeof config === 'string') {
+                                        return `<li>${escapeHtml(config)}</li>`;
+                                    }
+                                    return `<li>
+                                        <strong>${escapeHtml(config.parameter)}:</strong>
+                                        ${escapeHtml(config.current)} → ${escapeHtml(config.recommended)}
+                                        <br><em style="opacity: 0.8; font-size: 0.95em;">${escapeHtml(config.reason)}</em>
+                                    </li>`;
+                                }).join('')}
                             </ul>
                         </div>
                     ` : ''}
@@ -500,7 +555,15 @@
             </div>
         `;
         document.body.appendChild(modal);
-        
+
+        // Add event listener for close button
+        const closeBtn = modal.querySelector('.ai-modal-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.remove();
+            });
+        }
+
         // Close on overlay click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
