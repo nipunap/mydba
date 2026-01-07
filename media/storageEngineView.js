@@ -128,7 +128,7 @@
 
         // Update snapshot count in Comparison tab
         if (snapshotCount) {
-            snapshotCount.innerHTML = `Snapshots taken: <strong>${snapshots.length}</strong>`;
+            snapshotCount.innerHTML = `Snapshots taken: <strong>${escapeHtml(String(snapshots.length))}</strong>`;
         }
     }
 
@@ -195,9 +195,9 @@
                 <div class="health-score">
                     <div class="health-score-label">Health Score</div>
                     <div class="health-score-value ${getHealthClass(status.healthScore)}">
-                        ${status.healthScore}
+                        ${escapeHtml(String(status.healthScore))}
                     </div>
-                    <div class="health-score-label">${getHealthText(status.healthScore)}</div>
+                    <div class="health-score-label">${escapeHtml(getHealthText(status.healthScore))}</div>
                 </div>
             </div>
 
@@ -205,15 +205,15 @@
                 <h3>📝 Transactions</h3>
                 <div class="metric">
                     <span class="metric-label">History List Length</span>
-                    <span class="metric-value">${formatNumber(status.transactions.historyListLength)}</span>
+                    <span class="metric-value">${escapeHtml(formatNumber(status.transactions.historyListLength))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Active Transactions</span>
-                    <span class="metric-value">${status.transactions.activeTransactions}</span>
+                    <span class="metric-value">${escapeHtml(String(status.transactions.activeTransactions))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Purge Lag</span>
-                    <span class="metric-value">${formatNumber(status.transactions.purgeLag)}</span>
+                    <span class="metric-value">${escapeHtml(formatNumber(status.transactions.purgeLag))}</span>
                 </div>
             </div>
 
@@ -221,17 +221,17 @@
                 <h3>💾 Buffer Pool</h3>
                 <div class="metric">
                     <span class="metric-label">Total Size</span>
-                    <span class="metric-value">${formatNumber(status.bufferPool.totalSize)} pages</span>
+                    <span class="metric-value">${escapeHtml(formatNumber(status.bufferPool.totalSize))} pages</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Hit Rate</span>
                     <span class="metric-value ${getHitRateClass(status.bufferPool.hitRate)}">
-                        ${status.bufferPool.hitRate.toFixed(2)}%
+                        ${escapeHtml(status.bufferPool.hitRate.toFixed(2))}%
                     </span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Dirty Pages</span>
-                    <span class="metric-value">${formatNumber(status.bufferPool.dirtyPages)}</span>
+                    <span class="metric-value">${escapeHtml(formatNumber(status.bufferPool.dirtyPages))}</span>
                 </div>
             </div>
 
@@ -239,12 +239,12 @@
                 <h3>📊 Checkpoint & Log</h3>
                 <div class="metric">
                     <span class="metric-label">LSN</span>
-                    <span class="metric-value">${formatNumber(status.log.logSequenceNumber)}</span>
+                    <span class="metric-value">${escapeHtml(formatNumber(status.log.logSequenceNumber))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Checkpoint Age</span>
                     <span class="metric-value ${getCheckpointClass(status.log.checkpointAgePercent)}">
-                        ${status.log.checkpointAgePercent.toFixed(1)}%
+                        ${escapeHtml(status.log.checkpointAgePercent.toFixed(1))}%
                     </span>
                 </div>
             </div>
@@ -253,15 +253,15 @@
                 <h3>⚡ I/O Operations</h3>
                 <div class="metric">
                     <span class="metric-label">Pending Reads</span>
-                    <span class="metric-value">${status.io.pendingReads}</span>
+                    <span class="metric-value">${escapeHtml(String(status.io.pendingReads))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Pending Writes</span>
-                    <span class="metric-value">${status.io.pendingWrites}</span>
+                    <span class="metric-value">${escapeHtml(String(status.io.pendingWrites))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Pending Fsyncs</span>
-                    <span class="metric-value">${status.io.pendingFsyncs}</span>
+                    <span class="metric-value">${escapeHtml(String(status.io.pendingFsyncs))}</span>
                 </div>
             </div>
 
@@ -269,15 +269,15 @@
                 <h3>🔄 Row Operations</h3>
                 <div class="metric">
                     <span class="metric-label">Inserts/s</span>
-                    <span class="metric-value">${status.rowOps.insertsPerSecond.toFixed(2)}</span>
+                    <span class="metric-value">${escapeHtml(status.rowOps.insertsPerSecond.toFixed(2))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Updates/s</span>
-                    <span class="metric-value">${status.rowOps.updatesPerSecond.toFixed(2)}</span>
+                    <span class="metric-value">${escapeHtml(status.rowOps.updatesPerSecond.toFixed(2))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Reads/s</span>
-                    <span class="metric-value">${status.rowOps.readsPerSecond.toFixed(2)}</span>
+                    <span class="metric-value">${escapeHtml(status.rowOps.readsPerSecond.toFixed(2))}</span>
                 </div>
             </div>
         `;
@@ -305,7 +305,7 @@
                 <div class="health-score">
                     <div class="health-score-label">Health Score</div>
                     <div class="health-score-value ${getHealthClass(status.healthScore)}">
-                        ${status.healthScore}
+                        ${escapeHtml(String(status.healthScore))}
                     </div>
                 </div>
             </div>
@@ -314,11 +314,11 @@
                 <h3>💾 Page Cache</h3>
                 <div class="metric">
                     <span class="metric-label">Size</span>
-                    <span class="metric-value">${formatNumber(status.pageCache.size)} blocks</span>
+                    <span class="metric-value">${escapeHtml(formatNumber(status.pageCache.size))} blocks</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Hit Rate</span>
-                    <span class="metric-value">${status.pageCache.hitRate.toFixed(2)}%</span>
+                    <span class="metric-value">${escapeHtml(status.pageCache.hitRate.toFixed(2))}%</span>
                 </div>
             </div>
 
@@ -326,11 +326,11 @@
                 <h3>📝 Recovery Log</h3>
                 <div class="metric">
                     <span class="metric-label">Size</span>
-                    <span class="metric-value">${formatBytes(status.recoveryLog.size)}</span>
+                    <span class="metric-value">${escapeHtml(formatBytes(status.recoveryLog.size))}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Used</span>
-                    <span class="metric-value">${formatBytes(status.recoveryLog.used)}</span>
+                    <span class="metric-value">${escapeHtml(formatBytes(status.recoveryLog.used))}</span>
                 </div>
             </div>
         `;
@@ -394,17 +394,17 @@
                         <h3>${escapeHtml(delta.metric)}</h3>
                         <div class="metric">
                             <span class="metric-label">Before</span>
-                            <span class="metric-value">${formatNumber(delta.before)}</span>
+                            <span class="metric-value">${escapeHtml(formatNumber(delta.before))}</span>
                         </div>
                         <div class="metric">
                             <span class="metric-label">After</span>
-                            <span class="metric-value">${formatNumber(delta.after)}</span>
+                            <span class="metric-value">${escapeHtml(formatNumber(delta.after))}</span>
                         </div>
                         <div class="metric">
                             <span class="metric-label">Change</span>
                             <span class="metric-value ${delta.change > 0 ? 'health-warning' : 'health-healthy'}">
-                                ${delta.change > 0 ? '+' : ''}${formatNumber(delta.change)}
-                                (${delta.changePercent.toFixed(1)}%)
+                                ${delta.change > 0 ? '+' : ''}${escapeHtml(formatNumber(delta.change))}
+                                (${escapeHtml(delta.changePercent.toFixed(1))}%)
                             </span>
                         </div>
                     </div>
