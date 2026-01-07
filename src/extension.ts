@@ -25,6 +25,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         serviceContainer = new ServiceContainer(context, logger);
         await serviceContainer.initialize();
 
+        // Initialize AI Service Coordinator
+        const aiServiceCoordinator = serviceContainer.get(SERVICE_TOKENS.AIServiceCoordinator);
+        await aiServiceCoordinator.initialize();
+
         // Get performance monitor from service container
         const perfMon = serviceContainer.get(SERVICE_TOKENS.PerformanceMonitor);
         const activationSpan = perfMon.startSpan('extension.activate');

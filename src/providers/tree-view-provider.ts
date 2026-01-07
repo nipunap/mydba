@@ -129,6 +129,30 @@ export class TreeViewProvider implements vscode.TreeDataProvider<TreeItem> {
             });
 
             items.push({
+                id: `storage-engine-${connection.id}`,
+                label: 'Storage Engine Monitor',
+                iconPath: new vscode.ThemeIcon('server-process'),
+                contextValue: 'storage-engine',
+                command: {
+                    command: 'mydba.showStorageEngineMonitor',
+                    title: 'Show Storage Engine Monitor',
+                    arguments: [connection.id]
+                }
+            });
+
+            items.push({
+                id: `replication-${connection.id}`,
+                label: 'Replication Monitor',
+                iconPath: new vscode.ThemeIcon('sync'),
+                contextValue: 'replication',
+                command: {
+                    command: 'mydba.showReplicationMonitor',
+                    title: 'Show Replication Monitor',
+                    arguments: [connection.id]
+                }
+            });
+
+            items.push({
                 id: `processlist-${connection.id}`,
                 label: 'Process List',
                 iconPath: new vscode.ThemeIcon('pulse'),

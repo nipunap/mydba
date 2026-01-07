@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # MySQL 8.0 for testing
+  # MySQL 8.0 Primary (for testing replication)
   mysql-8.0:
     image: mysql:8.0
     container_name: mydba-mysql-8.0
@@ -15,6 +15,7 @@ services:
     volumes:
       - ./test/sql/init-mysql.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./test/sql/sample-data.sql:/docker-entrypoint-initdb.d/02-sample-data.sql
+      - ./test/sql/replication-primary.sql:/docker-entrypoint-initdb.d/03-replication-setup.sql
     command: >
       --default-authentication-plugin=mysql_native_password
       --performance-schema=ON
@@ -29,6 +30,11 @@ services:
       --slow-query-log-file=/var/log/mysql/slow-query.log
       --long-query-time=1
       --log-queries-not-using-indexes=ON
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest_password"]
       interval: 10s
@@ -36,7 +42,41 @@ services:
       retries: 5
       start_period: 30s
 
-  # MariaDB 10.11 LTS for testing
+  # MySQL 8.0 Replica (for testing REPLICA/SLAVE commands)
+  mysql-8.0-replica:
+    image: mysql:8.0
+    container_name: mydba-mysql-8.0-replica
+    depends_on:
+      mysql-8.0:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: test_password
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_password
+    ports:
+      - "3308:3306"
+    volumes:
+      - ./test/sql/replication-replica-mysql.sql:/docker-entrypoint-initdb.d/01-replication-setup.sql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --server-id=2
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
+      --relay-log=relay-bin
+      --log-replica-updates=ON
+      --read-only=1
+      --skip-slave-start
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # MariaDB 10.11 LTS Primary (for testing replication)
   mariadb-10.11:
     image: mariadb:10.11
     container_name: mydba-mariadb-10.11
@@ -50,6 +90,7 @@ services:
     volumes:
       - ./test/sql/init-mariadb.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./test/sql/sample-data.sql:/docker-entrypoint-initdb.d/02-sample-data.sql
+      - ./test/sql/replication-primary.sql:/docker-entrypoint-initdb.d/03-replication-setup.sql
     command: >
       --performance-schema=ON
       --performance-schema-instrument='%=ON'
@@ -63,6 +104,40 @@ services:
       --slow-query-log-file=/var/log/mysql/slow-query.log
       --long-query-time=1
       --log-queries-not-using-indexes=ON
+      --server-id=3
+      --log-bin=mariadb-bin
+      --binlog-format=ROW
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # MariaDB 10.11 Replica (for testing SLAVE commands)
+  mariadb-10.11-replica:
+    image: mariadb:10.11
+    container_name: mydba-mariadb-10.11-replica
+    depends_on:
+      mariadb-10.11:
+        condition: service_healthy
+    environment:
+      MARIADB_ROOT_PASSWORD: test_password
+      MARIADB_DATABASE: test_db
+      MARIADB_USER: test_user
+      MARIADB_PASSWORD: test_password
+    ports:
+      - "3309:3306"
+    volumes:
+      - ./test/sql/replication-replica-mariadb.sql:/docker-entrypoint-initdb.d/01-replication-setup.sql
+    command: >
+      --server-id=4
+      --log-bin=mariadb-bin
+      --binlog-format=ROW
+      --relay-log=relay-bin
+      --log-slave-updates=ON
+      --read-only=1
+      --skip-slave-start
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s

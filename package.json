@@ -117,6 +117,16 @@
         "command": "mydba.copyToEditor",
         "title": "Copy SQL to Editor",
         "category": "MyDBA"
+      },
+      {
+        "command": "mydba.showStorageEngineMonitor",
+        "title": "Show Storage Engine Monitor",
+        "category": "MyDBA"
+      },
+      {
+        "command": "mydba.showReplicationMonitor",
+        "title": "Show Replication Monitor",
+        "category": "MyDBA"
       }
     ],
     "views": {

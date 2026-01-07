@@ -5,6 +5,8 @@ import { Logger } from '../utils/logger';
 import { SchemaContext, AIAnalysisResult, OptimizationSuggestion, Citation, AntiPattern } from '../types/ai-types';
 import { EventBus, EVENTS, AIRequest as AIRequestEvent, AIResponse as AIResponseEvent } from './event-bus';
 import { AuditLogger } from './audit-logger';
+import { InnoDBStatus, AriaStatus } from '../types/storage-engine-types';
+import { ReplicationStatus } from '../types/replication-types';
 import * as crypto from 'crypto';
 
 /**
@@ -676,6 +678,504 @@ Use the reference documentation above to inform your response when relevant.`;
             throw error;
         }
     }
+
+    /**
+     * Analyze InnoDB status and provide diagnostic insights
+     */
+    async analyzeInnoDBStatus(
+        status: InnoDBStatus,
+        dbType: 'mysql' | 'mariadb' = 'mysql'
+    ): Promise<AIAnalysis> {
+        const startTime = Date.now();
+        this.logger.info('Analyzing InnoDB status with AI');
+
+        try {
+            // Build context for AI analysis
+            const context = this.buildInnoDBContext(status);
+
+            // Create prompt for AI analysis
+            const prompt = `You are a database expert analyzing InnoDB storage engine status. Provide actionable diagnostic insights and recommendations.
+
+**Current Status:**
+${context}
+
+**Analysis Requirements:**
+1. Identify the top 3 most critical issues or risks
+2. Explain the root cause of each issue in simple terms
+3. Provide specific, actionable recommendations with configuration changes
+4. Prioritize recommendations by impact (high/medium/low)
+5. Reference MySQL/MariaDB documentation when relevant
+
+Provide your analysis in the following format:
+## Critical Issues
+[List issues with severity and impact]
+
+## Root Causes
+[Explain why these issues are occurring]
+
+## Recommendations
+[Specific actions to take, ordered by priority]
+
+## Configuration Changes
+[Exact parameter changes with before/after values]
+`;
+
+            // Get AI analysis with RAG
+            const response = await this.getSimpleCompletion(
+                prompt,
+                dbType,
+                true,
+                ['innodb', 'buffer pool', 'transaction', 'checkpoint', dbType].join(' ')
+            );
+
+            // Track performance
+            const duration = Date.now() - startTime;
+            if (duration > 2000) {
+                this.logger.warn(`InnoDB AI analysis took ${duration}ms (exceeded 2s budget)`);
+            }
+
+            const analysis = {
+                summary: this.extractSummary(response),
+                issues: this.extractIssues(response),
+                recommendations: this.extractRecommendations(response),
+                configChanges: this.extractConfigChanges(response),
+                rawResponse: response
+            };
+
+            // Debug log the extracted analysis
+            this.logger.debug(`AI Analysis extracted - Summary: ${analysis.summary.length} chars, Issues: ${analysis.issues.length}, Recommendations: ${analysis.recommendations.length}, Config: ${analysis.configChanges.length}`);
+
+            // Log first 500 chars of raw response for debugging
+            this.logger.debug(`AI Raw Response (first 500 chars): ${response.substring(0, 500)}`);
+
+            return analysis;
+        } catch (error) {
+            this.logger.error('Failed to analyze InnoDB status:', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Analyze Aria storage engine status (MariaDB)
+     */
+    async analyzeAriaStatus(
+        status: AriaStatus
+    ): Promise<AIAnalysis> {
+        const startTime = Date.now();
+        this.logger.info('Analyzing Aria status with AI');
+
+        try {
+            const context = this.buildAriaContext(status);
+
+            const prompt = `You are a database expert analyzing MariaDB Aria storage engine status. Provide diagnostic insights and optimization recommendations.
+
+**Current Status:**
+${context}
+
+**Analysis Requirements:**
+1. Identify performance bottlenecks or configuration issues
+2. Compare Aria performance characteristics vs InnoDB
+3. Provide specific tuning recommendations
+4. Suggest if migration to InnoDB would be beneficial
+
+Provide actionable recommendations in structured format.
+`;
+
+            const response = await this.getSimpleCompletion(
+                prompt,
+                'mariadb',
+                true,
+                ['aria', 'mariadb', 'storage engine', 'page cache'].join(' ')
+            );
+
+            const duration = Date.now() - startTime;
+            if (duration > 2000) {
+                this.logger.warn(`Aria AI analysis took ${duration}ms`);
+            }
+
+            return {
+                summary: this.extractSummary(response),
+                issues: this.extractIssues(response),
+                recommendations: this.extractRecommendations(response),
+                configChanges: this.extractConfigChanges(response),
+                rawResponse: response
+            };
+        } catch (error) {
+            this.logger.error('Failed to analyze Aria status:', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Build context string for InnoDB analysis
+     */
+    private buildInnoDBContext(status: InnoDBStatus): string {
+        return `
+**Transaction Status:**
+- History List Length: ${status.transactions.historyListLength.toLocaleString()}
+- Active Transactions: ${status.transactions.activeTransactions}
+- Purge Lag: ${status.transactions.purgeLag.toLocaleString()} undo records
+
+**Buffer Pool:**
+- Total Size: ${status.bufferPool.totalSize.toLocaleString()} pages
+- Free Pages: ${status.bufferPool.freePages.toLocaleString()}
+- Dirty Pages: ${status.bufferPool.dirtyPages.toLocaleString()}
+- Hit Rate: ${status.bufferPool.hitRate.toFixed(2)}%
+
+**Checkpoint & Redo Log:**
+- Log Sequence Number: ${status.log.logSequenceNumber}
+- Last Checkpoint: ${status.log.lastCheckpointLSN}
+- Checkpoint Age: ${status.log.checkpointAge.toLocaleString()} (${status.log.checkpointAgePercent.toFixed(1)}% of max)
+
+**I/O Operations:**
+- Pending Reads: ${status.io.pendingReads}
+- Pending Writes: ${status.io.pendingWrites}
+- Pending Fsyncs: ${status.io.pendingFsyncs}
+
+**Row Operations (per second):**
+- Inserts: ${status.rowOps.insertsPerSecond.toFixed(2)}
+- Updates: ${status.rowOps.updatesPerSecond.toFixed(2)}
+- Deletes: ${status.rowOps.deletesPerSecond.toFixed(2)}
+- Reads: ${status.rowOps.readsPerSecond.toFixed(2)}
+
+**Semaphores:**
+- Mutex OS Waits: ${status.semaphores.mutexOSWaits.toLocaleString()}
+- RW-Lock OS Waits: ${status.semaphores.rwLockOSWaits.toLocaleString()}
+- Long Waits: ${status.semaphores.longSemaphoreWaits.length}
+
+**Overall Health Score:** ${status.healthScore}/100
+
+**Version:** ${status.version}
+`;
+    }
+
+    /**
+     * Build context string for Aria analysis
+     */
+    private buildAriaContext(status: AriaStatus): string {
+        return `
+**Page Cache:**
+- Size: ${status.pageCache.size.toLocaleString()} blocks
+- Used: ${status.pageCache.used.toLocaleString()} blocks
+- Hit Rate: ${status.pageCache.hitRate.toFixed(2)}%
+
+**Recovery Log:**
+- Size: ${status.recoveryLog.size.toLocaleString()} bytes
+- Used: ${status.recoveryLog.used.toLocaleString()} bytes
+- Checkpoint Interval: ${status.recoveryLog.checkpointInterval}s
+
+**Buffers:**
+- Read Buffer Size: ${status.readBufferSize.toLocaleString()} bytes
+- Write Buffer Size: ${status.writeBufferSize.toLocaleString()} bytes
+
+**Recovery Status:** ${status.crashRecoveryStatus}
+
+**Overall Health Score:** ${status.healthScore}/100
+
+**Version:** ${status.version}
+`;
+    }
+
+    /**
+     * Extract summary from AI response
+     */
+    private extractSummary(response: string): string {
+        // Look for summary section or use first paragraph
+        const summaryMatch = response.match(/##\s*Summary\s*\n([\s\S]*?)(?=\n##|$)/i);
+        if (summaryMatch) {
+            const summary = summaryMatch[1].trim();
+            // Make sure we didn't accidentally grab a section header
+            if (summary.length > 20 && !summary.startsWith('##')) {
+                return summary;
+            }
+        }
+
+        // Try to find any paragraph before the first ## section
+        const beforeSections = response.split(/\n##/)[0];
+        const lines = beforeSections.split('\n')
+            .filter(line => line.trim().length > 0 && !line.startsWith('#'))
+            .filter(line => !line.match(/^\*\*.*?\*\*:/)); // Skip bold headers
+
+        if (lines.length > 0) {
+            return lines.join(' ').trim();
+        }
+
+        // Last resort: create a generic summary
+        return 'InnoDB storage engine analysis completed. Review the issues and recommendations below.';
+    }
+
+    /**
+     * Extract issues from AI response
+     */
+    private extractIssues(response: string): Array<{ severity: string; description: string }> {
+        const issues: Array<{ severity: string; description: string }> = [];
+
+        // Try multiple patterns for the issues section
+        let issuesSection = response.match(/##\s*Critical Issues\s*\n([\s\S]*?)(?=\n##|$)/i);
+        if (!issuesSection) {
+            issuesSection = response.match(/##\s*Issues\s*\n([\s\S]*?)(?=\n##|$)/i);
+        }
+
+        if (issuesSection) {
+            const lines = issuesSection[1].split('\n');
+            for (const line of lines) {
+                // Skip empty lines and section markers
+                if (!line.trim() || line.trim().startsWith('#')) {
+                    continue;
+                }
+
+                // Try different formats:
+                // 1. **Severity**: Description
+                const match1 = line.match(/[-*]\s*\*\*(.*?)\*\*:\s*(.*)/);
+                if (match1 && match1[2].trim().length > 2) { // Ensure description has content
+                    issues.push({
+                        severity: match1[1].toLowerCase(),
+                        description: match1[2].trim()
+                    });
+                    continue;
+                }
+
+                // 2. Just bullet points with content
+                if (line.trim().startsWith('-') || line.trim().startsWith('*')) {
+                    let desc = line.replace(/^[-*]\s*/, '').trim();
+                    // Skip lines that are just punctuation or very short
+                    if (desc.length > 5 && !desc.match(/^[-–—]+$/)) {
+                        // Remove markdown bold
+                        desc = desc.replace(/\*\*/g, '');
+                        issues.push({
+                            severity: 'warning',
+                            description: desc
+                        });
+                    }
+                }
+            }
+        }
+
+        // If no issues found, provide a default positive message
+        if (issues.length === 0) {
+            issues.push({
+                severity: 'info',
+                description: 'No critical issues detected. System appears to be running within normal parameters.'
+            });
+        }
+
+        return issues;
+    }
+
+    /**
+     * Extract recommendations from AI response
+     */
+    private extractRecommendations(response: string): string[] {
+        const recommendations: string[] = [];
+        const recsSection = response.match(/##\s*Recommendations\s*\n([\s\S]*?)(?=\n##|$)/i);
+
+        if (recsSection) {
+            const lines = recsSection[1].split('\n');
+            for (const line of lines) {
+                // Skip empty lines and section markers
+                if (!line.trim() || line.trim().startsWith('#')) {
+                    continue;
+                }
+
+                // Match bullets (-, *, or numbered lists), with more flexible pattern
+                const match = line.match(/^[\s]*[-*•]\s*\.?\s*(.*?)$/);
+                if (match && match[1].trim().length > 0) {
+                    // Remove any markdown bold markers and leading punctuation
+                    const cleaned = match[1].replace(/\*\*/g, '').trim().replace(/^[.\-:]+\s*/, '');
+                    if (cleaned.length > 5) { // Only add substantial recommendations
+                        recommendations.push(cleaned);
+                    }
+                    continue;
+                }
+
+                // Also try numbered lists
+                const numberedMatch = line.match(/^\s*\d+\.\s+(.*?)$/);
+                if (numberedMatch && numberedMatch[1].trim().length > 5) {
+                    const cleaned = numberedMatch[1].replace(/\*\*/g, '').trim();
+                    recommendations.push(cleaned);
+                }
+            }
+        }
+
+        return recommendations;
+    }
+
+    /**
+     * Extract configuration changes from AI response
+     */
+    private extractConfigChanges(response: string): Array<{ parameter: string; current: string; recommended: string; reason: string }> {
+        const changes: Array<{ parameter: string; current: string; recommended: string; reason: string }> = [];
+        const configSection = response.match(/##\s*Configuration Changes\s*\n([\s\S]*?)(?=\n##|$)/i);
+
+        if (configSection) {
+            const lines = configSection[1].split('\n');
+
+            for (const line of lines) {
+                // Skip empty lines and section markers
+                if (!line.trim() || line.trim().startsWith('#')) {
+                    continue;
+                }
+
+                // Try multiple patterns:
+                // 1. parameter: current → recommended (reason)
+                let match = line.match(/[-*]\s*`?(\w+)`?\s*[:=]\s*(\S+)\s*[→>]+\s*(\S+)\s*\((.*?)\)/);
+                if (match) {
+                    changes.push({
+                        parameter: match[1],
+                        current: match[2],
+                        recommended: match[3],
+                        reason: match[4].trim()
+                    });
+                    continue;
+                }
+
+                // 2. **parameter** (without specific values, extract from text)
+                match = line.match(/[-*]\s*\*\*([^*]+)\*\*/);
+                if (match) {
+                    const fullText = line.replace(/^[-*]\s*/, '').trim();
+                    changes.push({
+                        parameter: match[1].trim(),
+                        current: 'current',
+                        recommended: 'optimized',
+                        reason: fullText.replace(/\*\*/g, '')
+                    });
+                }
+            }
+        }
+
+        return changes;
+    }
+
+    /**
+     * Analyze replication status and provide diagnostic insights
+     */
+    async analyzeReplicationStatus(
+        status: ReplicationStatus,
+        dbType: 'mysql' | 'mariadb' = 'mysql'
+    ): Promise<AIAnalysis> {
+        const startTime = Date.now();
+        this.logger.info('Analyzing replication status with AI');
+
+        try {
+            const context = this.buildReplicationContext(status);
+
+            const prompt = `You are a database replication expert. Analyze the following MySQL/MariaDB replication status and provide diagnostic insights.
+
+**Current Status:**
+${context}
+
+**Analysis Requirements:**
+1. Identify replication health issues or risks
+2. Explain root causes of lag spikes or thread failures
+3. Provide specific, actionable recommendations
+4. Suggest configuration optimizations for replication performance
+5. Reference MySQL/MariaDB documentation when relevant
+
+Provide your analysis in structured format with:
+## Issues
+[List current issues with severity]
+
+## Root Causes
+[Explain why lag or failures are occurring]
+
+## Recommendations
+[Specific actions to take, ordered by priority]
+
+## Configuration Changes
+[Exact parameter changes to improve replication]
+`;
+
+            const response = await this.getSimpleCompletion(
+                prompt,
+                dbType,
+                true,
+                ['replication', 'lag', 'gtid', 'binlog', dbType].join(' ')
+            );
+
+            const duration = Date.now() - startTime;
+            if (duration > 2000) {
+                this.logger.warn(`Replication AI analysis took ${duration}ms`);
+            }
+
+            return {
+                summary: this.extractSummary(response),
+                issues: this.extractIssues(response),
+                recommendations: this.extractRecommendations(response),
+                configChanges: this.extractConfigChanges(response),
+                rawResponse: response
+            };
+        } catch (error) {
+            this.logger.error('Failed to analyze replication status:', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Build context string for replication analysis
+     */
+    private buildReplicationContext(status: ReplicationStatus): string {
+        return `
+**Replication Type:** ${status.replicaType.toUpperCase()} ${status.replicaType === 'gtid' ? '(GTID Mode)' : '(Position-based)'}
+
+**Connection:**
+- Master: ${status.masterHost}:${status.masterPort}
+- User: ${status.masterUser}
+
+**Thread Status:**
+- I/O Thread: ${status.ioThread.running ? '✅ Running' : '❌ Stopped'} - ${status.ioThread.state}
+- SQL Thread: ${status.sqlThread.running ? '✅ Running' : '❌ Stopped'} - ${status.sqlThread.state}
+
+**Replication Lag:**
+- Seconds Behind Master: ${status.lagSeconds !== null ? `${status.lagSeconds}s` : 'NULL (threads stopped)'}
+
+${status.binlogPosition ? `
+**Binary Log Position:**
+- Master Log File: ${status.binlogPosition.masterLogFile}
+- Master Log Pos: ${status.binlogPosition.masterLogPos}
+- Relay Log File: ${status.binlogPosition.relayLogFile}
+- Relay Log Pos: ${status.binlogPosition.relayLogPos}
+` : ''}
+
+${status.gtidInfo ? `
+**GTID Status:**
+- Retrieved GTID Set: ${status.gtidInfo.retrievedGtidSet || 'N/A'}
+- Executed GTID Set: ${status.gtidInfo.executedGtidSet || 'N/A'}
+- Auto Position: ${status.gtidInfo.autoPosition ? 'Enabled' : 'Disabled'}
+` : ''}
+
+${status.lastIOError ? `
+**Last I/O Error:**
+- Error ${status.lastIOError.errorNumber}: ${status.lastIOError.errorMessage}
+- Timestamp: ${status.lastIOError.timestamp}
+` : ''}
+
+${status.lastSQLError ? `
+**Last SQL Error:**
+- Error ${status.lastSQLError.errorNumber}: ${status.lastSQLError.errorMessage}
+- Timestamp: ${status.lastSQLError.timestamp}
+` : ''}
+
+**Overall Health:** ${status.healthStatus.toUpperCase()}
+
+**Version:** ${status.version}
+`;
+    }
+}
+
+/**
+ * AI Analysis result for storage engine diagnostics
+ */
+export interface AIAnalysis {
+    summary: string;
+    issues: Array<{ severity: string; description: string }>;
+    recommendations: string[];
+    configChanges: Array<{
+        parameter: string;
+        current: string;
+        recommended: string;
+        reason: string;
+    }>;
+    rawResponse: string;
 }
 
 // Type definitions
